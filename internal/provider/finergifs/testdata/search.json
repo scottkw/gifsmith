@@ -1,0 +1,6 @@
+{"hits": {"found": 57, "start": 0},
+ "results": [
+  {"id": "1", "fields": {"name": "02x05-dwight-bears", "text": "Bears. Beets. Battlestar Galactica.", "fileid": "02x05-dwight-bears"}},
+  {"id": "2", "fields": {"name": "03x01-michael-no", "text": "", "fileid": "03x01-michael-no"}},
+  {"id": "3", "fields": {"name": "02x05-dwight-bears", "text": "Bears. Beets. Battlestar Galactica.", "fileid": "02x05-dwight-bears"}}
+ ]}
