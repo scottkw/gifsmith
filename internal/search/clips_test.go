@@ -157,9 +157,14 @@ func TestClipsRecheck(t *testing.T) {
 		t.Errorf("recheck still failing: %s, %v, probes %d; want unknown, the probe error, 2", s, err, p.calls.Load())
 	}
 	p.setErr(nil)
+	s, err = c.Recheck(context.Background()) // the one re-probe per key is spent: replay its error
+	if s != ClipsUnknown || !errors.Is(err, rl) || p.calls.Load() != 2 {
+		t.Errorf("second recheck: %s, %v, probes %d; want unknown, the last probe error, no probe", s, err, p.calls.Load())
+	}
+	c.Reset() // a new key gets its own re-probe
 	s, err = c.Recheck(context.Background())
 	if s != ClipsEnabled || err != nil || p.calls.Load() != 3 {
-		t.Errorf("recheck ok: %s, %v, probes %d; want enabled, nil, 3", s, err, p.calls.Load())
+		t.Errorf("recheck after Reset: %s, %v, probes %d; want enabled, nil, 3", s, err, p.calls.Load())
 	}
 	s, err = c.Recheck(context.Background())
 	if s != ClipsEnabled || err != nil || p.calls.Load() != 3 {
@@ -224,5 +229,31 @@ func TestBlocked(t *testing.T) {
 	c.advance(121 * time.Second)
 	if s.Blocked(provider.GIPHY) {
 		t.Error("still blocked after Retry-After")
+	}
+}
+
+// A 429 on the probe blocks the shared GIPHY budget, so the next Recheck answers
+// rate_limited without probing (CR-01).
+func TestClipsProbe429BlocksRecheck(t *testing.T) {
+	svc, _, _ := setup(provider.GIPHY)
+	var probes atomic.Int32
+	c := &Clips{
+		Probe: func(context.Context) error {
+			probes.Add(1)
+			return svc.Guard(provider.Clips, func() error {
+				return &provider.Error{Kind: provider.RateLimited, Provider: provider.Clips}
+			})
+		},
+		HasKey:  func() bool { return true },
+		Blocked: func() bool { return svc.Blocked(provider.GIPHY) },
+	}
+	c.Trigger()
+	if s := settle(t, c); s != ClipsUnknown {
+		t.Fatalf("state = %s, want unknown", s)
+	}
+	s, err := c.Recheck(context.Background())
+	var pe *provider.Error
+	if s != ClipsUnknown || !errors.As(err, &pe) || pe.Kind != provider.RateLimited || probes.Load() != 1 {
+		t.Errorf("recheck after a probe 429: %s, %v, probes %d; want unknown, rate_limited, 1", s, err, probes.Load())
 	}
 }

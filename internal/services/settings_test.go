@@ -70,7 +70,7 @@ func newSettings(t *testing.T, base string) settingsFixture {
 	clips := &search.Clips{
 		Probe: func(ctx context.Context) error {
 			probes.Add(1)
-			return clipsClient.ProbeClips(ctx)
+			return svc.Guard(provider.Clips, func() error { return clipsClient.ProbeClips(ctx) }) // as main.go
 		},
 		HasKey:  func() bool { _, ok := keys.Get(provider.GIPHY); return ok },
 		Blocked: func() bool { return svc.Blocked(provider.GIPHY) },
@@ -552,10 +552,18 @@ func TestCheckClipsUnknown(t *testing.T) {
 	if s != "unknown" || f.probes.Load() != 1 {
 		t.Errorf("CheckClips = %q, probes %d; want unknown, 1", s, f.probes.Load())
 	}
+	// The probe's 429 blocks the shared GIPHY budget: no second probe into it.
+	s, err = f.gifs.CheckClips(ctx)
+	wantProviderErr(t, err, provider.RateLimited, provider.Clips, 0)
+	if s != "unknown" || f.probes.Load() != 1 || !f.svc.Svc.Blocked(provider.GIPHY) {
+		t.Errorf("CheckClips while blocked = %q, probes %d; want unknown, 1, GIPHY blocked", s, f.probes.Load())
+	}
 	if err := f.store.Set("giphy", "uat-key-123"); err != nil {
 		t.Fatal(err)
 	}
 	f.svc.Keys.Load()
+	f.svc.Svc.Invalidate(provider.GIPHY) // what SaveKey does for a new key
+	f.clips.Reset()
 	if s, err := f.gifs.CheckClips(ctx); s != "enabled" || err != nil || f.probes.Load() != 2 {
 		t.Errorf("CheckClips retry = %q, %v, probes %d; want enabled, nil, 2", s, err, f.probes.Load())
 	}

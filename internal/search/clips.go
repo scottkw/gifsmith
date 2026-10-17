@@ -30,10 +30,12 @@ type Clips struct {
 	Blocked  func() bool // GIPHY is inside a 429 block: never probe into it
 	OnChange func()      // optional; called after every state change
 
-	mu     sync.Mutex
-	state  ClipsState // "" until a probe starts: reported as unknown
-	probed bool       // a probe ran or is running since the last Reset
-	gen    int        // bumped by Reset so a probe for an old key cannot land
+	mu        sync.Mutex
+	state     ClipsState // "" until a probe starts: reported as unknown
+	probed    bool       // a probe ran or is running since the last Reset
+	rechecked bool       // Recheck spent its one re-probe since the last Reset
+	lastErr   error      // the last probe's error, replayed once the re-probe is spent
+	gen       int        // bumped by Reset so a probe for an old key cannot land
 }
 
 func (c *Clips) State() ClipsState {
@@ -61,15 +63,23 @@ func (c *Clips) Trigger() {
 	}()
 }
 
-// Recheck probes again only when the result is unknown (the user chose Clips).
-// It returns the new state, plus the probe error when the state is still unknown.
+// Recheck probes again only when the result is unknown (the user chose Clips),
+// at most once per key per launch. It returns the new state, plus the probe
+// error (or, once the re-probe is spent, the last one) when still unknown.
 func (c *Clips) Recheck(ctx context.Context) (ClipsState, error) {
 	if c.HasKey() && c.Blocked() && c.State() == ClipsUnknown {
 		return ClipsUnknown, &provider.Error{Kind: provider.RateLimited, Provider: provider.Clips}
 	}
 	gen, ok := c.start(true)
 	if !ok {
-		return c.State(), nil
+		c.mu.Lock()
+		err := c.lastErr
+		c.mu.Unlock()
+		s := c.State()
+		if s != ClipsUnknown {
+			err = nil
+		}
+		return s, err
 	}
 	err := c.Probe(ctx)
 	s := c.finish(gen, err)
@@ -84,23 +94,24 @@ func (c *Clips) Recheck(ctx context.Context) (ClipsState, error) {
 func (c *Clips) Reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.state, c.probed = "", false
+	c.state, c.probed, c.rechecked, c.lastErr = "", false, false, nil
 	c.gen++
 }
 
 // start moves to checking if a probe may run: a key, no 429 block, and either
-// no probe yet (Trigger) or an unknown result (Recheck).
+// no probe yet (Trigger) or an unknown result and no re-probe yet (Recheck).
 func (c *Clips) start(recheck bool) (int, bool) {
 	if !c.HasKey() || c.Blocked() {
 		return 0, false
 	}
 	c.mu.Lock()
 	unknown := c.state == "" || c.state == ClipsUnknown
-	if (recheck && !unknown) || (!recheck && c.probed) {
+	if (recheck && (!unknown || c.rechecked)) || (!recheck && c.probed) {
 		c.mu.Unlock()
 		return 0, false
 	}
 	c.probed = true
+	c.rechecked = c.rechecked || recheck
 	c.state = ClipsChecking
 	gen := c.gen
 	c.mu.Unlock()
@@ -115,7 +126,7 @@ func (c *Clips) finish(gen int, err error) ClipsState {
 		c.mu.Unlock()
 		return ClipsUnknown
 	}
-	c.state = s
+	c.state, c.lastErr = s, err
 	c.mu.Unlock()
 	c.changed()
 	return s

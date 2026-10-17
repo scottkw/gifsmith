@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"log"
 	"net/http"
@@ -54,7 +55,10 @@ func main() {
 		provider.FinerGifs: &finergifs.Client{BaseURL: d.FinerBase, MediaBase: d.FinerMedia, HTTP: d.HTTP},
 	}, nil)
 	clips := &search.Clips{
-		Probe:   clipsClient.ProbeClips,
+		// Same key, same 429 budget as GIPHY GIFs: a probe 429 blocks both.
+		Probe: func(ctx context.Context) error {
+			return svc.Guard(provider.Clips, func() error { return clipsClient.ProbeClips(ctx) })
+		},
 		HasKey:  func() bool { _, ok := keys.Get(provider.GIPHY); return ok },
 		Blocked: func() bool { return svc.Blocked(provider.GIPHY) },
 	}

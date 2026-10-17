@@ -68,17 +68,63 @@ func (s *Service) Seed(p provider.ID, cursor string, pg provider.Page) {
 	s.cache[string(p)+"|trending||"+cursor] = entry{dedupe(p, pg), s.now().Add(TrendingTTL)}
 }
 
-// Invalidate drops the provider's cached pages and its 429 block (the key changed).
+// budget is the key and 429 budget p draws from: GIPHY Clips use the GIPHY key.
+func budget(p provider.ID) provider.ID {
+	if p == provider.Clips {
+		return provider.GIPHY
+	}
+	return p
+}
+
+// Invalidate drops the cached pages and the 429 block of every provider on p's key (the key changed).
 func (s *Service) Invalidate(p provider.ID) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	prefix := string(p) + "|"
 	for k := range s.cache {
-		if strings.HasPrefix(k, prefix) {
+		if id, _, _ := strings.Cut(k, "|"); budget(provider.ID(id)) == budget(p) {
 			delete(s.cache, k)
 		}
 	}
-	delete(s.blocked, p)
+	delete(s.blocked, budget(p))
+}
+
+// Guard runs an uncached call (the Clips probe) inside p's 429 budget: refused
+// while blocked, and a 429 it returns blocks the budget like any other request.
+func (s *Service) Guard(p provider.ID, call func() error) error {
+	s.mu.Lock()
+	err := s.blockedErr(p)
+	s.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	err = call()
+	s.noteRateLimit(p, err)
+	return err
+}
+
+// blockedErr is the rate_limited error while p's budget is blocked, else nil. Caller holds mu.
+func (s *Service) blockedErr(p provider.ID) error {
+	now := s.now()
+	b, ok := s.blocked[budget(p)]
+	if !ok || !now.Before(b.until) {
+		return nil
+	}
+	retry := 0
+	if b.known {
+		retry = int(math.Ceil(b.until.Sub(now).Seconds()))
+	}
+	return &provider.Error{Kind: provider.RateLimited, Provider: p, RetryAfterSec: retry}
+}
+
+// noteRateLimit blocks p's budget when err is a 429.
+func (s *Service) noteRateLimit(p provider.ID, err error) {
+	var pe *provider.Error
+	if errors.As(err, &pe) && pe.Kind == provider.RateLimited {
+		wait := max(time.Duration(pe.RetryAfterSec)*time.Second, MinBlock)
+		s.mu.Lock()
+		s.blocked[budget(p)] = block{until: s.now().Add(wait), known: pe.RetryAfterSec > 0}
+		s.mu.Unlock()
+	}
 }
 
 func (s *Service) get(p provider.ID, rest string, ttl time.Duration, call func(provider.Provider) (provider.Page, error)) (provider.Page, error) {
@@ -89,16 +135,11 @@ func (s *Service) get(p provider.ID, rest string, ttl time.Duration, call func(p
 	key := string(p) + "|" + rest
 
 	s.mu.Lock()
-	now := s.now()
-	if b, ok := s.blocked[p]; ok && now.Before(b.until) {
+	if err := s.blockedErr(p); err != nil {
 		s.mu.Unlock()
-		retry := 0
-		if b.known {
-			retry = int(math.Ceil(b.until.Sub(now).Seconds()))
-		}
-		return provider.Page{}, &provider.Error{Kind: provider.RateLimited, Provider: p, RetryAfterSec: retry}
+		return provider.Page{}, err
 	}
-	if e, ok := s.cache[key]; ok && now.Before(e.expires) {
+	if e, ok := s.cache[key]; ok && s.now().Before(e.expires) {
 		s.mu.Unlock()
 		return e.page, nil
 	}
@@ -106,13 +147,7 @@ func (s *Service) get(p provider.ID, rest string, ttl time.Duration, call func(p
 
 	pg, err := call(pr)
 	if err != nil {
-		var pe *provider.Error
-		if errors.As(err, &pe) && pe.Kind == provider.RateLimited {
-			wait := max(time.Duration(pe.RetryAfterSec)*time.Second, MinBlock)
-			s.mu.Lock()
-			s.blocked[p] = block{until: s.now().Add(wait), known: pe.RetryAfterSec > 0}
-			s.mu.Unlock()
-		}
+		s.noteRateLimit(p, err)
 		return pg, err // errors and cancellations are never cached
 	}
 	pg = dedupe(p, pg)
@@ -140,10 +175,9 @@ func dedupe(p provider.ID, pg provider.Page) provider.Page {
 	return pg
 }
 
-// Blocked reports whether p is inside a 429 block.
+// Blocked reports whether p's budget is inside a 429 block.
 func (s *Service) Blocked(p provider.ID) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	b, ok := s.blocked[p]
-	return ok && s.now().Before(b.until)
+	return s.blockedErr(p) != nil
 }

@@ -278,3 +278,48 @@ func TestConcurrent(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+// GIPHY GIFs and Clips share one key, so one 429 budget and one Invalidate (CR-01).
+func TestClipsShareGiphyBudget(t *testing.T) {
+	g, cl := &fakeProv{page: page("a")}, &fakeProv{page: page("c")}
+	c := &clock{t: time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)}
+	s := New(map[provider.ID]provider.Provider{provider.GIPHY: g, provider.Clips: cl}, c.now)
+
+	g.err = &provider.Error{Kind: provider.RateLimited, Provider: provider.GIPHY, RetryAfterSec: 120}
+	_, _ = s.Trending(ctx, provider.GIPHY, "")
+	_, err := s.Search(ctx, provider.Clips, "dwight", "")
+	if pe := rateLimited(t, err); pe.Provider != provider.Clips || pe.RetryAfterSec != 120 || cl.n() != 0 {
+		t.Fatalf("clips after a GIPHY 429: %+v, calls %d; want clips rate_limited 120, 0 calls", pe, cl.n())
+	}
+	if !s.Blocked(provider.Clips) {
+		t.Error("Blocked(clips) = false inside the GIPHY block")
+	}
+	g.err = nil
+	c.advance(121 * time.Second)
+
+	cl.err = &provider.Error{Kind: provider.RateLimited, Provider: provider.Clips}
+	_, _ = s.Trending(ctx, provider.Clips, "")
+	if _, err := s.Trending(ctx, provider.GIPHY, ""); g.n() != 1 {
+		t.Fatalf("GIPHY after a Clips 429: %v, calls %d; want blocked, 1 call", err, g.n())
+	}
+
+	err = s.Guard(provider.Clips, func() error { t.Fatal("Guard called into a block"); return nil })
+	rateLimited(t, err)
+
+	cl.err = nil
+	s.Invalidate(provider.GIPHY)
+	if _, err := s.Trending(ctx, provider.Clips, ""); err != nil {
+		t.Fatalf("clips after Invalidate(giphy): %v", err)
+	}
+	s.Invalidate(provider.GIPHY)
+	_, _ = s.Trending(ctx, provider.Clips, "")
+	if cl.n() != 3 {
+		t.Errorf("clips calls = %d, want 3 (Invalidate(giphy) drops cached clips pages)", cl.n())
+	}
+
+	s2, _, _ := setup(provider.GIPHY)
+	_ = s2.Guard(provider.Clips, func() error { return &provider.Error{Kind: provider.RateLimited, Provider: provider.Clips} })
+	if !s2.Blocked(provider.GIPHY) {
+		t.Error("a Guard 429 did not block the GIPHY budget")
+	}
+}
