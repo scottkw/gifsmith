@@ -25,12 +25,14 @@ type Options struct {
 const (
 	finerTotal = 60
 	giphyTotal = 60
+	klipyTotal = 60
 )
 
 func Handler(o Options) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /finer/search", func(w http.ResponseWriter, r *http.Request) { finerSearch(w, r, o) })
 	mux.HandleFunc("GET /giphy/v1/gifs/{kind}", func(w http.ResponseWriter, r *http.Request) { giphyGifs(w, r, o) })
+	mux.HandleFunc("GET /klipy/api/v1/{key}/gifs/{kind}", func(w http.ResponseWriter, r *http.Request) { klipyGifs(w, r, o) })
 	mux.HandleFunc("GET /media/{file}", media)
 	return mux
 }
@@ -129,6 +131,70 @@ func giphyGifs(w http.ResponseWriter, r *http.Request, o Options) {
 		"pagination": map[string]int{"total_count": total, "count": len(data), "offset": offset},
 		"meta":       map[string]any{"status": 200, "msg": "OK", "response_id": "fixture"},
 	})
+}
+
+// klipyGifs serves the native v1 search and trending routes (key in the path).
+// Items 1 and 2 share the slug "klipy-dup" so a dedupe anywhere is visible end to end.
+func klipyGifs(w http.ResponseWriter, r *http.Request, o Options) {
+	kind := r.PathValue("kind")
+	if kind != "search" && kind != "trending" {
+		http.NotFound(w, r)
+		return
+	}
+	key := r.PathValue("key")
+	if strings.HasPrefix(key, "bad") {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound) // what the real host sends for an invalid key
+		_, _ = fmt.Fprint(w, `{"result":false,"errors":{"message":["The provided API key is invalid."]}}`)
+		return
+	}
+	q := r.URL.Query()
+	page, err := strconv.Atoi(q.Get("page"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+	words := q.Get("q") + " " + key
+	if Scenario(w, r, words, page == 1, o) {
+		return
+	}
+	per, err := strconv.Atoi(q.Get("per_page"))
+	if err != nil || per <= 0 {
+		per = 24
+	}
+	total := klipyTotal
+	if hasWord(words, "empty") {
+		total = 0
+	}
+	type gifFile struct {
+		URL    string `json:"url"`
+		Width  int    `json:"width"`
+		Height int    `json:"height"`
+		Size   int    `json:"size"`
+	}
+	type item struct {
+		ID    int64                         `json:"id"`
+		Slug  string                        `json:"slug"`
+		Title string                        `json:"title"`
+		Type  string                        `json:"type"`
+		File  map[string]map[string]gifFile `json:"file"`
+	}
+	media := "http://" + r.Host + "/media/"
+	data := []item{}
+	first := (page-1)*per + 1
+	for n := first; n <= total && n < first+per; n++ {
+		name := "klipy-" + strconv.Itoa(n)
+		slug := name
+		if n <= 2 {
+			slug = "klipy-dup"
+		}
+		data = append(data, item{ID: 8041071659142944 + int64(n), Slug: slug, Title: "Klipy moment " + strconv.Itoa(n), Type: "gif", File: map[string]map[string]gifFile{
+			"sm": {"gif": {URL: media + name + "-sm.gif", Width: 220, Height: 220, Size: 1234}},
+			"hd": {"gif": {URL: media + name + "-hd.gif", Width: 498, Height: 498, Size: 5678}},
+		}})
+	}
+	writeJSON(w, map[string]any{"result": true, "data": map[string]any{
+		"data": data, "current_page": page, "per_page": per, "has_next": page*per < total,
+	}})
 }
 
 func hasWord(q, word string) bool { return strings.Contains(strings.ToLower(q), word) }
