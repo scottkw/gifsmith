@@ -1,0 +1,8 @@
+{"data": [{"type": "gif", "id": "3o7aD2saalBwwftBIY", "slug": "cat-3o7aD2saalBwwftBIY", "title": "Cat GIF",
+   "url": "https://giphy.com/gifs/cat-3o7aD2saalBwwftBIY", "rating": "g",
+   "images": {
+     "fixed_width": {"url": "https://media2.giphy.com/media/3o7aD2saalBwwftBIY/200w.gif?cid=abc&rid=200w.gif&ct=g", "width": "200", "height": "150", "size": "254321",
+                     "webp": "https://media2.giphy.com/media/3o7aD2saalBwwftBIY/200w.webp?cid=abc&rid=200w.webp&ct=g", "webp_size": "98765"},
+     "original": {"url": "https://media2.giphy.com/media/3o7aD2saalBwwftBIY/giphy.gif?cid=abc&rid=giphy.gif&ct=g", "width": "480", "height": "360", "size": "1543210", "frames": "40"}}}],
+ "pagination": {"total_count": 5000, "count": 1, "offset": 0},
+ "meta": {"status": 200, "msg": "OK", "response_id": "abc123"}}
