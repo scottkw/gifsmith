@@ -67,7 +67,26 @@ Plans:
   4. "Powered by GIPHY" shows on GIPHY and Clips results, and the Klipy search placeholder reads "Search KLIPY".
   5. GIPHY Clips appears as a provider only when the user's GIPHY key passes a Clips test call (otherwise a short explanation is shown). Rapid typing does not burn requests, a rate-limit hit shows a clear message with when to retry, and a network, timeout, or provider error shows a per-provider message while other providers stay usable.
 
-**Plans**: TBD
+**Plans:** 6 plans
+
+Plans:
+**Wave 1**
+- [ ] 02-01-PLAN.md — Tracer: Finer Gifs search in Go → animated grid → Enter copies the real GIF (typed URL-free errors, staging, smoke/UAT harness)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 02-02-PLAN.md — Virtualized grid with paging to End of results, full keyboard model, panel owns Esc and survives ⌘W (npm package gate)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 02-03-PLAN.md — search.Service cache + 429 budget + dedupe policy; every loading/empty/error state; cancellation of superseded searches
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 02-04-PLAN.md — GIPHY and Klipy clients, Keychain-backed keys verified by a test call, provider status, last provider (Go, end to end via bound API)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 02-05-PLAN.md — Provider tabs (⌘1–⌘4, remembered), attribution and placeholders, first-run setup card, revoked-key re-entry
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 02-06-PLAN.md — GIPHY Clips probe and states, compliance posture in PROJECT.md, UI backstops, signed install + native UAT with real keys
 **UI hint**: yes
 
 **Notes**: Copy works for Finer Gifs, GIPHY, and Klipy results here; Clips file handling (MP4) lands in Phase 3 (ACTN-09), and temp-file lifecycle hardening in Phase 3 (ACTN-10). Written compliance posture goes into PROJECT.md Key Decisions in this phase. Default PG-13 rating applies to GIPHY now; the user-facing control is in Phase 4.
@@ -120,6 +139,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Native Spike & Signed Dev Loop | 4/4 | Complete    | 2026-10-17 |
-| 2. Providers, Search UI & First Run | 0/TBD | Not started | - |
+| 2. Providers, Search UI & First Run | 0/6 | Planned | - |
 | 3. Action Pipeline & Library | 0/TBD | Not started | - |
 | 4. Settings, Shell Polish & Release | 0/TBD | Not started | - |
