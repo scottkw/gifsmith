@@ -80,7 +80,8 @@ func (s *Shell) Toggle() {
 }
 
 func (s *Shell) Show() {
-	s.panel.Center() // plan 01-02: cursor-screen placement
+	x, y := panelOrigin(s.plat.CursorScreenWorkArea(), PanelWidth, PanelHeight)
+	s.panel.SetPosition(x, y)
 	s.panel.Show()
 	s.panel.Focus() // Show() alone never makes a non-activating panel key
 	s.plat.FocusWebView(s.panel.NativeWindow())

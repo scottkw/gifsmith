@@ -17,4 +17,6 @@ type Platform interface {
 	CopyFile(path string) error
 	// FocusWebView makes the window's WKWebView first responder so typing reaches the page.
 	FocusWebView(nsWindow unsafe.Pointer)
+	// CursorScreenWorkArea is the visible frame of the screen under the mouse cursor.
+	CursorScreenWorkArea() Rect
 }

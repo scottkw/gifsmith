@@ -40,6 +40,12 @@ func (darwin) FocusWebView(nsWindow unsafe.Pointer) {
 	}
 }
 
+func (darwin) CursorScreenWorkArea() Rect {
+	var x, y, w, h C.int
+	C.gsCursorScreenVisibleFrame(&x, &y, &w, &h)
+	return Rect{X: int(x), Y: int(y), Width: int(w), Height: int(h)}
+}
+
 // The helpers below take a pasteboard name ("" = general) so tests can use a private one;
 // they live here because _test.go files cannot use cgo.
 

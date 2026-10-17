@@ -7,9 +7,10 @@ import (
 
 // Fake records calls in order; tests read Calls after the code under test returns.
 type Fake struct {
-	mu      sync.Mutex
-	Calls   []string
-	CopyErr error
+	mu       sync.Mutex
+	Calls    []string
+	CopyErr  error
+	WorkArea Rect
 }
 
 func (f *Fake) Note(s string) {
@@ -24,3 +25,8 @@ func (f *Fake) CopyFile(path string) error {
 }
 
 func (f *Fake) FocusWebView(unsafe.Pointer) { f.Note("FocusWebView") }
+
+func (f *Fake) CursorScreenWorkArea() Rect {
+	f.Note("CursorScreenWorkArea")
+	return f.WorkArea
+}

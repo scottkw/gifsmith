@@ -75,3 +75,21 @@ void gsFocusWebView(void *nsWindow) {
         if (wv) [w makeFirstResponder:wv];
     });
 }
+
+// Visible frame (minus menu bar and Dock) of the screen under the mouse, converted to Wails
+// window coordinates: Y down from the top of the primary screen, as windowSetPosition expects.
+void gsCursorScreenVisibleFrame(int *x, int *y, int *w, int *h) {
+    onMain(^{
+        NSPoint p = [NSEvent mouseLocation];
+        NSScreen *screen = [NSScreen mainScreen];
+        for (NSScreen *s in [NSScreen screens]) {
+            if (NSMouseInRect(p, s.frame, NO)) { screen = s; break; }
+        }
+        NSRect vf = screen.visibleFrame;
+        CGFloat primaryHeight = [NSScreen screens][0].frame.size.height;
+        *x = (int)vf.origin.x;
+        *y = (int)(primaryHeight - (vf.origin.y + vf.size.height));
+        *w = (int)vf.size.width;
+        *h = (int)vf.size.height;
+    });
+}
