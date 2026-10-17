@@ -24,7 +24,7 @@ func TestCopyFileWritesFileURL(t *testing.T) {
 	t.Cleanup(func() { releasePasteboard(pb) })
 
 	// Twice: clearContents must leave exactly one URL.
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		if err := copyFileToPasteboard(pb, path); err != nil {
 			t.Fatal(err)
 		}

@@ -46,7 +46,7 @@ func TestCopyErrorKeepsPanelOpen(t *testing.T) {
 func TestCopyTwiceUsesSamePath(t *testing.T) {
 	f := &platform.Fake{}
 	s := newService(f)
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		if _, err := s.Copy(context.Background()); err != nil {
 			t.Fatal(err)
 		}
