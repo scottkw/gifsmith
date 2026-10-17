@@ -132,4 +132,54 @@ if [ "$CODE" = "200" ] || grep -q 'evil.example' "$BODY"; then
 fi
 echo "ActionService.Copy(disallowed URL): HTTP $CODE $(cat "$BODY")"
 
+# Keys: fixture keys only (bad-key-123 is rejected by the fixture, uat-key-123 accepted). Never a real key.
+SET="$SVC/settingsservice.ts"
+SAVE_ID=$(method_id "$SET" SaveKey)
+LAST_ID=$(method_id "$SET" SetLastProvider)
+PROV_ID=$(method_id "$SVC/gifservice.ts" Providers)
+TREND_ID=$(method_id "$SVC/gifservice.ts" Trending)
+[ -n "$SAVE_ID" ] && [ -n "$LAST_ID" ] && [ -n "$PROV_ID" ] && [ -n "$TREND_ID" ] || fail "missing SettingsService/GifService method IDs"
+
+for p in giphy klipy; do
+  CODE=$(call "$SAVE_ID" "[\"$p\",\"bad-key-123\"]")
+  if [ "$CODE" = "200" ] || ! grep -q 'key_rejected' "$BODY" || grep -q 'bad-key-123' "$BODY"; then
+    fail "SaveKey($p, bad key): HTTP $CODE, body: $(cat "$BODY")"
+  fi
+  echo "SettingsService.SaveKey($p, bad key): HTTP $CODE $(cat "$BODY")"
+done
+
+CODE=$(call "$PROV_ID" '[]')
+[ "$CODE" = "200" ] && grep -q '"id":"giphy","configured":false' "$BODY" || fail "Providers before save: HTTP $CODE, body: $(cat "$BODY")"
+echo "GifService.Providers before save: $(cat "$BODY")"
+
+CODE=$(call "$SAVE_ID" '["giphy","uat-key-123"]')
+[ "$CODE" = "200" ] || fail "SaveKey(giphy, fixture key): HTTP $CODE, body: $(cat "$BODY")"
+CODE=$(call "$PROV_ID" '[]')
+[ "$CODE" = "200" ] && grep -q '"id":"giphy","configured":true' "$BODY" || fail "Providers after save: HTTP $CODE, body: $(cat "$BODY")"
+echo "SaveKey(giphy, fixture key): 200; Providers now $(cat "$BODY")"
+
+CODE=$(call "$TREND_ID" '["giphy",""]')
+[ "$CODE" = "200" ] && grep -q '/media/giphy-' "$BODY" || fail "Trending(giphy): HTTP $CODE, body: $(head -c 300 "$BODY")"
+echo "GifService.Trending(giphy): HTTP 200 with fixture /media/giphy- URLs"
+
+CODE=$(call "$SAVE_ID" '["klipy","uat-key-123"]')
+[ "$CODE" = "200" ] || fail "SaveKey(klipy, fixture key): HTTP $CODE, body: $(cat "$BODY")"
+CODE=$(call "$TREND_ID" '["klipy",""]')
+[ "$CODE" = "200" ] && grep -q '/media/klipy-' "$BODY" || fail "Trending(klipy): HTTP $CODE, body: $(head -c 300 "$BODY")"
+DUPS=$(grep -o '"id":"klipy-dup"' "$BODY" | wc -l | tr -d ' ')
+[ "$DUPS" = "2" ] || fail "Trending(klipy): klipy-dup appears $DUPS times, want 2 (Klipy pages are never deduped)"
+echo "SaveKey(klipy, fixture key): 200; Trending(klipy) keeps both klipy-dup items"
+
+CODE=$(call "$LAST_ID" '["giphy"]')
+[ "$CODE" = "200" ] || fail "SetLastProvider(giphy): HTTP $CODE, body: $(cat "$BODY")"
+grep -q '"lastProvider":"giphy"' bin/uat-config/settings.json || fail "settings.json: $(cat bin/uat-config/settings.json 2>&1)"
+echo "SetLastProvider(giphy): bin/uat-config/settings.json = $(cat bin/uat-config/settings.json)"
+
+for f in bin/uat-config/settings.json bin/smoke-server.log; do
+  if grep -q -e 'uat-key-123' -e 'bad-key-123' "$f"; then
+    fail "a key appears in $f"
+  fi
+done
+echo "no fixture key in settings.json or the server log"
+
 echo "SMOKE OK"

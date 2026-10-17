@@ -4,12 +4,15 @@
 import * as ActionService from "./actionservice.js";
 import * as GifService from "./gifservice.js";
 import * as PanelService from "./panelservice.js";
+import * as SettingsService from "./settingsservice.js";
 export {
     ActionService,
     GifService,
-    PanelService
+    PanelService,
+    SettingsService
 };
 
 export type {
+    ProviderStatus,
     Result
 } from "./models.js";

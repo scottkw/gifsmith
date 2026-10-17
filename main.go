@@ -9,8 +9,11 @@ import (
 	"gifsmith/internal/platform"
 	"gifsmith/internal/provider"
 	"gifsmith/internal/provider/finergifs"
+	"gifsmith/internal/provider/giphy"
+	"gifsmith/internal/provider/klipy"
 	"gifsmith/internal/search"
 	"gifsmith/internal/services"
+	"gifsmith/internal/settings"
 	"gifsmith/internal/shell"
 	"gifsmith/internal/staging"
 
@@ -26,6 +29,9 @@ var assets embed.FS
 type deps struct {
 	HTTP                  *http.Client
 	FinerBase, FinerMedia string
+	GiphyBase, KlipyBase  string
+	Secrets               settings.SecretStore
+	ConfigDir             string // settings.json lives here
 	StagingDir            string
 	Allow                 func(provider.ID, *url.URL) bool // download allowlist for staging
 }
@@ -38,9 +44,21 @@ func main() {
 	stage := &staging.Store{Dir: d.StagingDir, HTTP: &http.Client{}, Allow: d.Allow}
 	actions := &services.ActionService{Platform: plat, Staging: stage}
 	panel := &services.PanelService{}
-	gifs := &services.GifService{Svc: search.New(map[provider.ID]provider.Provider{
+	keys := settings.NewKeys(d.Secrets)
+	keys.Load()
+	svc := search.New(map[provider.ID]provider.Provider{
+		provider.GIPHY:     &giphy.Client{BaseURL: d.GiphyBase, Key: keys.Func(provider.GIPHY), HTTP: d.HTTP},
+		provider.Klipy:     &klipy.Client{BaseURL: d.KlipyBase, Key: keys.Func(provider.Klipy), HTTP: d.HTTP},
 		provider.FinerGifs: &finergifs.Client{BaseURL: d.FinerBase, MediaBase: d.FinerMedia, HTTP: d.HTTP},
-	}, nil)}
+	}, nil)
+	gifs := &services.GifService{Svc: svc, Keys: keys}
+	settingsSvc := &services.SettingsService{Keys: keys, Dir: d.ConfigDir, Svc: svc, NewClient: func(p provider.ID, key string) provider.Provider {
+		candidate := func() (string, bool) { return key, true }
+		if p == provider.Klipy {
+			return &klipy.Client{BaseURL: d.KlipyBase, Key: candidate, HTTP: d.HTTP}
+		}
+		return &giphy.Client{BaseURL: d.GiphyBase, Key: candidate, HTTP: d.HTTP}
+	}}
 
 	// No ApplicationShouldTerminateAfterLastWindowClosed: the hidden panel counts as closed.
 	app := application.New(application.Options{
@@ -49,6 +67,7 @@ func main() {
 			application.NewService(actions),
 			application.NewService(gifs),
 			application.NewService(panel),
+			application.NewService(settingsSvc),
 		},
 		MarshalError: provider.MarshalError,
 		Assets:       application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
@@ -56,6 +75,7 @@ func main() {
 		// Used only by -tags server builds (browser UAT); WAILS_SERVER_PORT overrides.
 		Server: application.ServerOptions{Host: "localhost", Port: 8089},
 	})
+	settingsSvc.Emit = func(n string) { app.Event.Emit(n) }
 	sh := shell.New(app, plat)
 	actions.Hide = sh.Hide
 	actions.Previous = sh.Previous

@@ -19,13 +19,29 @@ type GifService struct {
 	Keys *settings.Keys
 }
 
+// ProviderStatus crosses to the webview: booleans and state strings only, never a key.
 type ProviderStatus struct {
 	ID         string `json:"id"`
 	Configured bool   `json:"configured"`
 	Clips      string `json:"clips"`
 }
 
-func (s *GifService) Providers(ctx context.Context) []ProviderStatus { return nil }
+// Providers reports the four fixed slots. Clips needs the GIPHY key; plan 02-06
+// adds its probe states (checking/enabled/disabled) in place of "unknown".
+func (s *GifService) Providers(ctx context.Context) []ProviderStatus {
+	_, giphy := s.Keys.Get(provider.GIPHY)
+	_, klipy := s.Keys.Get(provider.Klipy)
+	clips := "no_key"
+	if giphy {
+		clips = "unknown"
+	}
+	return []ProviderStatus{
+		{ID: string(provider.GIPHY), Configured: giphy, Clips: clips},
+		{ID: string(provider.Clips), Configured: giphy, Clips: clips},
+		{ID: string(provider.Klipy), Configured: klipy, Clips: clips},
+		{ID: string(provider.FinerGifs), Configured: true, Clips: clips},
+	}
+}
 
 func parse(p string) (provider.ID, error) {
 	id, ok := provider.ParseID(p)

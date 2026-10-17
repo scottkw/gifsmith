@@ -38,7 +38,7 @@ func TestMemoryStore(t *testing.T) {
 
 func TestKeysLoadOnce(t *testing.T) {
 	cs := &countingStore{MemoryStore: NewMemoryStore()}
-	_ = cs.MemoryStore.Set("klipy", "uat-key-123")
+	_ = cs.Set("klipy", "uat-key-123")
 	k := NewKeys(cs)
 	k.Load()
 	for range 3 {

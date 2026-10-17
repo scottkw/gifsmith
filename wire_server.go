@@ -12,6 +12,7 @@ import (
 
 	"gifsmith/internal/provider"
 	"gifsmith/internal/provider/fakeapi"
+	"gifsmith/internal/settings"
 	"gifsmith/internal/staging"
 )
 
@@ -32,6 +33,10 @@ func wire() deps {
 		HTTP:       &http.Client{Timeout: 3 * time.Second},
 		FinerBase:  "http://" + host + "/finer",
 		FinerMedia: "http://" + host + "/media",
+		GiphyBase:  "http://" + host + "/giphy",
+		KlipyBase:  "http://" + host + "/klipy",
+		Secrets:    settings.NewMemoryStore(), // never the user's Keychain
+		ConfigDir:  "bin/uat-config",
 		StagingDir: "bin/uat-cache/staging",
 		// Vendor hosts, plus plain http to the fixture listener only.
 		Allow: func(p provider.ID, u *url.URL) bool {
