@@ -16,7 +16,7 @@
 
 ### Search
 
-- [ ] **SRCH-01**: User can search GIPHY, Klipy, and The Finer Gifs Club, switching provider from the panel; last provider is remembered
+- [x] **SRCH-01**: User can search GIPHY, Klipy, and The Finer Gifs Club, switching provider from the panel; last provider is remembered
 - [ ] **SRCH-02**: GIPHY Clips appears as a provider only when the user's GIPHY key passes a Clips test call; otherwise a short explanation is shown
 - [x] **SRCH-03**: With an empty query, user sees trending GIFs (providers that support trending)
 - [x] **SRCH-04**: Results show as an animated grid that loads more as the user scrolls or arrows near the end
@@ -29,8 +29,8 @@
 ### Onboarding & Compliance
 
 - [ ] **ONBD-01**: First run opens on GIPHY with an inline setup card to paste a key, plus a "Try Finer Gifs (no key)" button
-- [ ] **ONBD-02**: Pasted key is verified with a test call before being saved
-- [ ] **ONBD-03**: API keys are stored in the macOS Keychain and never shown to the web UI or written to logs/errors
+- [x] **ONBD-02**: Pasted key is verified with a test call before being saved
+- [x] **ONBD-03**: API keys are stored in the macOS Keychain and never shown to the web UI or written to logs/errors
 - [ ] **ONBD-04**: "Powered by GIPHY" is shown on GIPHY/Clips results; Klipy search placeholder reads "Search KLIPY"
 - [x] **ONBD-05**: Providers are never blended in one grid; results are never reordered or filtered (except same-page duplicates for non-Klipy)
 
@@ -108,7 +108,7 @@
 | SHEL-04 | Phase 1 | Complete |
 | SHEL-05 | Phase 4 | Pending |
 | SHEL-06 | Phase 4 | Pending |
-| SRCH-01 | Phase 2 | Pending |
+| SRCH-01 | Phase 2 | Complete |
 | SRCH-02 | Phase 2 | Pending |
 | SRCH-03 | Phase 2 | Complete |
 | SRCH-04 | Phase 2 | Complete |
@@ -118,8 +118,8 @@
 | SRCH-08 | Phase 3 | Pending |
 | SRCH-09 | Phase 4 | Pending |
 | ONBD-01 | Phase 2 | Pending |
-| ONBD-02 | Phase 2 | Pending |
-| ONBD-03 | Phase 2 | Pending |
+| ONBD-02 | Phase 2 | Complete |
+| ONBD-03 | Phase 2 | Complete |
 | ONBD-04 | Phase 2 | Pending |
 | ONBD-05 | Phase 2 | Complete |
 | ACTN-01 | Phase 1 | Complete |
