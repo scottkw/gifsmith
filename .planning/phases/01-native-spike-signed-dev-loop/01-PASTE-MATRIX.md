@@ -28,8 +28,8 @@
 | N10 | No clash with Vorssaint | PENDING | PENDING | Passed in the 01-01 gate (unsigned dev build); not re-checked on the signed build |
 | N11 | Enter then ⌘V in TextEdit inserts the animated GIF with Accessibility OFF | PASS | PENDING | |
 | N12 | ⌘Enter with Accessibility OFF shows the copied + how-to-grant message and pastes nothing | PASS | PENDING | |
-| N13 | "Enable automatic paste…" raises the prompt / opens the Accessibility pane | FAIL | PENDING | ce0c96d: user saw the copied message but no "Enable automatic paste…" button; under re-test after the diagnostic build |
-| N14 | ⌘Enter with Accessibility ON pastes into TextEdit with no manual ⌘V | PENDING | PENDING | Not tested: Accessibility was never granted (N13 blocked it) |
+| N13 | "Enable automatic paste…" raises the prompt / opens the Accessibility pane | PENDING | PENDING | Earlier FAIL was plain Enter (Copy path); button not clicked in re-test. Accessibility was granted via the Privacy_Accessibility URL instead |
+| N14 | ⌘Enter with Accessibility ON pastes into TextEdit with no manual ⌘V | PENDING | PENDING | Crashed: TIS off main thread — fixed in e9f1230; under re-test |
 | N15 | Accessibility grant carried over from the previous build without re-granting | n/a | PENDING | Dev column n/a: first signed build |
 
 ## 2. Per-app paste matrix
