@@ -7,6 +7,7 @@ import (
 
 	"gifsmith/internal/provider"
 	"gifsmith/internal/search"
+	"gifsmith/internal/settings"
 )
 
 var errUnknownProvider = errors.New("unknown provider")
@@ -14,8 +15,17 @@ var errUnknownProvider = errors.New("unknown provider")
 // GifService exposes search and trending to the webview. All provider HTTP stays
 // in Go, behind search.Service (cache, 429 budget, dedupe policy).
 type GifService struct {
-	Svc *search.Service
+	Svc  *search.Service
+	Keys *settings.Keys
 }
+
+type ProviderStatus struct {
+	ID         string `json:"id"`
+	Configured bool   `json:"configured"`
+	Clips      string `json:"clips"`
+}
+
+func (s *GifService) Providers(ctx context.Context) []ProviderStatus { return nil }
 
 func parse(p string) (provider.ID, error) {
 	id, ok := provider.ParseID(p)
