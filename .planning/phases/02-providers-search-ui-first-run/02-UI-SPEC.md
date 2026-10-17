@@ -367,3 +367,7 @@ The only new frontend dependency is `@tanstack/svelte-virtual` (npm, pinned per 
 - [ ] Dimension 7 Inventory Provenance: PASS (not applicable, `Tool: none`, section omitted per template)
 
 **Approval:** pending
+
+## User Confirmations (2026-10-17)
+
+The user confirmed these [default] choices: search field above the provider tabs; single click selects / double-click copies (hover never moves selection); copy shows "Copied — press ⌘V to paste" then hides after 400 ms; a stored key rejected during search re-shows the setup card (K6) and saving overwrites the Keychain entry. No component library (hand-written Svelte) and footer title for the selected GIF stand as specified.
