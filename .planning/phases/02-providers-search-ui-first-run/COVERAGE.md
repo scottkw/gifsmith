@@ -41,7 +41,7 @@
 | Klipy GIFs: categories, search suggestions, autocomplete | OPT-OUT | not needed yet: v2 differentiator DIFF-02 |
 | Klipy GIFs: share trigger / view reporting | OPT-OUT | explicitly out of scope: no analytics or pingbacks; to be re-checked against Klipy's integration requirements in the Phase 4 Klipy clearance review |
 | Klipy GIFs: recent items per customer | OPT-OUT | not needed: Gifsmith keeps its own local Recents (Phase 3) |
-| Klipy advertisements (type "ad" items) | OPT-OUT | not needed: ads require a mobile browser user agent and Partner Panel enablement; non-gif items are skipped and their count logged (RESEARCH A4) |
+| Klipy advertisements (type "ad" items) | OPT-OUT | not needed: ads require a mobile browser user agent and Partner Panel enablement; items with GIF renditions (ads included) stay in place per Klipy no-filter rule; only items with no GIF rendition are skipped and logged (RESEARCH A4, WR-04) |
 | Klipy Stickers API | OPT-OUT | explicitly out of scope: stickers are listed under Out of Scope |
 | Klipy Clips API | OPT-OUT | explicitly out of scope: Clips come from GIPHY only per the provider list (SRCH-01/02) |
 | Klipy Memes API | OPT-OUT | explicitly out of scope: not part of the extension's feature set |

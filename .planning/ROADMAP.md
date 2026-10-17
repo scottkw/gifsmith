@@ -17,7 +17,7 @@ Gifsmith ports the Raycast "GIF Search" extension to a standalone macOS menu bar
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Native Spike & Signed Dev Loop** - Hard go/no-go gate: hotkey panel → copy GIF file → paste into TextEdit, from signed and notarized builds (completed 2026-10-17)
-- [ ] **Phase 2: Providers, Search UI & First Run** - Vertical slice: search/trending → animated grid → copy, across Finer Gifs, GIPHY, Klipy (and Clips), with key setup and attribution
+- [x] **Phase 2: Providers, Search UI & First Run** - Vertical slice: search/trending → animated grid → copy, across Finer Gifs, GIPHY, Klipy (and Clips), with key setup and attribution (completed 2026-10-17)
 - [ ] **Phase 3: Action Pipeline & Library** - Every extension action (link, Markdown, download, square crop, ⌘K menu) plus favorites, recents, details, and recent searches
 - [ ] **Phase 4: Settings, Shell Polish & Release** - Settings window, rebindable hotkeys, launch at login, then a signed, notarized DMG that installs on a clean Mac
 
@@ -57,7 +57,6 @@ Plans:
 ### Phase 2: Providers, Search UI & First Run
 
 **Goal**: A stranger can open the panel, get set up with a key (or skip to the keyless provider), search or browse trending GIFs on any available provider in a fast keyboard-driven animated grid, and Enter copies the GIF, with vendor-required attribution and honest error handling.
-**Mode:** mvp
 **Depends on**: Phase 1 (go decision, signed dev loop, copy-GIF-as-file primitive, server-mode UAT loop)
 **Requirements**: SRCH-01, SRCH-02, SRCH-03, SRCH-04, SRCH-05, SRCH-06, SRCH-07, ONBD-01, ONBD-02, ONBD-03, ONBD-04, ONBD-05
 **Success Criteria** (what must be TRUE):
@@ -67,7 +66,7 @@ Plans:
   4. "Powered by GIPHY" shows on GIPHY and Clips results, and the Klipy search placeholder reads "Search KLIPY".
   5. GIPHY Clips appears as a provider only when the user's GIPHY key passes a Clips test call (otherwise a short explanation is shown). Rapid typing does not burn requests, a rate-limit hit shows a clear message with when to retry, and a network, timeout, or provider error shows a per-provider message while other providers stay usable.
 
-**Plans:** 6/6 plans executed
+**Plans:** 6/6 plans complete
 
 Plans:
 **Wave 1**
@@ -96,7 +95,6 @@ Plans:
 ### Phase 3: Action Pipeline & Library
 
 **Goal**: Every action the Raycast extension offered works on the selected GIF, and favorites, recents, details, and recent searches put the GIFs a user reuses one keystroke away, even offline or rate-limited.
-**Mode:** mvp
 **Depends on**: Phase 2
 **Requirements**: ACTN-03, ACTN-04, ACTN-05, ACTN-06, ACTN-07, ACTN-09, ACTN-10, ACTN-11, LIBR-01, LIBR-02, LIBR-03, LIBR-04, LIBR-05, SRCH-08
 **Success Criteria** (what must be TRUE):
@@ -115,7 +113,6 @@ Plans:
 ### Phase 4: Settings, Shell Polish & Release
 
 **Goal**: Everything is configurable from a proper Settings window with hotkeys that can be rebound and launch at login, and a stranger can install a signed, notarized build on a clean Mac and use it within vendor and license obligations.
-**Mode:** mvp
 **Depends on**: Phase 3
 **Requirements**: SETT-01, SETT-02, SETT-03, SETT-04, SETT-05, SETT-06, SRCH-09, ACTN-08, SHEL-05, SHEL-06, RELS-01, RELS-02, RELS-03, RELS-04
 **Success Criteria** (what must be TRUE):
@@ -140,6 +137,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Native Spike & Signed Dev Loop | 4/4 | Complete    | 2026-10-17 |
-| 2. Providers, Search UI & First Run | 6/6 | In Progress | - |
+| 2. Providers, Search UI & First Run | 6/6 | Complete    | 2026-10-17 |
 | 3. Action Pipeline & Library | 0/TBD | Not started | - |
 | 4. Settings, Shell Polish & Release | 0/TBD | Not started | - |
