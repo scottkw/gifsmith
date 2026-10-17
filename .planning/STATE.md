@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-17)
 
 **Core value:** Hotkey → type → Enter puts the right GIF on the clipboard (or into the frontmost app) in seconds, without Raycast.
-**Current focus:** Phase 1 — Native Spike & Signed Dev Loop
+**Current focus:** Phase 2 — Providers, Search UI & First Run
 
 ## Current Position
 

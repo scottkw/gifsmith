@@ -12,11 +12,12 @@ Hotkey → type → Enter puts the right GIF on the clipboard (or into the front
 
 ### Validated
 
-(None yet — ship to validate)
+- ✓ Global hotkey (⌃⌥⌘G) opens a non-activating floating panel that takes typing while the previous app keeps focus, shows over full-screen apps, hides on Esc/click-away; menu bar only, no Dock icon — Phase 1
+- ✓ Copy GIF as a file (no Accessibility needed) and ⌘Enter auto-paste into the previous app (Accessibility-gated, copy fallback) — Phase 1 (TextEdit, Notes, Mail, Messages; other apps untested)
+- ✓ Developer ID–signed dev build with a stable identity; Accessibility grant survives rebuilds — Phase 1 (notarization deferred to Phase 4)
 
 ### Active
 
-- [ ] Global hotkey opens a floating search panel; app lives in the menu bar with no Dock icon
 - [ ] Search and trending across four providers with a provider switcher, mirroring the extension: GIPHY, GIPHY Clips, Klipy, The Finer Gifs Club
 - [ ] Users enter their own GIPHY and Klipy API keys in settings; Finer Gifs Club works with no key
 - [ ] Animated GIF grid with paging/infinite scroll and configurable item size
@@ -26,6 +27,7 @@ Hotkey → type → Enter puts the right GIF on the clipboard (or into the front
 - [ ] GIF details view (metadata, tags, source links)
 - [ ] Settings: API keys, hotkey, grid sizes, max results, default action, download folder, hide filename, GIPHY/Klipy locales
 - [ ] Signed and notarized macOS download (Developer ID), distributed outside the Mac App Store
+- [ ] Accessibility onboarding deep-links to the permission list (macOS 27 has no browsable path) — emerged in Phase 1
 
 ### Out of Scope
 
@@ -86,4 +88,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-17 after initialization*
+*Last updated: 2026-10-17 after Phase 1*
