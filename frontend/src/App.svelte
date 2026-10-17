@@ -1,41 +1,106 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { Events } from '@wailsio/runtime';
-  import { copy, hide, paste, requestAccessibility, search, type Gif, type Page } from './lib/api';
+  import {
+    cancel,
+    copy,
+    hide,
+    latest,
+    paste,
+    providerError,
+    requestAccessibility,
+    search,
+    type Gif,
+    type Page,
+    type ProviderErr,
+  } from './lib/api';
+  import { errorState, pagingMessage, providerName } from './lib/errors';
   import { move, nearEnd, routeKey } from './lib/grid';
   import ResultGrid from './components/ResultGrid.svelte';
+  import StateMessage from './components/StateMessage.svelte';
 
-  const PROVIDER = 'finergifs';
+  const PROVIDER = 'finergifs'; // the active provider; the tabs in plan 02-05 make it switchable
   const DEBOUNCE_MS = 450;
   const HIDE_AFTER_COPY_MS = 400;
   const COPY_FAILED = "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";
   const CLIPS_COPY = 'Copying Clips (MP4) arrives in the next update.';
+  const AX_FAILED = "Couldn't ask macOS for Accessibility access. Try again.";
   const BUSY = 'another action is still running'; // Go ErrBusy: a second call while one runs is ignored
+
+  type Status = 'idle' | 'loading' | 'refreshing' | 'ready' | 'empty' | 'error';
+  type Paging = 'idle' | 'loading' | 'end' | 'error';
+  // UI state is held per provider id, so one provider's failure never touches another's.
+  type PState = {
+    status: Status;
+    q: string; // query of the last first-page request (S7 copy, Try Again)
+    items: Gif[];
+    next: string; // provider cursor; "" = no more pages
+    seq: number; // bumped on every result-set replacement, so a late page is dropped, not appended
+    more: ((cursor: string) => Promise<Page | undefined>) | null;
+    paging: Paging;
+    err: ProviderErr | null; // first-page error (S9–S12)
+    errAt: number;
+    pageErr: ProviderErr | null; // page 2+ error (S9a/S12a)
+    pageErrAt: number;
+  };
+  const fresh = (): PState => ({
+    status: 'idle',
+    q: '',
+    items: [],
+    next: '',
+    seq: 0,
+    more: null,
+    paging: 'idle',
+    err: null,
+    errAt: 0,
+    pageErr: null,
+    pageErrAt: 0,
+  });
+  const states = $state<Record<string, PState>>({ [PROVIDER]: fresh() });
+  const cur = $derived(states[PROVIDER]);
 
   let input: HTMLInputElement;
   let query = $state('');
-  let items = $state<Gif[]>([]);
   let selected = $state(-1);
-  let status = $state('');
+  let status = $state(''); // footer center status line
   let tone = $state<'' | 'success' | 'error'>('');
   let copying = $state(false); // one Copy/Paste in flight; a second Enter would paste twice
   let needsAccessibility = $state(false);
   // Paste hides the panel before ⌘V; a copied-only fallback message must survive to the next show.
   let keepStatus = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let seq = 0; // only the latest search may update the grid
-  // Paging for the current result set. resultSeq changes whenever items are replaced, so a page
-  // that lands after a new search (or a cleared query) is dropped instead of appended.
-  let resultSeq = $state(0);
-  let next = ''; // provider cursor; "" = no more pages
-  let fetchPage: ((cursor: string) => Promise<Page>) | null = null;
-  let paging = $state<'idle' | 'loading' | 'end' | 'error'>('idle');
+  let now = $state(Date.now()); // clock for retry countdowns; set whenever an error arrives
 
-  const footerCenter = $derived(status || items[selected]?.title || '');
+  const footerCenter = $derived(status || cur.items[selected]?.title || '');
+  const busy = $derived(cur.status === 'loading' || cur.status === 'refreshing');
+  // S8: Finer Gifs has no trending list, so a short query shows a prompt and makes no request.
+  const finerIdle = $derived(PROVIDER === 'finergifs' && [...query.trim()].length < 2);
+  // Error copy comes only from errors.ts rows, never from the caught error's text.
+  const errView = $derived(cur.status === 'error' && cur.err ? errorState(cur.err, now, cur.errAt) : null);
+  const pageView = $derived(
+    cur.paging === 'error' && cur.pageErr
+      ? { note: pagingMessage(cur.pageErr, now, cur.pageErrAt), state: errorState(cur.pageErr, now, cur.pageErrAt) }
+      : null,
+  );
+  const retryAt = $derived(errView?.retryAt ?? pageView?.state?.retryAt);
+
+  // Rate-limit countdown: refresh the copy once a minute and exactly when the window ends.
+  $effect(() => {
+    const at = retryAt;
+    if (!at) return;
+    const tick = () => (now = Date.now());
+    const iv = setInterval(tick, 60_000);
+    const end = setTimeout(tick, Math.max(0, at - Date.now()) + 50);
+    return () => {
+      clearInterval(iv);
+      clearTimeout(end);
+    };
+  });
 
   onMount(() => {
     input.focus();
     Events.On('panel:show', () => {
+      now = Date.now();
       if (!keepStatus) setStatus('');
       keepStatus = false;
       needsAccessibility = false;
@@ -67,56 +132,71 @@
     clearTimeout(timer);
     const q = query.trim();
     if ([...q].length < 2) {
-      seq++;
-      setResults(null, null);
+      cancel(`first:${PROVIDER}`);
+      setResults(PROVIDER, null, null);
       return;
     }
-    timer = setTimeout(() => runSearch(q), DEBOUNCE_MS);
+    timer = setTimeout(() => runSearch(PROVIDER, q), DEBOUNCE_MS);
   }
 
-  async function runSearch(q: string) {
-    const mine = ++seq;
+  // S2 (nothing shown yet) or S4 (previous results stay, spinner only) until the latest call lands.
+  async function runSearch(p: string, q: string) {
+    const s = states[p];
+    s.q = q;
+    s.status = s.items.length ? 'refreshing' : 'loading';
     try {
-      const more = (cursor: string) => search(PROVIDER, q, cursor);
-      const page = await more('');
-      if (mine !== seq) return;
-      setResults(page, more);
-    } catch {
-      if (mine !== seq) return;
-      setResults(null, null);
-      setStatus("Couldn't search The Finer Gifs Club.", 'error');
+      const page = await latest(`first:${p}`, search(p, q, ''));
+      if (!page) return; // cancelled or superseded: the newer call owns the state
+      setResults(p, page, (cursor) => latest(`page:${p}`, search(p, q, cursor)));
+    } catch (e) {
+      setResults(p, null, null);
+      s.status = 'error';
+      s.err = providerError(e) ?? { kind: 'http', provider: p };
+      now = s.errAt = Date.now();
     }
   }
 
   // A new result set (or none): first tile selected, paging restarts.
-  function setResults(page: Page | null, more: typeof fetchPage) {
-    resultSeq++;
-    items = page?.items ?? [];
-    selected = items.length ? 0 : -1;
-    next = page?.next ?? '';
-    fetchPage = more;
-    paging = page && !next ? 'end' : 'idle';
+  function setResults(p: string, page: Page | null, more: PState['more']) {
+    const s = states[p];
+    cancel(`page:${p}`);
+    s.seq++;
+    s.items = page?.items ?? [];
+    s.next = page?.next ?? '';
+    s.more = more;
+    s.paging = page && !s.next ? 'end' : 'idle';
+    s.pageErr = null;
+    s.err = null;
+    s.status = !page ? 'idle' : s.items.length ? 'ready' : 'empty';
+    if (p === PROVIDER) selected = s.items.length ? 0 : -1;
+  }
+
+  function retry() {
+    if (cur.q) runSearch(PROVIDER, cur.q);
   }
 
   // One page request at a time; a failed page keeps loaded results until Try Again.
   async function loadMore() {
-    if (paging !== 'idle' || !next || !fetchPage) return;
-    const mine = resultSeq;
-    paging = 'loading';
+    const s = states[PROVIDER];
+    if (s.paging !== 'idle' || !s.next || !s.more) return;
+    const mine = s.seq;
+    s.paging = 'loading';
     try {
-      const page = await fetchPage(next);
-      if (mine !== resultSeq) return;
-      items = [...items, ...(page.items ?? [])];
-      next = page.next;
-      paging = next ? 'idle' : 'end';
-    } catch {
-      if (mine !== resultSeq) return;
-      paging = 'error';
+      const page = await s.more(s.next);
+      if (!page || mine !== s.seq) return;
+      s.items.push(...(page.items ?? []));
+      s.next = page.next;
+      s.paging = s.next ? 'idle' : 'end';
+    } catch (e) {
+      if (mine !== s.seq) return;
+      s.paging = 'error';
+      s.pageErr = providerError(e);
+      now = s.pageErrAt = Date.now();
     }
   }
 
   function retryPage() {
-    paging = 'idle';
+    cur.paging = 'idle';
     loadMore();
   }
 
@@ -131,12 +211,17 @@
       case 'right':
       case 'up':
       case 'down':
-        if (!items.length) return;
-        select(move(selected, a, items.length));
-        if (nearEnd(selected, items.length)) loadMore();
+        if (!cur.items.length) return;
+        select(move(selected, a, cur.items.length));
+        if (nearEnd(selected, cur.items.length)) loadMore();
         return;
       case 'copy':
       case 'paste':
+        // ↵ with nothing selected runs a visible Try Again.
+        if (selected < 0) {
+          if (a === 'copy' && errView?.tryAgain) retry();
+          return;
+        }
         run(a);
         return;
       case 'escape':
@@ -150,7 +235,7 @@
   }
 
   async function run(action: 'copy' | 'paste') {
-    const g = items[selected];
+    const g = cur.items[selected];
     if (copying || !g) return;
     if (g.isClip) {
       setStatus(CLIPS_COPY);
@@ -170,6 +255,7 @@
         keepStatus = r.copied && !r.pasted && !r.needsAccessibility;
       }
     } catch (err) {
+      // Compared, never rendered: Go's ErrBusy is the one error that is silently ignored.
       if ((err as Error)?.message === BUSY) setStatus('');
       else setStatus(COPY_FAILED, 'error');
     } finally {
@@ -184,8 +270,8 @@
         'After turning Gifsmith on, press ⌘Enter again. If it still says it is not allowed, quit Gifsmith from the menu bar and open it again.',
       );
       needsAccessibility = false;
-    } catch (err) {
-      setStatus(String(err), 'error');
+    } catch {
+      setStatus(AX_FAILED, 'error');
     }
     input.focus();
   }
@@ -209,20 +295,30 @@
       autocomplete="off"
       spellcheck="false"
       role="combobox"
-      aria-expanded={items.length > 0}
+      aria-expanded={cur.items.length > 0}
       aria-controls="grid"
       aria-activedescendant={selected >= 0 ? `tile-${selected}` : undefined}
     />
+    {#if busy}
+      <span class="spinner busy" role="status" aria-label="Loading"></span>
+    {/if}
   </header>
 
   <section class="content">
-    {#if items.length}
-      {#key resultSeq}
+    {#if finerIdle}
+      <StateMessage
+        heading="Search The Office GIFs"
+        body="The Finer Gifs Club has no trending list. Type at least 2 characters to search."
+      />
+    {:else if cur.items.length}
+      {#key cur.seq}
         <ResultGrid
-          {items}
+          items={cur.items}
           {selected}
           {copying}
-          {paging}
+          paging={cur.paging}
+          pagingNote={pageView?.note}
+          pagingRetry={pageView?.state?.tryAgain ?? true}
           onselect={select}
           oncopy={(i) => {
             select(i);
@@ -232,6 +328,25 @@
           onretrypage={retryPage}
         />
       {/key}
+    {:else if cur.status === 'loading'}
+      <div class="skeleton" aria-hidden="true">
+        {#each Array(8), i (i)}
+          <div></div>
+        {/each}
+      </div>
+    {:else if cur.status === 'empty'}
+      <StateMessage
+        heading="No GIFs found"
+        body="Nothing on {providerName(PROVIDER)} matches “{cur.q}”. Try different words, or switch providers with ⌘1–⌘4."
+      />
+    {:else if errView}
+      <StateMessage
+        icon
+        heading={errView.heading}
+        body={errView.body}
+        button={errView.tryAgain ? 'Try Again' : ''}
+        onbutton={retry}
+      />
     {/if}
   </section>
 
@@ -290,9 +405,36 @@
   input::placeholder {
     color: var(--text-secondary);
   }
+  .busy {
+    flex: none;
+    color: var(--text-secondary);
+  }
   .content {
     flex: 1;
     min-height: 0;
+  }
+  /* S2: 8 skeleton tiles (2 rows) in grid geometry. */
+  .skeleton {
+    display: grid;
+    grid-template-columns: repeat(4, 166px);
+    grid-auto-rows: 144px;
+    gap: 8px;
+    padding: 16px;
+  }
+  .skeleton div {
+    border-radius: 8px;
+    background: var(--surface);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    50% {
+      opacity: 0.6;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton div {
+      animation: none;
+    }
   }
   footer {
     box-sizing: border-box;

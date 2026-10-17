@@ -10,6 +10,8 @@
     selected,
     copying,
     paging,
+    pagingNote = "Couldn't load more.",
+    pagingRetry = true,
     onselect,
     oncopy,
     onneedmore,
@@ -19,6 +21,8 @@
     selected: number;
     copying: boolean;
     paging: Paging;
+    pagingNote?: string; // E6, or E2 while a 429 window is open (S9a)
+    pagingRetry?: boolean; // false while the provider is still blocked
     onselect: (i: number) => void;
     oncopy: (i: number) => void;
     onneedmore: () => void;
@@ -78,8 +82,10 @@
         {:else if extra === 'end'}
           <span class="note">End of results</span>
         {:else if extra === 'error'}
-          <span class="note secondary">Couldn't load more.</span>
-          <button class="link" onclick={onretrypage}>Try Again</button>
+          <span class="note secondary">{pagingNote}</span>
+          {#if pagingRetry}
+            <button class="link" onclick={onretrypage}>Try Again</button>
+          {/if}
         {/if}
       </div>
     {/each}
