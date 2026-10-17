@@ -140,5 +140,10 @@ func dedupe(p provider.ID, pg provider.Page) provider.Page {
 	return pg
 }
 
-// Blocked reports whether p is inside a 429 block (skeleton).
-func (s *Service) Blocked(p provider.ID) bool { return false }
+// Blocked reports whether p is inside a 429 block.
+func (s *Service) Blocked(p provider.ID) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	b, ok := s.blocked[p]
+	return ok && s.now().Before(b.until)
+}

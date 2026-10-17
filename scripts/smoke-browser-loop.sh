@@ -158,6 +158,17 @@ CODE=$(call "$PROV_ID" '[]')
 [ "$CODE" = "200" ] && grep -q '"id":"giphy","configured":true' "$BODY" || fail "Providers after save: HTTP $CODE, body: $(cat "$BODY")"
 echo "SaveKey(giphy, fixture key): 200; Providers now $(cat "$BODY")"
 
+# The GIPHY save starts the launch's single Clips probe in the background.
+for _ in $(seq 1 20); do
+  CODE=$(call "$PROV_ID" '[]')
+  grep -q '"id":"clips","configured":true,"clips":"enabled"' "$BODY" && break
+  sleep 0.25
+done
+grep -q '"id":"clips","configured":true,"clips":"enabled"' "$BODY" || fail "Clips never reached enabled: HTTP $CODE, body: $(cat "$BODY")"
+CODE=$(call "$TREND_ID" '["clips",""]')
+[ "$CODE" = "200" ] && grep -q '"isClip":true' "$BODY" || fail "Trending(clips): HTTP $CODE, body: $(head -c 300 "$BODY")"
+echo "Clips probe: enabled; GifService.Trending(clips) returned isClip items"
+
 CODE=$(call "$TREND_ID" '["giphy",""]')
 [ "$CODE" = "200" ] && grep -q '/media/giphy-' "$BODY" || fail "Trending(giphy): HTTP $CODE, body: $(head -c 300 "$BODY")"
 echo "GifService.Trending(giphy): HTTP 200 with fixture /media/giphy- URLs"

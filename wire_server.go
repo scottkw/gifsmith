@@ -23,8 +23,9 @@ func wire() deps {
 		log.Fatal(err)
 	}
 	h := fakeapi.Handler(fakeapi.Options{
-		FinerDown: os.Getenv("FAKE_FINER") == "down",
-		SlowDelay: 5 * time.Second, // past the 3 s client timeout below, so "slow" times out quickly
+		FinerDown:   os.Getenv("FAKE_FINER") == "down",
+		ClipsDenied: os.Getenv("FAKE_CLIPS") == "denied",
+		SlowDelay:   5 * time.Second, // past the 3 s client timeout below, so "slow" times out quickly
 	})
 	go func() { log.Fatal(http.Serve(ln, h)) }()
 	host := ln.Addr().String()

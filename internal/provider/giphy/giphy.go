@@ -1,4 +1,4 @@
-// Package giphy is the GIPHY GIFs client (api.giphy.com/v1/gifs).
+// Package giphy is the GIPHY client: GIFs (api.giphy.com/v1/gifs) and, with Clips set, GIPHY Clips (/v1/clips).
 package giphy
 
 import (
@@ -62,19 +62,48 @@ type response struct {
 	} `json:"pagination"`
 }
 
-func bad(status int) error {
-	return &provider.Error{Kind: provider.HTTP, Provider: provider.GIPHY, Status: status}
+func (c *Client) id() provider.ID {
+	if c.Clips {
+		return provider.Clips
+	}
+	return provider.GIPHY
+}
+
+func (c *Client) bad(status int) error {
+	return &provider.Error{Kind: provider.HTTP, Provider: c.id(), Status: status}
+}
+
+// path is /v1/gifs/<op> or /v1/clips/<op>.
+func (c *Client) path(op string) string {
+	if c.Clips {
+		return "/v1/clips/" + op
+	}
+	return "/v1/gifs/" + op
 }
 
 func (c *Client) Search(ctx context.Context, q, cursor string) (provider.Page, error) {
 	if r := []rune(q); len(r) > maxQueryRunes {
 		q = string(r[:maxQueryRunes])
 	}
-	return c.get(ctx, "/v1/gifs/search", url.Values{"q": {q}}, cursor, searchOffsetCap)
+	return c.get(ctx, c.path("search"), url.Values{"q": {q}}, cursor, searchOffsetCap)
 }
 
 func (c *Client) Trending(ctx context.Context, cursor string) (provider.Page, error) {
-	return c.get(ctx, "/v1/gifs/trending", url.Values{}, cursor, trendingOffsetCap)
+	return c.get(ctx, c.path("trending"), url.Values{}, cursor, trendingOffsetCap)
+}
+
+// ProbeClips asks whether the key is approved for Clips: nil on a 2xx JSON
+// answer, key_rejected on 401/403. A 401 means nothing on its own (a bad key
+// gets it too), so callers probe only after a GIFs call succeeded with the same key.
+func (c *Client) ProbeClips(ctx context.Context) error {
+	key, ok := c.Key()
+	if !ok || key == "" {
+		return &provider.Error{Kind: provider.KeyMissing, Provider: provider.Clips}
+	}
+	v := url.Values{"api_key": {key}, "limit": {"1"}, "rating": {"pg-13"}}
+	var body any
+	_, err := httpx.GetJSON(ctx, c.HTTP, provider.Clips, c.BaseURL+"/v1/clips/trending?"+v.Encode(), &body)
+	return httpx.Remap(err, 401, 403)
 }
 
 // get pages with an opaque cursor that is the decimal offset.
@@ -83,38 +112,47 @@ func (c *Client) get(ctx context.Context, path string, v url.Values, cursor stri
 	if cursor != "" {
 		n, err := strconv.Atoi(cursor)
 		if err != nil || n < 0 {
-			return provider.Page{}, bad(0) // never silently restart at the first page
+			return provider.Page{}, c.bad(0) // never silently restart at the first page
 		}
 		offset = n
 	}
 	key, ok := c.Key()
 	if !ok || key == "" {
-		return provider.Page{}, &provider.Error{Kind: provider.KeyMissing, Provider: provider.GIPHY}
+		return provider.Page{}, &provider.Error{Kind: provider.KeyMissing, Provider: c.id()}
 	}
 	v.Set("api_key", key)
 	v.Set("limit", strconv.Itoa(provider.PageSize))
 	v.Set("offset", strconv.Itoa(offset))
-	v.Set("rating", "pg-13")
-	v.Set("bundle", "messaging_non_clips")
+	v.Set("rating", "pg-13") // always sent: Clips search defaults to R
+	if c.Clips {
+		v.Set("bundle", "clips_grid_picker")
+	} else {
+		v.Set("bundle", "messaging_non_clips")
+	}
 
 	var r response
-	status, err := httpx.GetJSON(ctx, c.HTTP, provider.GIPHY, c.BaseURL+path+"?"+v.Encode(), &r)
+	status, err := httpx.GetJSON(ctx, c.HTTP, c.id(), c.BaseURL+path+"?"+v.Encode(), &r)
 	if err != nil {
 		return provider.Page{}, httpx.Remap(err, 401, 403)
 	}
 	if r.Data == nil {
-		return provider.Page{}, bad(status)
+		return provider.Page{}, c.bad(status)
 	}
 	items := make([]provider.Gif, 0, len(r.Data))
 	for _, d := range r.Data {
-		if d.Images.FixedWidth.URL == "" || d.Images.Original.URL == "" {
-			return provider.Page{}, bad(status) // a silently shorter page would hide the problem
+		// Clips carry no download URL until Phase 3 copies the MP4.
+		if d.Images.FixedWidth.URL == "" || (!c.Clips && d.Images.Original.URL == "") {
+			return provider.Page{}, c.bad(status) // a silently shorter page would hide the problem
 		}
 		title := d.Title
 		if title == "" {
 			title = d.Slug
 		}
-		items = append(items, provider.Gif{Provider: provider.GIPHY, ID: d.ID, Title: title, PreviewURL: d.Images.FixedWidth.URL, DownloadURL: d.Images.Original.URL})
+		g := provider.Gif{Provider: c.id(), ID: d.ID, Title: title, PreviewURL: d.Images.FixedWidth.URL, IsClip: c.Clips}
+		if !c.Clips {
+			g.DownloadURL = d.Images.Original.URL
+		}
+		items = append(items, g)
 	}
 	next := offset + len(items)
 	more := len(items) == provider.PageSize
@@ -127,6 +165,3 @@ func (c *Client) get(ctx context.Context, path string, v url.Values, cursor stri
 	}
 	return p, nil
 }
-
-// ProbeClips asks GIPHY whether the key is approved for Clips (skeleton).
-func (c *Client) ProbeClips(ctx context.Context) error { return nil }

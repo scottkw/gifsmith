@@ -46,13 +46,20 @@ func main() {
 	panel := &services.PanelService{}
 	keys := settings.NewKeys(d.Secrets)
 	keys.Load()
+	clipsClient := &giphy.Client{BaseURL: d.GiphyBase, Key: keys.Func(provider.GIPHY), HTTP: d.HTTP, Clips: true}
 	svc := search.New(map[provider.ID]provider.Provider{
 		provider.GIPHY:     &giphy.Client{BaseURL: d.GiphyBase, Key: keys.Func(provider.GIPHY), HTTP: d.HTTP},
+		provider.Clips:     clipsClient,
 		provider.Klipy:     &klipy.Client{BaseURL: d.KlipyBase, Key: keys.Func(provider.Klipy), HTTP: d.HTTP},
 		provider.FinerGifs: &finergifs.Client{BaseURL: d.FinerBase, MediaBase: d.FinerMedia, HTTP: d.HTTP},
 	}, nil)
-	gifs := &services.GifService{Svc: svc, Keys: keys}
-	settingsSvc := &services.SettingsService{Keys: keys, Dir: d.ConfigDir, Svc: svc, NewClient: func(p provider.ID, key string) provider.Provider {
+	clips := &search.Clips{
+		Probe:   clipsClient.ProbeClips,
+		HasKey:  func() bool { _, ok := keys.Get(provider.GIPHY); return ok },
+		Blocked: func() bool { return svc.Blocked(provider.GIPHY) },
+	}
+	gifs := &services.GifService{Svc: svc, Keys: keys, Clips: clips}
+	settingsSvc := &services.SettingsService{Keys: keys, Dir: d.ConfigDir, Svc: svc, Clips: clips, NewClient: func(p provider.ID, key string) provider.Provider {
 		candidate := func() (string, bool) { return key, true }
 		if p == provider.Klipy {
 			return &klipy.Client{BaseURL: d.KlipyBase, Key: candidate, HTTP: d.HTTP}
@@ -76,6 +83,10 @@ func main() {
 		Server: application.ServerOptions{Host: "localhost", Port: 8089},
 	})
 	settingsSvc.Emit = func(n string) { app.Event.Emit(n) }
+	clips.OnChange = func() {
+		log.Printf("clips: %s", clips.State()) // state only: records the native probe outcome
+		app.Event.Emit("providers:changed")
+	}
 	sh := shell.New(app, plat)
 	actions.Hide = sh.Hide
 	actions.Previous = sh.Previous

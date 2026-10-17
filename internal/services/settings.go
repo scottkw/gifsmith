@@ -75,6 +75,11 @@ func (s *SettingsService) SaveKey(ctx context.Context, p, key string) error {
 	s.Svc.Invalidate(id)
 	s.Svc.Seed(id, "", page)
 	log.Printf("key saved for %s", id)
+	if id == provider.GIPHY {
+		// The new key just passed a GIFs call, so its Clips probe is meaningful now.
+		s.Clips.Reset()
+		s.Clips.Trigger()
+	}
 	if s.Emit != nil {
 		s.Emit("providers:changed")
 	}

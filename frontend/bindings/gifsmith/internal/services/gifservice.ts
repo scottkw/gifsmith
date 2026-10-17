@@ -20,8 +20,16 @@ import * as provider$0 from "../provider/models.js";
 import * as $models from "./models.js";
 
 /**
- * Providers reports the four fixed slots. Clips needs the GIPHY key; plan 02-06
- * adds its probe states (checking/enabled/disabled) in place of "unknown".
+ * CheckClips re-probes once when the Clips result is unknown (the user chose
+ * Clips). It returns the state, and the probe's error while still unknown.
+ */
+export function CheckClips(): $CancellablePromise<string> {
+    return $Call.ByID(1016896621);
+}
+
+/**
+ * Providers reports the four fixed slots; clips is the Clips probe state
+ * (no_key, checking, enabled, disabled or unknown).
  */
 export function Providers(): $CancellablePromise<$models.ProviderStatus[] | null> {
     return $Call.ByID(727355388);

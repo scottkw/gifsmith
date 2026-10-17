@@ -27,15 +27,12 @@ type ProviderStatus struct {
 	Clips      string `json:"clips"`
 }
 
-// Providers reports the four fixed slots. Clips needs the GIPHY key; plan 02-06
-// adds its probe states (checking/enabled/disabled) in place of "unknown".
+// Providers reports the four fixed slots; clips is the Clips probe state
+// (no_key, checking, enabled, disabled or unknown).
 func (s *GifService) Providers(ctx context.Context) []ProviderStatus {
 	_, giphy := s.Keys.Get(provider.GIPHY)
 	_, klipy := s.Keys.Get(provider.Klipy)
-	clips := "no_key"
-	if giphy {
-		clips = "unknown"
-	}
+	clips := string(s.Clips.State())
 	return []ProviderStatus{
 		{ID: string(provider.GIPHY), Configured: giphy, Clips: clips},
 		{ID: string(provider.Clips), Configured: giphy, Clips: clips},
@@ -53,23 +50,37 @@ func parse(p string) (provider.ID, error) {
 }
 
 func (s *GifService) Search(ctx context.Context, p, q, cursor string) (provider.Page, error) {
-	id, err := parse(p)
-	if err != nil {
-		return provider.Page{}, err
-	}
-	page, err := s.Svc.Search(ctx, id, q, cursor)
-	logProviderErr("search", p, err)
-	return page, err
+	return s.call("search", p, func(id provider.ID) (provider.Page, error) { return s.Svc.Search(ctx, id, q, cursor) })
 }
 
 func (s *GifService) Trending(ctx context.Context, p, cursor string) (provider.Page, error) {
+	return s.call("trending", p, func(id provider.ID) (provider.Page, error) { return s.Svc.Trending(ctx, id, cursor) })
+}
+
+// call refuses Clips until its probe passed, and lets the first GIPHY GIFs
+// success start the launch's Clips probe (the key is now proven on GIFs).
+func (s *GifService) call(op, p string, get func(provider.ID) (provider.Page, error)) (provider.Page, error) {
 	id, err := parse(p)
 	if err != nil {
 		return provider.Page{}, err
 	}
-	page, err := s.Svc.Trending(ctx, id, cursor)
-	logProviderErr("trending", p, err)
+	if id == provider.Clips && s.Clips.State() != search.ClipsEnabled {
+		return provider.Page{}, &provider.Error{Kind: provider.ClipsDisabled, Provider: provider.Clips}
+	}
+	page, err := get(id)
+	logProviderErr(op, p, err)
+	if err == nil && id == provider.GIPHY {
+		s.Clips.Trigger()
+	}
 	return page, err
+}
+
+// CheckClips re-probes once when the Clips result is unknown (the user chose
+// Clips). It returns the state, and the probe's error while still unknown.
+func (s *GifService) CheckClips(ctx context.Context) (string, error) {
+	st, err := s.Clips.Recheck(ctx)
+	logProviderErr("clips probe", string(provider.Clips), err)
+	return string(st), err
 }
 
 // logProviderErr logs only typed provider errors (URL-free by construction); cancellations are routine.
@@ -79,6 +90,3 @@ func logProviderErr(op, p string, err error) {
 		log.Printf("%s %s: %v", op, p, pe)
 	}
 }
-
-// CheckClips (skeleton).
-func (g *GifService) CheckClips(ctx context.Context) (string, error) { return "", nil }

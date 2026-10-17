@@ -32,7 +32,8 @@ const (
 func Handler(o Options) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /finer/search", func(w http.ResponseWriter, r *http.Request) { finerSearch(w, r, o) })
-	mux.HandleFunc("GET /giphy/v1/gifs/{kind}", func(w http.ResponseWriter, r *http.Request) { giphyGifs(w, r, o) })
+	mux.HandleFunc("GET /giphy/v1/gifs/{kind}", func(w http.ResponseWriter, r *http.Request) { giphyGifs(w, r, o, false) })
+	mux.HandleFunc("GET /giphy/v1/clips/{kind}", func(w http.ResponseWriter, r *http.Request) { giphyGifs(w, r, o, true) })
 	mux.HandleFunc("GET /klipy/api/v1/{key}/gifs/{kind}", func(w http.ResponseWriter, r *http.Request) { klipyGifs(w, r, o) })
 	mux.HandleFunc("GET /media/{file}", media)
 	return mux
@@ -75,9 +76,10 @@ func finerSearch(w http.ResponseWriter, r *http.Request, o Options) {
 	writeJSON(w, map[string]any{"hits": map[string]int{"found": found, "start": start}, "results": results})
 }
 
-// giphyGifs serves /v1/gifs/search and /v1/gifs/trending. Scenario words are
-// read from q and the key, so trending (no q) can be driven by a key such as "ratelimit-key".
-func giphyGifs(w http.ResponseWriter, r *http.Request, o Options) {
+// giphyGifs serves /v1/gifs/{search,trending} and, with clips, /v1/clips/{search,trending}
+// (clips_grid_picker-shaped: fixed_width plus video assets, no original GIF). Scenario
+// words are read from q and the key, so trending (no q) can be driven by a key such as "ratelimit-key".
+func giphyGifs(w http.ResponseWriter, r *http.Request, o Options, clips bool) {
 	kind := r.PathValue("kind")
 	if kind != "search" && kind != "trending" {
 		http.NotFound(w, r)
@@ -91,6 +93,12 @@ func giphyGifs(w http.ResponseWriter, r *http.Request, o Options) {
 		w.Header().Set("Retry-After", "0") // what the real host sends on 401
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = fmt.Fprint(w, `{"data": [], "meta": {"status": 401, "msg": "Unauthorized", "response_id": ""}}`)
+		return
+	}
+	if clips && o.ClipsDenied {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden) // GIPHY does not document the unapproved-key status; 403 stands in
+		_, _ = fmt.Fprint(w, `{"data": [], "meta": {"status": 403, "msg": "Forbidden", "response_id": ""}}`)
 		return
 	}
 	offset, _ := strconv.Atoi(q.Get("offset"))
@@ -118,10 +126,18 @@ func giphyGifs(w http.ResponseWriter, r *http.Request, o Options) {
 		Slug   string               `json:"slug"`
 		Title  string               `json:"title"`
 		Images map[string]rendition `json:"images"`
+		Video  map[string]any       `json:"video,omitempty"`
 	}
 	media := "http://" + r.Host + "/media/"
 	data := []item{}
 	for n := max(offset, 0) + 1; n <= total && len(data) < limit; n++ {
+		if clips {
+			id := "clip-" + strconv.Itoa(n)
+			data = append(data, item{Type: "video", ID: id, Slug: "clip-" + id, Title: "GIPHY clip " + strconv.Itoa(n), Images: map[string]rendition{
+				"fixed_width": {URL: media + id + "-200w.gif", Width: "200", Height: "112", Size: "1234"},
+			}, Video: map[string]any{"assets": map[string]rendition{"360p": {URL: media + id + "-360p.mp4", Width: "640", Height: "360"}}}})
+			continue
+		}
 		id := "giphy-" + strconv.Itoa(n)
 		data = append(data, item{Type: "gif", ID: id, Slug: "moment-" + id, Title: "GIPHY moment " + strconv.Itoa(n), Images: map[string]rendition{
 			"fixed_width": {URL: media + id + "-200w.gif", Width: "200", Height: "200", Size: "1234"},
