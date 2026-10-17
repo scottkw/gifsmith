@@ -15,6 +15,8 @@ type Fake struct {
 	Trusted   bool
 	Frontmost App
 	PasteErr  error
+	// ActivateSetsFrontmost makes ActivateApp succeed; otherwise it is declined (Frontmost unchanged).
+	ActivateSetsFrontmost bool
 }
 
 func (f *Fake) Note(s string) {
@@ -42,6 +44,9 @@ func (f *Fake) FrontmostApp() (App, error) {
 
 func (f *Fake) ActivateApp(pid int) error {
 	f.Note("ActivateApp:" + strconv.Itoa(pid))
+	if f.ActivateSetsFrontmost {
+		f.Frontmost = App{PID: pid}
+	}
 	return nil
 }
 

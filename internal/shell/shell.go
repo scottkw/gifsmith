@@ -81,11 +81,12 @@ func (s *Shell) Toggle() {
 }
 
 func (s *Shell) Show() {
-	if app, err := s.plat.FrontmostApp(); err != nil {
+	app, err := s.plat.FrontmostApp()
+	if err != nil {
 		log.Printf("frontmost app: %v", err)
-	} else {
-		s.prev = app
+		app = platform.App{} // never paste into a target left over from an earlier show
 	}
+	s.prev = app
 	x, y := panelOrigin(s.plat.CursorScreenWorkArea(), PanelWidth, PanelHeight)
 	s.panel.SetPosition(x, y)
 	s.panel.Show()

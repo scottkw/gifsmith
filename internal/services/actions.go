@@ -55,18 +55,24 @@ func (a *ActionService) Paste(ctx context.Context) (Result, error) {
 	}
 	a.Hide()
 	sleep(PasteDelay)
-	if prev := a.Previous(); prev.PID != 0 {
+	prev := a.Previous()
+	if prev.PID != 0 {
 		if front, err := a.Platform.FrontmostApp(); err == nil && front.PID != prev.PID {
 			if err := a.Platform.ActivateApp(prev.PID); err != nil {
-				log.Printf("reactivate %s: %v", prev.Name, err) // best effort; post anyway
+				log.Printf("reactivate %s: %v", prev.Name, err)
 			}
 			sleep(PasteDelay)
+			// macOS 14+ may decline the activation; never post ⌘V into an app the user did not pick.
+			if now, err := a.Platform.FrontmostApp(); err != nil || now.PID != prev.PID {
+				log.Printf("paste: could not return to %q, copied only", prev.Name)
+				return Result{Copied: true, Message: "Copied — press ⌘V to paste (could not return to " + prev.Name + ")"}, nil
+			}
 		}
 	}
 	if err := a.Platform.PasteShortcut(); err != nil {
 		return Result{Copied: true}, err
 	}
-	log.Printf("paste: posted ⌘V (previous app %q)", a.Previous().Name)
+	log.Printf("paste: posted ⌘V (previous app %q)", prev.Name)
 	return Result{Copied: true, Pasted: true, Message: "Pasted GIF"}, nil
 }
 

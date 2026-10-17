@@ -107,13 +107,32 @@ func TestPasteTrustedOrder(t *testing.T) {
 }
 
 func TestPasteReactivatesPrevious(t *testing.T) {
-	f := &platform.Fake{Trusted: true, Frontmost: platform.App{BundleID: "com.other", PID: 7}}
-	if _, err := newPasteService(f).Paste(context.Background()); err != nil {
+	f := &platform.Fake{Trusted: true, Frontmost: platform.App{BundleID: "com.other", PID: 7}, ActivateSetsFrontmost: true}
+	r, err := newPasteService(f).Paste(context.Background())
+	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"CopyFile:" + sample, "AccessibilityTrusted:false", "hide", "sleep:80ms", "FrontmostApp", "ActivateApp:42", "sleep:80ms", "PasteShortcut"}
+	if !r.Pasted {
+		t.Errorf("result = %+v, want Pasted", r)
+	}
+	want := []string{"CopyFile:" + sample, "AccessibilityTrusted:false", "hide", "sleep:80ms", "FrontmostApp", "ActivateApp:42", "sleep:80ms", "FrontmostApp", "PasteShortcut"}
 	if !slices.Equal(f.Calls, want) {
 		t.Errorf("calls = %q, want %q", f.Calls, want)
+	}
+}
+
+// macOS 14+ often declines activation from a background app; ⌘V must not land in the wrong app.
+func TestPasteDeclinedReactivationCopiesOnly(t *testing.T) {
+	f := &platform.Fake{Trusted: true, Frontmost: platform.App{BundleID: "com.other", PID: 7}}
+	r, err := newPasteService(f).Paste(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.Copied || r.Pasted || !strings.Contains(r.Message, "TextEdit") {
+		t.Errorf("result = %+v, want Copied, not Pasted, message naming TextEdit", r)
+	}
+	if slices.Contains(f.Calls, "PasteShortcut") {
+		t.Errorf("⌘V posted after declined activation: calls = %q", f.Calls)
 	}
 }
 
