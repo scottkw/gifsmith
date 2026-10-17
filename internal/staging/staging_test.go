@@ -42,7 +42,7 @@ func gif(base, name, title string) provider.Gif {
 func entries(t *testing.T, dir string) []string {
 	t.Helper()
 	var out []string
-	filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+	_ = filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
 		if p != dir {
 			rel, _ := filepath.Rel(dir, p)
 			out = append(out, rel)
@@ -83,7 +83,7 @@ func TestFetchStagesGIF(t *testing.T) {
 func TestFetchNotGIF(t *testing.T) {
 	s, base, _ := newStore(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte("<html>"))
+		_, _ = w.Write([]byte("<html>"))
 	}))
 	_, err := s.Fetch(context.Background(), gif(base, "x", "x"))
 	if !errors.Is(err, ErrNotGIF) {
@@ -176,7 +176,9 @@ func TestSweep(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	os.WriteFile(filepath.Join(s.Dir, "sample.gif"), []byte("GIF89a"), 0o644) // Phase 1 leftover
+	if err := os.WriteFile(filepath.Join(s.Dir, "sample.gif"), []byte("GIF89a"), 0o644); err != nil { // Phase 1 leftover
+		t.Fatal(err)
+	}
 	keep, err := s.Fetch(context.Background(), gif(base, "office-4", "keep"))
 	if err != nil {
 		t.Fatal(err)

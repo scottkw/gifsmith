@@ -42,7 +42,7 @@ func GetJSON(ctx context.Context, c *http.Client, p provider.ID, rawURL string, 
 		}
 		return 0, &provider.Error{Kind: provider.Network, Provider: p}
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
 	if err != nil {
 		if ctx.Err() != nil {

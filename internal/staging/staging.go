@@ -68,7 +68,7 @@ func (s *Store) Fetch(ctx context.Context, g provider.Gif) (string, error) {
 	if err != nil {
 		return "", ErrDownload
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return "", ErrDownload
 	}
@@ -106,8 +106,8 @@ func (s *Store) Fetch(ctx context.Context, g provider.Gif) (string, error) {
 		}
 		err = ErrDownload
 	}
-	os.Remove(part)
-	os.Remove(dir) // only succeeds when empty: an earlier copy of the same GIF stays
+	_ = os.Remove(part)
+	_ = os.Remove(dir) // only succeeds when empty: an earlier copy of the same GIF stays
 	return "", err
 }
 

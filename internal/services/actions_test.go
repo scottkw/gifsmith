@@ -61,7 +61,9 @@ func TestCopyStagesAndDoesNotHide(t *testing.T) {
 	f := &platform.Fake{}
 	s, fx := newService(t, f)
 	stray := filepath.Join(fx.dir, "0123456789abcdef")
-	os.MkdirAll(stray, 0o755) // an older staged copy
+	if err := os.MkdirAll(stray, 0o755); err != nil { // an older staged copy
+		t.Fatal(err)
+	}
 	r, err := s.Copy(context.Background(), fx.gif)
 	if err != nil {
 		t.Fatal(err)
@@ -82,7 +84,9 @@ func TestCopyErrorKeepsPanelOpen(t *testing.T) {
 	f := &platform.Fake{CopyErr: errors.New("pasteboard write failed")}
 	s, fx := newService(t, f)
 	stray := filepath.Join(fx.dir, "0123456789abcdef")
-	os.MkdirAll(stray, 0o755)
+	if err := os.MkdirAll(stray, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	r, err := s.Copy(context.Background(), fx.gif)
 	if !errors.Is(err, f.CopyErr) {
 		t.Errorf("err = %v, want %v", err, f.CopyErr)

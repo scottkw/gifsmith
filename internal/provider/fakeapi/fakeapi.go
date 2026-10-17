@@ -35,7 +35,7 @@ func finerSearch(w http.ResponseWriter, r *http.Request, o Options) {
 	if o.FinerDown {
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(530)
-		fmt.Fprint(w, "error code: 1033")
+		_, _ = fmt.Fprint(w, "error code: 1033")
 		return
 	}
 	q := r.URL.Query()
@@ -94,10 +94,10 @@ func media(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "image/gif")
-	w.Write(buf.Bytes())
+	_, _ = w.Write(buf.Bytes())
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(v)
 }

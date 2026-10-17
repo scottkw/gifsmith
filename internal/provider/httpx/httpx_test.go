@@ -65,7 +65,7 @@ func TestGetJSONClassification(t *testing.T) {
 					w.Header().Set(k, v)
 				}
 				w.WriteHeader(c.status)
-				fmt.Fprint(w, c.body)
+				_, _ = fmt.Fprint(w, c.body)
 			})
 			var v map[string]any
 			status, err := GetJSON(context.Background(), srv.Client(), provider.GIPHY, srv.URL+"/x", &v)

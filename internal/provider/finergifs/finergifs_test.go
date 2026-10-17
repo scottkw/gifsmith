@@ -72,7 +72,7 @@ func bodyClient(t *testing.T, body string) (*Client, *atomic.Int32) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(body))
+		_, _ = w.Write([]byte(body))
 	}))
 	t.Cleanup(srv.Close)
 	return &Client{BaseURL: srv.URL, MediaBase: "https://media.thefinergifs.club", HTTP: srv.Client()}, &hits
