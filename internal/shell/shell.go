@@ -99,8 +99,9 @@ func (s *Shell) show() {
 		app = platform.App{} // never paste into a target left over from an earlier show
 	}
 	s.prev = app
-	x, y := panelOrigin(s.plat.CursorScreenWorkArea(), PanelWidth, PanelHeight)
-	s.panel.SetPosition(x, y)
+	if wa := s.plat.CursorScreenWorkArea(); wa.Width > 0 && wa.Height > 0 { // zero: no screen, keep position
+		s.panel.SetPosition(panelOrigin(wa, PanelWidth, PanelHeight))
+	}
 	s.panel.Show()
 	s.panel.Focus() // Show() alone never makes a non-activating panel key
 	s.plat.FocusWebView(s.panel.NativeWindow())

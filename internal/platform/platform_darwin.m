@@ -87,8 +87,11 @@ void gsCursorScreenVisibleFrame(int *x, int *y, int *w, int *h) {
         for (NSScreen *s in [NSScreen screens]) {
             if (NSMouseInRect(p, s.frame, NO)) { screen = s; break; }
         }
+        // No screens during display reconfiguration or lid-closed; [screens][0] would throw and abort.
+        NSScreen *primary = [[NSScreen screens] firstObject] ?: [NSScreen mainScreen];
+        if (screen == nil || primary == nil) { *x = *y = *w = *h = 0; return; }
         NSRect vf = screen.visibleFrame;
-        CGFloat primaryHeight = [NSScreen screens][0].frame.size.height;
+        CGFloat primaryHeight = primary.frame.size.height;
         *x = (int)vf.origin.x;
         *y = (int)(primaryHeight - (vf.origin.y + vf.size.height));
         *w = (int)vf.size.width;

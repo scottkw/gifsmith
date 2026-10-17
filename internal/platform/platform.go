@@ -23,7 +23,7 @@ type Platform interface {
 	CopyFile(path string) error
 	// FocusWebView makes the window's WKWebView first responder so typing reaches the page.
 	FocusWebView(nsWindow unsafe.Pointer)
-	// CursorScreenWorkArea is the visible frame of the screen under the mouse cursor.
+	// CursorScreenWorkArea is the visible frame of the screen under the mouse cursor (zero Rect if there is no screen).
 	CursorScreenWorkArea() Rect
 	// FrontmostApp is the app that currently owns the menu bar.
 	FrontmostApp() (App, error)
