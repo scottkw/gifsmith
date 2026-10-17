@@ -8,6 +8,7 @@
   let needsAccessibility = $state(false);
   // Paste hides the panel before ⌘V; a copied-only fallback message must survive to the next show.
   let keepStatus = false;
+  let busy = false; // one Copy/Paste in flight; a second Enter would paste twice
 
   onMount(() => {
     input.focus();
@@ -27,6 +28,8 @@
     // Enter that commits an IME composition (WebKit: keyCode 229) is not a submit.
     if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229 || e.repeat) return;
     e.preventDefault();
+    if (busy) return;
+    busy = true;
     try {
       if (e.metaKey) {
         const r = await ActionService.Paste();
@@ -38,6 +41,8 @@
       }
     } catch (err) {
       status = String(err);
+    } finally {
+      busy = false;
     }
   }
 

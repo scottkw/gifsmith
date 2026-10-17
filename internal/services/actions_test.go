@@ -171,3 +171,25 @@ func TestRequestAccessibilityOpensSettings(t *testing.T) {
 		t.Errorf("calls = %q, want %q", f.Calls, want)
 	}
 }
+
+func TestActionsRefuseWhileBusy(t *testing.T) {
+	f := &platform.Fake{Trusted: true, Frontmost: prevApp}
+	s := newPasteService(f)
+	s.busy.Lock() // an action is in flight
+	if _, err := s.Copy(context.Background()); !errors.Is(err, ErrBusy) {
+		t.Errorf("Copy err = %v, want ErrBusy", err)
+	}
+	if _, err := s.Paste(context.Background()); !errors.Is(err, ErrBusy) {
+		t.Errorf("Paste err = %v, want ErrBusy", err)
+	}
+	if _, err := s.RequestAccessibility(context.Background()); !errors.Is(err, ErrBusy) {
+		t.Errorf("RequestAccessibility err = %v, want ErrBusy", err)
+	}
+	if len(f.Calls) != 0 {
+		t.Errorf("calls = %q, want none while busy", f.Calls)
+	}
+	s.busy.Unlock()
+	if _, err := s.Paste(context.Background()); err != nil {
+		t.Errorf("Paste after release: %v", err)
+	}
+}

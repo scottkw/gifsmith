@@ -4,11 +4,16 @@ package services
 
 import (
 	"context"
+	"errors"
 	"log"
+	"sync"
 	"time"
 
 	"gifsmith/internal/platform"
 )
+
+// ErrBusy is returned when another action is still running (each bound call has its own goroutine).
+var ErrBusy = errors.New("another action is still running")
 
 // PasteDelay is the wait between hiding the panel (or reactivating the previous app) and ⌘V.
 const PasteDelay = 80 * time.Millisecond
@@ -26,11 +31,16 @@ type ActionService struct {
 	Hide       func()
 	Previous   func() platform.App
 	Sleep      func(time.Duration) // nil means time.Sleep
+	busy       sync.Mutex          // one action at a time: no racing pasteboard writes, no double ⌘V
 }
 
 // Copy puts the staged sample GIF on the clipboard as a file and hides the panel.
 // On failure the panel stays open so the frontend can show the error.
 func (a *ActionService) Copy(ctx context.Context) (Result, error) {
+	if !a.busy.TryLock() {
+		return Result{}, ErrBusy
+	}
+	defer a.busy.Unlock()
 	if err := a.Platform.CopyFile(a.SamplePath); err != nil {
 		return Result{}, err
 	}
@@ -42,6 +52,10 @@ func (a *ActionService) Copy(ctx context.Context) (Result, error) {
 // Paste copies the GIF, hides the panel and posts one ⌘V to the previous app.
 // Without Accessibility it only copies and keeps the panel open with instructions.
 func (a *ActionService) Paste(ctx context.Context) (Result, error) {
+	if !a.busy.TryLock() {
+		return Result{}, ErrBusy
+	}
+	defer a.busy.Unlock()
 	if err := a.Platform.CopyFile(a.SamplePath); err != nil {
 		return Result{}, err
 	}
@@ -81,6 +95,10 @@ func (a *ActionService) Paste(ctx context.Context) (Result, error) {
 // RequestAccessibility raises the macOS prompt and, if still untrusted, opens the settings pane.
 // Only an explicit button click calls this.
 func (a *ActionService) RequestAccessibility(ctx context.Context) (bool, error) {
+	if !a.busy.TryLock() {
+		return false, ErrBusy
+	}
+	defer a.busy.Unlock()
 	if a.Platform.AccessibilityTrusted(true) {
 		log.Printf("request accessibility: already trusted")
 		return true, nil
