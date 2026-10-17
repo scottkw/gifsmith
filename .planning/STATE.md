@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-17)
 
 **Core value:** Hotkey → type → Enter puts the right GIF on the clipboard (or into the frontmost app) in seconds, without Raycast.
-**Current focus:** Phase 2 — Providers, Search UI & First Run
+**Current focus:** Phase 3 — Action Pipeline & Library
 
 ## Current Position
 
@@ -34,7 +34,7 @@ Plan: Not started
 Status: Ready to plan
 Last activity: 2026-10-17 — Phase 2 complete, transitioned to Phase 3
 
-Progress: [█████░░░░░] 50% (4/4 plans in Phase 1)
+Progress: [█████░░░░░] 50% (2/4 phases; 10/10 planned plans complete)
 
 ## Performance Metrics
 
@@ -113,6 +113,9 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-06: Clips is offered only after one Clips probe per launch passes, made after a GIPHY GIFs success with the same key; 401/403/404 -> disabled, transient -> unknown with one user-initiated recheck; Go refuses Clips calls unless enabled
 - [Phase 02]: 02-06: C2 primary action is an <a> 'Email clips@giphy.com ↗' opening mailto:clips@giphy.com with a subject (the only mailto in the openExternal allow-list)
 - [Phase 02]: 02-06: Native UAT approved; the user's real GIPHY key is not approved for Clips (probe checking -> disabled, C2 shown); dev logs hold no key material
+- [Phase 2 close]: Klipy items with GIF renditions (ads included) stay in place (WR-04); persisted Clips tab restored when a GIPHY key exists (WR-02) — both accepted verification overrides
+- [Phase 2 close]: GIPHY and Clips share one 429 budget; Clips probed at most once per key after a GIPHY GIFs success; a rate-limited re-check does not spend the re-probe; staging downloads check the allowlist on every redirect
+- [Phase 2 close]: MVP mode dropped for Phases 2–4; 11 Info-level review items left open in 02-REVIEW-DISPOSITION.md
 
 ### Pending Todos
 
@@ -121,8 +124,10 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 1→3/4]: N10, N13 and paste in Slack, Discord, Telegram, Safari/Chrome composers untested; re-check in later UAT (GO WITH FALLBACKS limit 2)
-- [Phase 2]: Klipy request shapes untested with a live key; GIPHY Clips needs per-key approval; Finer Gifs was down on 2026-10-17
-- [Phase 4]: Klipy written clearance for temp file copies (developers@klipy.com) is a pre-release gate; request early
+- [Phase 2→]: The user's GIPHY key is not approved for Clips (C2 shown); approval via clips@giphy.com is a user action
+- [Phase 2→]: The Finer Gifs Club API was down on 2026-10-17; Phase 2 UAT accepted either results or the down message, so availability is still unconfirmed
+- [Phase 4]: Klipy written clearance for temp file copies (developers@klipy.com) is a pre-release gate; request early, and ask about labelling Klipy ads (IN-09)
+- [Phase 2→4]: Public repo github.com/scottkw/gifsmith holds only the MIT LICENSE; push code after the Phase 2 merge to main and add the Raycast GIF Search authors' MIT notice to LICENSE
 - [Phase 4]: Apple Developer agreement 403 (notarytool store-credentials: 'A required agreement is missing or has expired') must be resolved by the user before Phase 4 notarization; notarized dry run + N15 carried over from Phase 1
 
 ### Quick Tasks Completed
@@ -141,6 +146,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-17T21:22:45.916Z
+Last session: 2026-10-17T23:06:34.000Z
 Stopped at: Phase 2 complete, ready to plan Phase 3
 Resume file: None
