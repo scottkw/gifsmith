@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | macOS version | 27.0.1 |
-| Dev build commit | ce0c96d |
+| Dev build commit | e9f1230 (gate re-test build; first signed build ce0c96d) |
 | Notarized build commit | PENDING (plan 01-04) |
 | Paste delay (ms) | 80 |
 | Date | 2026-10-17 |
@@ -28,8 +28,8 @@
 | N10 | No clash with Vorssaint | PENDING | PENDING | Passed in the 01-01 gate (unsigned dev build); not re-checked on the signed build |
 | N11 | Enter then ⌘V in TextEdit inserts the animated GIF with Accessibility OFF | PASS | PENDING | |
 | N12 | ⌘Enter with Accessibility OFF shows the copied + how-to-grant message and pastes nothing | PASS | PENDING | |
-| N13 | "Enable automatic paste…" raises the prompt / opens the Accessibility pane | PENDING | PENDING | Earlier FAIL was plain Enter (Copy path); button not clicked in re-test. Accessibility was granted via the Privacy_Accessibility URL instead |
-| N14 | ⌘Enter with Accessibility ON pastes into TextEdit with no manual ⌘V | PENDING | PENDING | Crashed: TIS off main thread — fixed in e9f1230; under re-test |
+| N13 | "Enable automatic paste…" raises the prompt / opens the Accessibility pane | PENDING | PENDING | Earlier FAIL was plain Enter (Copy path). Button not clicked in the re-test; the user reached the permission list via the same `x-apple.systempreferences:…?Privacy_Accessibility` URL the button opens (run by the orchestrator), so the destination is confirmed but the click itself is unverified. Re-check at 01-04 UAT |
+| N14 | ⌘Enter with Accessibility ON pastes into TextEdit with no manual ⌘V | PASS | PENDING | First try crashed (TIS keyboard-layout lookup off the main thread); fixed in e9f1230. Re-test: ⌃⌥⌘G then ⌘Enter ×5 in TextEdit pasted each time, no crash |
 | N15 | Accessibility grant carried over from the previous build without re-granting | n/a | PENDING | Dev column n/a: first signed build |
 
 ## 2. Per-app paste matrix
@@ -38,15 +38,19 @@
 
 | App | Copy→⌘V (dev) | ⌘Enter (dev) | Copy→⌘V (notarized) | ⌘Enter (notarized) | Notes |
 |-----|---------------|--------------|---------------------|--------------------|-------|
-| TextEdit (rich text) | PASS | PENDING | PENDING | PENDING | |
-| Notes | PASS | PENDING | PENDING | PENDING | |
-| Mail (new message) | PASS | PENDING | PENDING | PENDING | |
-| Messages | PASS | PENDING | PENDING | PENDING | |
+| TextEdit (rich text) | PASS | PASS | PENDING | PENDING | |
+| Notes | PASS | PASS | PENDING | PENDING | |
+| Mail (new message) | PASS | PASS | PENDING | PENDING | |
+| Messages | PASS | PASS | PENDING | PENDING | |
 | Slack | PENDING | PENDING | PENDING | PENDING | |
 | Discord | PENDING | PENDING | PENDING | PENDING | |
 | Telegram | PENDING | PENDING | PENDING | PENDING | |
 | Safari composer (e.g. a Gmail or GitHub comment box) | PENDING | PENDING | PENDING | PENDING | |
 | Chrome composer (same site) | PENDING | PENDING | PENDING | PENDING | |
+
+Slack, Discord, Telegram and the Safari/Chrome composers were not tested in the dev gate; they stay PENDING for the 01-04 notarized UAT.
+
+**macOS 27 Settings finding (for Phase 4 Settings/onboarding):** on macOS 27.0.1 the user saw no "Accessibility" row under System Settings › Privacy & Security. The permission list is reachable only via the URL `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility` (what "Enable automatic paste…" opens). Onboarding copy must not tell the user to navigate there by hand; use the button/URL.
 
 ## 3. Payload conclusion
 
