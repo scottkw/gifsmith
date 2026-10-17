@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="100 100 824 824">
+<g transform="translate(189 206) scale(34)">
+<!-- Back frame minus the design's 15x15 knockout. Inside the stroke band its edges are straight (y=3.5, x=14.5), so an L-shaped clip is exact. -->
+<clipPath id="b"><path d="M4 -1H19V14H14.5V3.5H4Z"/></clipPath>
+<rect x="6" y="1" width="11" height="11" rx="2.75" stroke="#22201c" stroke-width="2" fill="none" clip-path="url(#b)"/>
+<rect x="1" y="5" width="12" height="12" rx="3" fill="#e0612f"/>
+<path d="M5 8.4L10.6 11L5 13.6Z" fill="#f6f4ef" stroke="#f6f4ef" stroke-width="0.4" stroke-linejoin="round"/>
+</g>
+</svg>
