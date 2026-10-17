@@ -77,3 +77,13 @@ export function pagingMessage(e: ProviderErr, now: number, receivedAt = now): st
   if (left <= 0) return "Couldn't load more.";
   return `Request limit reached. More results in ${Math.ceil(left / 60)} min.`;
 }
+
+// Setup card inline message (K2–K4); null = not a provider error, i.e. the Keychain write failed.
+export function keyMessage(e: ProviderErr | null, providerLabel: string, now: number): string {
+  return '';
+}
+
+// K6: a stored key rejected during search or trending (S13).
+export function revokedMessage(providerLabel: string): string {
+  return '';
+}

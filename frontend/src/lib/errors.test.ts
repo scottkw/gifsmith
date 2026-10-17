@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { errorState, pagingMessage, providerName } from './errors.ts';
+import { errorState, pagingMessage, providerName, keyMessage, revokedMessage } from './errors.ts';
 
 const NOW = Date.UTC(2026, 9, 17, 19, 0, 0);
 const SWITCH = 'Other providers still work: ⌘1–⌘4.';
@@ -118,4 +118,37 @@ test('no copy leaks a URL or undefined', () => {
       }
     }
   }
+});
+
+test('keyMessage: rejected key (K2)', () => {
+  assert.equal(
+    keyMessage({ kind: 'key_rejected', provider: 'giphy', status: 401 }, 'GIPHY', NOW),
+    'GIPHY rejected that key. Check that you copied the whole key, then try again.',
+  );
+});
+
+test('keyMessage: network, timeout and other http (K3)', () => {
+  const k3 = "Couldn't reach Klipy to check the key. Check your connection, then try again.";
+  assert.equal(keyMessage({ kind: 'network', provider: 'klipy' }, 'Klipy', NOW), k3);
+  assert.equal(keyMessage({ kind: 'timeout', provider: 'klipy' }, 'Klipy', NOW), k3);
+  assert.equal(keyMessage({ kind: 'http', provider: 'klipy', status: 503 }, 'Klipy', NOW), k3);
+});
+
+test('keyMessage: rate limited with known and unknown retry (K4)', () => {
+  assert.equal(
+    keyMessage({ kind: 'rate_limited', provider: 'giphy', retryAfterSec: 180 }, 'GIPHY', NOW),
+    "GIPHY's request limit was hit while checking the key. Try again in 3 minutes.",
+  );
+  assert.equal(
+    keyMessage({ kind: 'rate_limited', provider: 'giphy', retryAfterSec: 0 }, 'GIPHY', NOW),
+    "GIPHY's request limit was hit while checking the key. Try again later this hour.",
+  );
+});
+
+test('keyMessage: Keychain failure', () => {
+  assert.equal(keyMessage(null, 'GIPHY', NOW), "Couldn't save the key to the macOS Keychain. Try again.");
+});
+
+test('revokedMessage (K6)', () => {
+  assert.equal(revokedMessage('Klipy'), 'Klipy rejected your saved key. It may have been revoked. Paste a new key to continue.');
 });
