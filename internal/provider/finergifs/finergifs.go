@@ -35,8 +35,9 @@ type response struct {
 	} `json:"hits"`
 }
 
-func (c *Client) bad() error {
-	return &provider.Error{Kind: provider.HTTP, Provider: provider.FinerGifs}
+// bad is a malformed request or response; status is the response's HTTP status (0 before any request).
+func bad(status int) error {
+	return &provider.Error{Kind: provider.HTTP, Provider: provider.FinerGifs, Status: status}
 }
 
 // Search pages with an opaque cursor that is the start offset.
@@ -45,7 +46,7 @@ func (c *Client) Search(ctx context.Context, q, cursor string) (provider.Page, e
 	if cursor != "" {
 		n, err := strconv.Atoi(cursor)
 		if err != nil || n < 0 {
-			return provider.Page{}, c.bad() // never silently restart at the first page
+			return provider.Page{}, bad(0) // never silently restart at the first page
 		}
 		start = n
 	}
@@ -57,17 +58,18 @@ func (c *Client) Search(ctx context.Context, q, cursor string) (provider.Page, e
 		"start":    {strconv.Itoa(start)},
 	}
 	var r response
-	if _, err := httpx.GetJSON(ctx, c.HTTP, provider.FinerGifs, c.BaseURL+"/search?"+v.Encode(), &r); err != nil {
+	status, err := httpx.GetJSON(ctx, c.HTTP, provider.FinerGifs, c.BaseURL+"/search?"+v.Encode(), &r)
+	if err != nil {
 		return provider.Page{}, err
 	}
 	if r.Results == nil {
-		return provider.Page{}, c.bad()
+		return provider.Page{}, bad(status)
 	}
 	items := make([]provider.Gif, 0, len(r.Results))
 	for _, res := range r.Results {
 		f := res.Fields
 		if !fileidRE.MatchString(f.Fileid) {
-			return provider.Page{}, c.bad()
+			return provider.Page{}, bad(status)
 		}
 		title := f.Text
 		if title == "" {
