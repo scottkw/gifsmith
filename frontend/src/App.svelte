@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { Events } from '@wailsio/runtime';
-  import { copy, hide, paste, requestAccessibility, search, type Gif } from './lib/api';
+  import { copy, hide, paste, requestAccessibility, search, type Gif, type Page } from './lib/api';
+  import ResultGrid from './components/ResultGrid.svelte';
 
   const PROVIDER = 'finergifs';
   const DEBOUNCE_MS = 450;
@@ -22,6 +23,12 @@
   let keepStatus = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let seq = 0; // only the latest search may update the grid
+  // Paging for the current result set. resultSeq changes whenever items are replaced, so a page
+  // that lands after a new search (or a cleared query) is dropped instead of appended.
+  let resultSeq = $state(0);
+  let next = ''; // provider cursor; "" = no more pages
+  let fetchPage: ((cursor: string) => Promise<Page>) | null = null;
+  let paging = $state<'idle' | 'loading' | 'end' | 'error'>('idle');
 
   const footerCenter = $derived(status || items[selected]?.title || '');
 
@@ -58,8 +65,7 @@
     const q = query.trim();
     if ([...q].length < 2) {
       seq++;
-      items = [];
-      selected = -1;
+      setResults(null, null);
       return;
     }
     timer = setTimeout(() => runSearch(q), DEBOUNCE_MS);
@@ -68,16 +74,47 @@
   async function runSearch(q: string) {
     const mine = ++seq;
     try {
-      const page = await search(PROVIDER, q, '');
+      const more = (cursor: string) => search(PROVIDER, q, cursor);
+      const page = await more('');
       if (mine !== seq) return;
-      items = page.items ?? [];
-      selected = items.length ? 0 : -1;
+      setResults(page, more);
     } catch {
       if (mine !== seq) return;
-      items = [];
-      selected = -1;
+      setResults(null, null);
       setStatus("Couldn't search The Finer Gifs Club.", 'error');
     }
+  }
+
+  // A new result set (or none): first tile selected, paging restarts.
+  function setResults(page: Page | null, more: typeof fetchPage) {
+    resultSeq++;
+    items = page?.items ?? [];
+    selected = items.length ? 0 : -1;
+    next = page?.next ?? '';
+    fetchPage = more;
+    paging = page && !next ? 'end' : 'idle';
+  }
+
+  // One page request at a time; a failed page keeps loaded results until Try Again.
+  async function loadMore() {
+    if (paging !== 'idle' || !next || !fetchPage) return;
+    const mine = resultSeq;
+    paging = 'loading';
+    try {
+      const page = await fetchPage(next);
+      if (mine !== resultSeq) return;
+      items = [...items, ...(page.items ?? [])];
+      next = page.next;
+      paging = next ? 'idle' : 'end';
+    } catch {
+      if (mine !== resultSeq) return;
+      paging = 'error';
+    }
+  }
+
+  function retryPage() {
+    paging = 'idle';
+    loadMore();
   }
 
   function onKeydown(e: KeyboardEvent) {
@@ -151,30 +188,23 @@
   </header>
 
   <section class="content">
-    <div class="grid" id="grid" role="listbox" aria-label="Results">
-      {#each items as g, i (i)}
-        <!-- Keyboard selection goes through the combobox input (aria-activedescendant), never tile focus. -->
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div
-          class="tile"
-          id="tile-{i}"
-          role="option"
-          tabindex="-1"
-          aria-selected={i === selected}
-          aria-label={g.title || `GIF ${i + 1}`}
-          onclick={() => select(i)}
-          ondblclick={() => {
+    {#if items.length}
+      {#key resultSeq}
+        <ResultGrid
+          {items}
+          {selected}
+          {copying}
+          {paging}
+          onselect={select}
+          oncopy={(i) => {
             select(i);
             run('copy');
           }}
-        >
-          <img src={g.previewUrl} alt="" decoding="async" draggable="false" loading="lazy" />
-          {#if copying && i === selected}
-            <div class="overlay"><span class="spinner" role="status" aria-label="Loading"></span></div>
-          {/if}
-        </div>
-      {/each}
-    </div>
+          onneedmore={loadMore}
+          onretrypage={retryPage}
+        />
+      {/key}
+    {/if}
   </section>
 
   <footer>
@@ -235,71 +265,6 @@
   .content {
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-  }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(4, 166px);
-    grid-auto-rows: 144px;
-    gap: 8px;
-    padding: 16px;
-  }
-  .tile {
-    position: relative;
-    border-radius: 8px;
-    background: var(--surface);
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .tile:hover {
-    background: var(--surface-active);
-  }
-  .tile[aria-selected='true'] {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  .overlay {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.4);
-  }
-  .spinner {
-    box-sizing: border-box;
-    width: 16px;
-    height: 16px;
-    border: 2px solid rgba(255, 255, 255, 0.35);
-    border-top-color: #fff;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .spinner {
-      animation: none;
-      border: 0;
-      width: auto;
-      height: auto;
-      color: #fff;
-      font: var(--label);
-    }
-    .spinner::before {
-      content: '•••';
-    }
-  }
-  .tile img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
   }
   footer {
     box-sizing: border-box;

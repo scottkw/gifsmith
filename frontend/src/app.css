@@ -52,3 +52,32 @@ body {
   font: var(--body);
   -webkit-font-smoothing: antialiased;
 }
+
+/* 16px spinner shared by the copy overlay, the paging row and (02-03) the search bar; takes its colour from `color`. */
+.spinner {
+  box-sizing: border-box;
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+    border: 0;
+    width: auto;
+    height: auto;
+    font: var(--label);
+  }
+  .spinner::before {
+    content: "•••";
+  }
+}
