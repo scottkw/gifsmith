@@ -63,6 +63,7 @@
 - [ ] **SETT-03**: User can rebind the global hotkeys; conflicts are reported and the old binding stays until the new one registers
 - [ ] **SETT-04**: User can set grid item size (search and trending), max results, download folder, hide filename, GIPHY and Klipy locales
 - [ ] **SETT-05**: Settings shows Accessibility permission status and a button to grant it
+- [ ] **SETT-06**: User can choose the window theme: Light, Dark, or System (default System, follows macOS appearance)
 
 ### Release
 
@@ -143,14 +144,15 @@
 | SETT-03 | Phase 4 | Pending |
 | SETT-04 | Phase 4 | Pending |
 | SETT-05 | Phase 4 | Pending |
+| SETT-06 | Phase 4 | Pending |
 | RELS-01 | Phase 4 | Pending |
 | RELS-02 | Phase 4 | Pending |
 | RELS-03 | Phase 4 | Pending |
 | RELS-04 | Phase 4 | Pending |
 
 **Coverage:**
-- v1 requirements: 45 total
-- Mapped to phases: 45 (Phase 1: 6, Phase 2: 12, Phase 3: 14, Phase 4: 13)
+- v1 requirements: 46 total
+- Mapped to phases: 46 (Phase 1: 6, Phase 2: 12, Phase 3: 14, Phase 4: 14)
 - Unmapped: 0
 
 ---
