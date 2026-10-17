@@ -2,17 +2,16 @@ package main
 
 import (
 	"embed"
-	"io/fs"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
+	"net/url"
 
 	"gifsmith/internal/platform"
 	"gifsmith/internal/provider"
 	"gifsmith/internal/provider/finergifs"
 	"gifsmith/internal/services"
 	"gifsmith/internal/shell"
+	"gifsmith/internal/staging"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -26,34 +25,18 @@ var assets embed.FS
 type deps struct {
 	HTTP                  *http.Client
 	FinerBase, FinerMedia string
-}
-
-// stageSample writes the embedded sample GIF to the cache dir. The file must persist:
-// the pasteboard holds a URL to it, not its bytes.
-func stageSample() (string, error) {
-	b, err := fs.ReadFile(assets, "frontend/dist/sample.gif")
-	if err != nil {
-		return "", err
-	}
-	dir, err := os.UserCacheDir()
-	if err != nil {
-		return "", err
-	}
-	p := filepath.Join(dir, "com.kenscott.gifsmith", "staging", "sample.gif")
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		return "", err
-	}
-	return p, os.WriteFile(p, b, 0o644)
+	StagingDir            string
+	Allow                 func(provider.ID, *url.URL) bool // download allowlist for staging
 }
 
 func main() {
-	sample, err := stageSample()
-	if err != nil {
-		log.Fatal(err)
-	}
 	d := wire()
 	plat := platform.New()
-	actions := &services.ActionService{Platform: plat, SamplePath: sample}
+	// Downloads get their own client: Fetch's 45 s deadline bounds them, and the
+	// API client's 15 s timeout would cut off a multi-MB original on a slow link.
+	stage := &staging.Store{Dir: d.StagingDir, HTTP: &http.Client{}, Allow: d.Allow}
+	actions := &services.ActionService{Platform: plat, Staging: stage}
+	panel := &services.PanelService{}
 	gifs := &services.GifService{Providers: map[provider.ID]provider.Provider{
 		provider.FinerGifs: &finergifs.Client{BaseURL: d.FinerBase, MediaBase: d.FinerMedia, HTTP: d.HTTP},
 	}}
@@ -64,6 +47,7 @@ func main() {
 		Services: []application.Service{
 			application.NewService(actions),
 			application.NewService(gifs),
+			application.NewService(panel),
 		},
 		MarshalError: provider.MarshalError,
 		Assets:       application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
@@ -74,6 +58,7 @@ func main() {
 	sh := shell.New(app, plat)
 	actions.Hide = sh.Hide
 	actions.Previous = sh.Previous
+	panel.HideFunc = sh.Hide
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)

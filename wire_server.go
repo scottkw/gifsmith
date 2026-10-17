@@ -6,10 +6,13 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 
+	"gifsmith/internal/provider"
 	"gifsmith/internal/provider/fakeapi"
+	"gifsmith/internal/staging"
 )
 
 // wire points every provider at an in-process fixture server on 127.0.0.1 (browser UAT only, never shipped).
@@ -20,11 +23,16 @@ func wire() deps {
 	}
 	h := fakeapi.Handler(fakeapi.Options{FinerDown: os.Getenv("FAKE_FINER") == "down"})
 	go func() { log.Fatal(http.Serve(ln, h)) }()
-	base := "http://" + ln.Addr().String()
-	log.Printf("fixture server: %s", base)
+	host := ln.Addr().String()
+	log.Printf("fixture server: http://%s", host)
 	return deps{
 		HTTP:       &http.Client{Timeout: 3 * time.Second},
-		FinerBase:  base + "/finer",
-		FinerMedia: base + "/media",
+		FinerBase:  "http://" + host + "/finer",
+		FinerMedia: "http://" + host + "/media",
+		StagingDir: "bin/uat-cache/staging",
+		// Vendor hosts, plus plain http to the fixture listener only.
+		Allow: func(p provider.ID, u *url.URL) bool {
+			return staging.VendorAllow(p, u) || (u.Scheme == "http" && u.Host == host)
+		},
 	}
 }

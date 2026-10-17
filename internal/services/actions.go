@@ -1,5 +1,5 @@
-// Package services holds the methods bound to the webview. They take no paths or
-// URLs from JS: the only file they can touch is SamplePath, fixed in Go.
+// Package services holds the methods bound to the webview. They take no paths from
+// JS, and the only URL they fetch is a Gif's DownloadURL that passes the staging allowlist.
 package services
 
 import (
@@ -31,28 +31,46 @@ type Result struct {
 }
 
 type ActionService struct {
-	Platform   platform.Platform
-	SamplePath string
-	Staging    *staging.Store
-	Hide       func()
-	Previous   func() platform.App
-	Sleep      func(time.Duration) // nil means time.Sleep
-	busy       sync.Mutex          // one action at a time: no racing pasteboard writes, no double ⌘V
+	Platform platform.Platform
+	Staging  *staging.Store
+	Hide     func()
+	Previous func() platform.App
+	Sleep    func(time.Duration) // nil means time.Sleep
+	busy     sync.Mutex          // one action at a time: no racing pasteboard writes, no double ⌘V
 }
 
-// Copy puts the staged sample GIF on the clipboard as a file and hides the panel.
-// On failure the panel stays open so the frontend can show the error.
+// stage downloads g and puts its file URL on the pasteboard. Older staged files
+// are swept only after that succeeds: until then the clipboard may point at one.
+func (a *ActionService) stage(ctx context.Context, g provider.Gif) error {
+	if g.IsClip {
+		return ErrClipsCopy
+	}
+	path, err := a.Staging.Fetch(ctx, g)
+	if err != nil {
+		log.Printf("stage %s: %v", g.Provider, err)
+		return err
+	}
+	if err := a.Platform.CopyFile(path); err != nil {
+		return err
+	}
+	if err := a.Staging.Sweep(path); err != nil {
+		log.Printf("staging sweep: %v", err)
+	}
+	return nil
+}
+
+// Copy puts the selected GIF on the clipboard as a file. The panel stays open:
+// the frontend shows the confirmation, then hides it.
 func (a *ActionService) Copy(ctx context.Context, g provider.Gif) (Result, error) {
 	if !a.busy.TryLock() {
 		return Result{}, ErrBusy
 	}
 	defer a.busy.Unlock()
-	if err := a.Platform.CopyFile(a.SamplePath); err != nil {
+	if err := a.stage(ctx, g); err != nil {
 		return Result{}, err
 	}
-	log.Printf("copy: copied, hiding panel")
-	a.Hide()
-	return Result{Copied: true, Message: "Copied GIF — paste with ⌘V"}, nil
+	log.Printf("copy: staged and copied")
+	return Result{Copied: true, Message: "Copied — press ⌘V to paste"}, nil
 }
 
 // Paste copies the GIF, hides the panel and posts one ⌘V to the previous app.
@@ -62,7 +80,7 @@ func (a *ActionService) Paste(ctx context.Context, g provider.Gif) (Result, erro
 		return Result{}, ErrBusy
 	}
 	defer a.busy.Unlock()
-	if err := a.Platform.CopyFile(a.SamplePath); err != nil {
+	if err := a.stage(ctx, g); err != nil {
 		return Result{}, err
 	}
 	if !a.Platform.AccessibilityTrusted(false) {
