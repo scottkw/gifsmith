@@ -1,5 +1,7 @@
 ---
 gsd_state_version: '1.0'
+milestone: v1.0
+milestone_name: Gifsmith MVP
 status: planning
 progress:
   total_phases: 4

@@ -4,6 +4,10 @@
 
 Gifsmith ports the Raycast "GIF Search" extension to a standalone macOS menu bar app (Go + Wails v3). The journey is risk-first: a small, hard go/no-go spike proves the native behaviors the whole product depends on (non-activating hotkey panel, copy GIF as a file, paste into the previous app, signed and notarized builds). Then one vertical slice delivers real search end to end (providers, animated grid, first-run key setup, vendor-compliant attribution) so Hotkey → type → Enter works. Next the full action pipeline and the favorites/recents library complete the extension's feature set. Finally the Settings window, shell polish, and a signed, notarized DMG make it releasable to strangers.
 
+## Milestones
+
+- 🚧 **v1.0** Gifsmith MVP — Phases 1-4 (in progress)
+
 ## Phases
 
 **Phase Numbering:**
