@@ -1,0 +1,38 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-10-17T19:48:20.380Z",
+  "phase": "2",
+  "phase_name": "Providers, Search UI & First Run",
+  "phase_dir": ".planning/phases/02-providers-search-ui-first-run",
+  "plan": 2,
+  "task": 1,
+  "total_tasks": 6,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "Plan 02-01: Finer Gifs tracer (Go search -> animated grid -> Enter copies real GIF)", "status": "done", "commit": "1ec93a6"}
+  ],
+  "remaining_tasks": [
+    {"id": 2, "name": "Plan 02-02: virtualized grid + keyboard model + shell Esc/close/menu (starts with blocking-human package approval for @tanstack/svelte-virtual 3.13.47)", "status": "not_started"},
+    {"id": 3, "name": "Plan 02-03: search.Service cache/429 block + all S2-S12a states + cancellation", "status": "not_started"},
+    {"id": 4, "name": "Plan 02-04: GIPHY + Klipy clients, Keychain SecretStore, SaveKey test call", "status": "not_started"},
+    {"id": 5, "name": "Plan 02-05: provider tabs, attribution, setup card", "status": "not_started"},
+    {"id": 6, "name": "Plan 02-06: Clips probe, compliance posture, install:dev, native UAT with real keys", "status": "not_started"}
+  ],
+  "blockers": [
+    {"description": "Apple Developer agreement HTTP 403 blocks notarytool store-credentials (gifsmith-notary); needed before Phase 4 notarization", "type": "human_action", "workaround": "Notarized dry run deferred to Phase 4"}
+  ],
+  "async_jobs": [],
+  "human_actions_pending": [
+    {"action": "Approve @tanstack/svelte-virtual 3.13.47 install at plan 02-02 Task 1", "context": "blocking-human package gate", "blocking": true},
+    {"action": "Paste real GIPHY and Klipy keys into Gifsmith's setup card at plan 02-06 UAT (keys created and saved by user)", "context": "agents never receive keys", "blocking": true},
+    {"action": "Resolve Apple Developer agreement 403 before Phase 4", "context": "notarization", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "Executors run sequentially on the main tree (workflow.use_worktrees=false)", "rationale": "single-plan waves; signed builds and human checkpoints need the real folder", "phase": "1"},
+    {"decision": "Phase branches gsd/phase-NN-*, merged to main when a phase passes", "rationale": "user choice", "phase": "1"},
+    {"decision": "Clips card emails clips@giphy.com; Klipy content_filter=medium", "rationale": "user choice post-research", "phase": "2"}
+  ],
+  "uncommitted_files": ["?? .ignore", "?? .planning/milestone.lock", "?? .planning/state.json"],
+  "next_action": "Run /gsd-autonomous --from 2; it should skip discuss/UI-spec/planning (all exist) and resume execute-phase 2 at plan 02-02 (02-01 SUMMARY exists).",
+  "context_notes": "Phase 1 complete and merged to main. Phase 2 context, UI-SPEC (approved), research, 6 plans and COVERAGE.md are committed on gsd/phase-02-providers-search-ui-first-run. Executor prompts must include the root-pin guard, user-machine-safety prohibitions, and tdd.md (all Phase 2 plans are TDD-applicable). gopls diagnostics after agent edits are usually stale; re-run go vet/test."
+}
