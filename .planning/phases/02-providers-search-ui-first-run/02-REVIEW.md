@@ -1,7 +1,8 @@
 ---
 phase: 02-providers-search-ui-first-run
-reviewed: 2026-10-17T21:30:34Z
+reviewed: 2026-10-17T22:02:22Z
 depth: standard
+iteration: 3
 files_reviewed: 56
 files_reviewed_list:
   - .gitignore
@@ -61,197 +62,130 @@ files_reviewed_list:
   - wire_desktop.go
   - wire_server.go
 findings:
-  critical: 2
-  warning: 4
-  info: 7
-  total: 13
+  critical: 0
+  warning: 0
+  info: 11
+  total: 11
 status: issues_found
 ---
 
-# Phase 2: Code Review Report
+# Phase 2: Code Review Report (iteration 3)
 
-**Reviewed:** 2026-10-17T21:30:34Z
+**Reviewed:** 2026-10-17T22:02:22Z
 **Depth:** standard
 **Files Reviewed:** 56
-**Status:** issues_found
+**Status:** issues_found (Info only)
 
 ## Summary
 
-I reviewed the Phase 2 diff (`c4f8403..HEAD`): provider clients (GIPHY, Clips, Klipy, Finer Gifs), the `httpx` choke point, `search.Service` (cache, 429 block, dedupe), the Clips probe state machine, the bound services (Gif, Settings, Action, Panel), staging, settings/Keychain, wiring, and the Svelte panel. `go vet ./...` and `go vet -tags server ./...` are clean, and `go test -race ./internal/...` passes.
+This re-review covers fix commits bc4bc08, fc0906e and e360050. I re-read `internal/search/clips.go`, `internal/search/search.go`, `internal/services/gifs.go`, `internal/services/settings.go`, `main.go`, `frontend/src/App.svelte`, `frontend/src/lib/api.ts`, `frontend/src/lib/errors.ts`, `frontend/src/components/ProviderTabs.svelte` and the updated tests and UAT. I traced the Clips state machine (`triggered`, `proven`, `rechecked`, `gen`) against the frontend's `bootClips`, `recheckClips`, `refreshProviders`, `switchTo` and `retry` paths. I did not rely on the fix report.
 
-Key handling holds up. `httpx` never formats a `*url.Error`. `provider.Error` carries no URL, query, or body. `SaveKey` logs only the provider and the error kind. Keychain errors are fixed text. No bound method returns a key. The Klipy key is validated and then `PathEscape`d. Klipy pages skip dedupe. The download allowlist is applied before the request. I found no XSS sinks: there is no `{@html}` or `innerHTML`.
+Gates, run read-only: `go vet . ./internal/...` and `go vet -tags server .` are clean (only linker version warnings). `go test -race -count=1 ./internal/...` passes in all 11 packages that have tests. `pnpm --dir frontend run check` reports 0 errors and 0 warnings. `pnpm --dir frontend run test` passes 23 of 23.
 
-There are two blocking defects:
+**Prior findings, checked against the code:**
 
-1. The 429 budget is tracked per provider ID, but GIPHY GIFs and GIPHY Clips use the same key. The Clips probe also bypasses the block entirely. Together, these let the app send repeated requests into a known 429, which breaks the service's own "never retries into a 429" rule.
-2. A revoked GIPHY key seen on the Clips tab leaves the content area blank, with no message and no way to recover.
+| Prior | Verdict | Evidence |
+|-------|---------|----------|
+| WR-01: "Go to GIPHY" lands on a GIPHY grid with no key field | **Fixed** | `App.svelte:479-484` clears GIPHY's results and sets `err: key_rejected` before `switchTo('giphy')`. `show('giphy')` then returns at line 242, and `card` (lines 98-102) renders. The UAT step in `06-clips.js:54-60` clears the query, so GIPHY keeps its cached `ready` / `q: ''` state. That reproduces the real case. The step is deterministic: `show('clips')` returns at line 242 on `key_rejected`, so clearing the query starts no Clips reload that could remove the message before the click. |
+| WR-02: a pre-success re-probe leaves Clips unavailable | **Fixed** | `start` sets `rechecked` only when `proven` (clips.go:122). `Trigger` is refused only when `triggered` is set or a probe is running (line 117), and it always sets `proven` (lines 57-59). `classify` returns `disabled` only when `proven` (line 155). On the frontend, `bootClips` (App.svelte:182-197) runs before every Clips probe the user starts. It calls `recheckClips` only after `trending('giphy')` succeeds, and `GifService.call` runs `Trigger` (and so sets `proven`) on that success before it returns (gifs.go:72-74). In the offline-at-login case, Try Again now retries GIPHY first and lets the Trigger probe run. |
+| WR-03: Try Again replays a stale rate-limit countdown | **Fixed** | `finish` clears `rechecked` on `RateLimited` (clips.go:138-141), so a 429 re-probe is not counted. Once the block ends, a Recheck probes again rather than replaying `lastErr`. The fast path returns `svc.BlockedErr(provider.Clips)` (main.go:63, clips.go:75-79), and `blockedErr` returns the real seconds left when known. Retries cannot loop: an auto-recheck from `refreshProviders` is refused while `rechecking` is set, and the 429 block keeps probes at least 60 s apart. |
 
-The warnings cover a stale in-flight request that can undo `Invalidate`, a persisted Clips tab that can never be restored, staging redirects that skip the allowlist, and Klipy ad filtering.
+**Regression check on fc0906e and e360050:**
+- `bootClips` uses an uncancellable `trending('giphy', '')` outside `latest()`. A late answer touches only `states.clips`, and only while Clips is still active. GIPHY's own tab state is not changed. That is correct.
+- Delivery order of the `providers:changed` event (from `Trigger` → `start`) relative to the `trending` response does not matter. `Recheck` reads Go's state, gets `checking`, and returns `(checking, nil)`, so the skeleton stays until the probe finishes.
+- `Trigger` refused during a Recheck leaves `triggered` false. The next GIPHY success can then run one more probe. This uses more probes but stays bounded.
+- No new data races. `HasKey` and `Blocked` run without `c.mu` held. `Blocked` takes `svc.mu` alone, so the two locks are never held together.
 
-## Critical Issues
-
-### CR-01: GIPHY and Clips share one key and one rate limit, but the 429 block is per provider ID, and the Clips probe bypasses it
-
-**File:** `internal/search/search.go:93,113`, `internal/search/clips.go:66-80,94`, `internal/provider/giphy/giphy.go:98-107`, `main.go:59`, `frontend/src/App.svelte:132,232`
-**Issue:** `Service.blocked` is keyed by `provider.ID`. GIPHY GIFs (`giphy`) and GIPHY Clips (`clips`) are separate keys in that map, but they send the same `api_key` and draw from the same 100 calls/hour budget. This causes three failures:
-- After a GIPHY 429 sets `blocked["giphy"]`, switching to the Clips tab calls `get(provider.Clips, ...)`. `blocked["clips"]` is not set, so the request goes out straight into the 429. A Clips 429 likewise does not block GIPHY GIFs.
-- `ProbeClips` calls `httpx.GetJSON` directly rather than going through `search.Service`. A 429 on the probe therefore never sets a block. `classify` maps it to `unknown`. `Recheck` checks only `svc.Blocked(GIPHY)`, which is still clear, so it probes again.
-- The frontend calls `recheckClips()` on every `switchTo('clips')` while the state is `unknown` (`App.svelte:232`), and also from `refreshProviders` (`App.svelte:132`). Every ⌘2 press re-probes, so this is not the "re-probes once" behavior specified in RESEARCH. While the key is rate-limited, each tab switch spends another request into the 429.
-
-`SettingsService.SaveKey` also calls `Svc.Invalidate(provider.GIPHY)` only. Cached Clips pages and any `clips` block from the old key survive a GIPHY key change.
-**Fix:** Collapse GIPHY and Clips into one budget, route the probe's 429 into that budget, and limit re-probes to one per launch:
-```go
-// search.go
-func budget(p provider.ID) provider.ID {
-	if p == provider.Clips {
-		return provider.GIPHY // same api_key, same 100/h budget
-	}
-	return p
-}
-// in get(): s.blocked[budget(p)] for both the read and the write.
-// Invalidate(GIPHY) should also drop "clips|" cache entries.
-
-// Exported so the probe can record a 429:
-func (s *Service) NoteRateLimit(p provider.ID, retryAfterSec int) { /* same block logic as get() */ }
-
-// main.go
-Probe: func(ctx context.Context) error {
-	err := clipsClient.ProbeClips(ctx)
-	var pe *provider.Error
-	if errors.As(err, &pe) && pe.Kind == provider.RateLimited {
-		svc.NoteRateLimit(provider.GIPHY, pe.RetryAfterSec)
-	}
-	return err
-},
-```
-In `clips.go`, add a `rechecked bool` that `Reset` clears and that `start(true)` sets, so `Recheck` probes at most once per key per launch. Add a test that a GIPHY 429 blocks `Search(ctx, provider.Clips, ...)`, and a test that a probe 429 makes the next `Recheck` return `rate_limited` without calling `Probe`.
-
-### CR-02: A revoked GIPHY key on the Clips tab renders a blank content area with no recovery
-
-**File:** `frontend/src/App.svelte:98-102,221,442-508`, `frontend/src/lib/errors.ts:32-34`
-**Issue:** The Clips slot has no `keyProvider`, so `card` is always false there. When a Clips search fails with `key_rejected`, for example because the GIPHY key was revoked after the probe passed, `runFirst` sets `status = 'error'` and `err.kind = 'key_rejected'`. Walking the render chain:
-- `!giphyKey` is false because the key is still configured.
-- `clipsState === 'disabled'` is false.
-- `!clipsEnabled` is false.
-- `finerIdle` is false and `items` is empty.
-- `status` is neither `loading` nor `empty`.
-- `errView` is `null`, because `errorState()` returns `null` for `key_rejected` and `key_missing`.
-
-No branch matches, so the content area is empty: no message, no Try Again. `show('clips')` also returns early on `key_rejected` (line 221), so switching away and back cannot recover. Only a relaunch or saving a new GIPHY key on the GIPHY tab clears it. Even then, `keySaved('giphy')` never resets `states.clips`, so the `key_rejected` error and the early return in `show()` remain until the user relaunches.
-**Fix:** Handle the Clips slot's key errors explicitly and reset Clips state when the GIPHY key changes:
-```svelte
-{:else if active === 'clips' && (cur.err?.kind === 'key_rejected' || cur.err?.kind === 'key_missing')}
-  <StateMessage
-    heading="GIPHY rejected your saved key"
-    body="Clips use your GIPHY key. Paste a new key on the GIPHY tab to continue."
-    button="Go to GIPHY" primary
-    onbutton={() => switchTo('giphy')}
-  />
-```
-In `keySaved(p)`, when `p === 'giphy'`, also call `setResults('clips', null, null)` so the next Clips view loads fresh.
-
-## Warnings
-
-### WR-01: An in-flight request with the old key can land after `Invalidate` and restore the old cache entry or 429 block
-
-**File:** `internal/search/search.go:105-121`, `internal/services/settings.go:71-76`
-**Issue:** `get()` reads the key inside `call(pr)` while holding no lock, and writes the cache or block when the call returns. If `SaveKey` runs `Keys.Set`, `Invalidate`, and `Seed` while a GIPHY or Klipy request using the old key is in flight, that request completes afterwards:
-- A 429 for the old key re-blocks the provider for at least `MinBlock` (60 s) under the new key. This is the likely case, because users replace a key precisely when it hits its limit.
-- A success overwrites the seeded `trending||` entry with the old key's page.
-
-`SaveKey` serializes against other saves only, not against searches.
-**Fix:** Give each provider a generation counter. Capture it before the call and drop the write if it has changed:
-```go
-type Service struct { /* ... */ gen map[provider.ID]int }
-// get():
-s.mu.Lock(); g := s.gen[p]; s.mu.Unlock()
-pg, err := call(pr)
-s.mu.Lock(); stale := s.gen[p] != g; s.mu.Unlock()
-if stale { return pg, err } // never cache or block on behalf of a replaced key
-// Invalidate(): s.gen[p]++
-```
-
-### WR-02: The persisted Clips tab can never be restored
-
-**File:** `frontend/src/App.svelte:173`, `internal/services/gifs.go:72-74`, `internal/search/clips.go:45-47`
-**Issue:** At startup, `onMount` restores `last === 'clips'` only when `st.clips?.clips === 'enabled'`. The Clips probe runs only after the first GIPHY GIFs success in this process (`gifs.go:72-74`), and that success is triggered by this same `onMount`'s `load(active)`. When `Providers()` answers at mount, the Clips state is always `""`, reported as `unknown`. The `last === 'clips'` branch is therefore unreachable: a user who quits on the Clips tab always reopens on GIPHY, although `switchTo` persists `clips` (line 231). The UAT note "last tab survives Quit and relaunch" only exercises the non-Clips slots.
-**Fix:** If `last === 'clips'` and the state is `unknown` or `checking`, open on Clips (skeleton) and fire one GIPHY trending fetch in the background to start the probe. Or explicitly persist `giphy` when the user picks Clips, so the stored value does not promise something the boot path cannot honor.
-
-### WR-03: Staging downloads follow redirects without re-checking the host allowlist
-
-**File:** `main.go:44`, `internal/staging/staging.go:52-70`
-**Issue:** `VendorAllow` is checked against `g.DownloadURL` only. The staging client is `&http.Client{}` with the default `CheckRedirect`, which follows up to 10 redirects to any host and any scheme, including a downgrade to `http://`. The `Gif` comes from the webview (`ActionService.Copy(g)`), and the allowlist exists to bound which URLs Go fetches. A vendor-host URL that redirects (an open redirect on a CDN or vendor domain, or a tampered `downloadUrl`) bypasses it. The magic-byte check limits what gets staged, not what gets requested.
-**Fix:** Re-apply the allowlist on every hop:
-```go
-stage := &staging.Store{Dir: d.StagingDir, Allow: d.Allow, HTTP: &http.Client{
-	CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		if len(via) >= 5 || !d.Allow(gifProviderFrom(via[0]), req.URL) {
-			return staging.ErrNotAllowed
-		}
-		return nil
-	},
-}}
-```
-Alternatively, have `Store.Fetch` build a per-call client that captures `g.Provider`.
-
-### WR-04: The Klipy mapper drops ad items despite the no-filter rule, and a page of only ads keeps the grid fetching
-
-**File:** `internal/provider/klipy/klipy.go:99-103,121-127`, `frontend/src/components/ResultGrid.svelte:64-66`
-**Issue:**
-- `if d.Type != "gif" { skipped++; continue }` removes items from a Klipy page. The project constraint (CLAUDE.md, Klipy integration rules) says "do not reorder, insert, remove, or filter results". Logging the skip does not make it compliant. This needs the vendor's sign-off or a rendered ad tile.
-- When every item on a page is skipped and `has_next` is true, the client returns `Items: []` with `Next` set. The GIPHY and Finer clients guard this case with `len(items) > 0`; Klipy does not. In the grid, appending zero items changes `paging` from `loading` back to `idle`. That changes `count`, which triggers `$virt.setOptions`, and the sentinel effect fires again while the last row is still mounted. The result is back-to-back page requests against a 100/hour key until a page contains a GIF.
-**Fix:** Confirm the ad policy with developers@klipy.com, as already planned for the copy-file question. In the meantime, also guard the cursor:
-```go
-if r.Data.HasNext && len(items) > 0 { /* set p.Next */ }
-```
-Alternatively, have `loadMore` stop when a page adds no items: `if (!page.items?.length) { s.paging = 'end'; return; }`.
+There are no Critical or Warning findings. Info items IN-01 to IN-09 are still valid and are carried forward with updated line numbers. IN-04 gains one more path. IN-10 and IN-11 are new, low-impact items.
 
 ## Info
 
-### IN-01: Raising the Wails log level to Debug would log every bound call's arguments, including the API key
+### IN-01: Raising the Wails log level to Debug would log every bound call's arguments, including the API key (carried forward)
 
-**File:** `main.go:71-84` (via Wails `pkg/application/messageprocessor_call.go:126-131`)
-**Issue:** Wails logs `"Binding call complete:" ... "args", string(jsonArgs)` at Debug for every bound call, so `SettingsService.SaveKey(p, key)` would be logged with the key. This is safe today: `LogLevel` is unset (Info), and the production logger discards output. But a single `LogLevel: slog.LevelDebug` added while debugging would leak keys to stderr and Console.
-**Fix:** Add a comment next to `application.Options` forbidding Debug level, or set an explicit `Logger` that filters the `args` attribute. Optionally, add a test asserting that `Options.LogLevel` is above Debug.
+**File:** `main.go:75-88`
+**Issue:** Wails logs bound-call arguments at Debug level, and `SettingsService.SaveKey(p, key)` takes the key as an argument. This is safe while `LogLevel` is unset, but nothing guards it.
+**Fix:** Add a comment that forbids Debug level, or set a `Logger` that drops the `args` attribute.
 
-### IN-02: Retry-After is not capped
+### IN-02: Retry-After is not capped (carried forward)
 
-**File:** `internal/provider/httpx/httpx.go:73-82`, `internal/search/search.go:111`
-**Issue:** A Retry-After of `1000000000` blocks the provider for about 31 years in this process. The only recovery is changing the key, because `Invalidate` clears the block, or relaunching. Values above about 9.2e9 overflow `time.Duration` to a negative value and fall back to 60 s, which is inconsistent.
-**Fix:** Clamp in `retryAfter`, for example `return min(max(n, 0), 3600)`, since both vendors' windows are hourly.
+**File:** `internal/provider/httpx/httpx.go:73-81`, `internal/search/search.go:127`
+**Issue:** A huge Retry-After blocks the shared GIPHY/Clips budget for the life of the process. A value above about 9.2e9 seconds overflows `time.Duration`, and the block falls back to 60 s. Since e360050 the fast path shows this value to the user as a countdown (`BlockedErr`), so a hostile or buggy value now shows up directly in the UI copy.
+**Fix:** `return min(max(n, 0), 3600)` in `retryAfter`, with the same clamp on the HTTP-date branch.
 
-### IN-03: Staged files persist across launches (Klipy no-retain rule)
+### IN-03: Staged files persist across launches, against Klipy's no-retain rule (carried forward, deferred to Phase 3 as ACTN-10)
 
-**File:** `main.go:44`, `internal/staging/staging.go:114-132`
-**Issue:** Sweep runs only after a later successful copy. A Klipy GIF copied just before quitting stays in `~/Library/Caches/com.kenscott.gifsmith/staging` indefinitely. The project constraint asks for deletion "on next copy and at quit". This is deferred to Phase 3 (ACTN-10); it is recorded here so it is not lost.
-**Fix:** In Phase 3, sweep at startup (for example `stage.Sweep("")` with a variant that keeps nothing) and on `ApplicationShouldTerminate`.
+**File:** `main.go:45`, `internal/staging/staging.go:124-142`
+**Issue:** `Sweep` runs only after a later successful copy (`actions.go:56`). A Klipy GIF copied just before quitting stays on disk.
+**Fix:** Sweep at startup and in `ApplicationShouldTerminate`.
 
-### IN-04: A stale Clips probe error stays on screen after Clips becomes enabled
+### IN-04: A stale Clips error stays on screen after Clips becomes enabled (carried forward, one more path)
 
-**File:** `frontend/src/App.svelte:131,222`
-**Issue:** A failed `recheckClips` sets `states.clips.status = 'error'` but leaves `q` at `''`. If Clips later becomes `enabled` (for example after a GIPHY key save), `refreshProviders` and `switchTo` call `show('clips')`. That returns early because `status !== 'idle' && s.q === wanted()`, so the old timeout or rate-limit error remains until the user clicks Try Again.
-**Fix:** In `refreshProviders`, when Clips flips to enabled, call `load('clips')` instead of `show('clips')`, or reset `states.clips` first.
+**File:** `frontend/src/App.svelte:131`, `frontend/src/App.svelte:243`, `frontend/src/App.svelte:254`, `frontend/src/App.svelte:145-149`
+**Issue:**
+- **Still reproducible:** launch on Clips while offline. `bootClips` copies a GIPHY network or timeout error onto Clips (`q` stays `''`). The user fixes it on the GIPHY tab: GIPHY loads, `Trigger` probes, and Clips becomes `enabled`. Pressing ⌘2 calls `show('clips')`, which returns at line 243 (`status === 'error'`, `q === wanted()`). The old "Can't reach GIPHY" message stays until the user presses Try Again.
+- **New path, made worse by the WR-01 fix:** a `recheckClips` call in flight for the old key can return a `key_rejected` error after `keySaved('giphy')` has cleared Clips. `show('clips')` then returns at line 242 for good. "Go to GIPHY" (lines 479-484) then marks the newly saved, valid GIPHY key as rejected and shows the setup card again. This needs a narrow timing window: the user switches tabs and saves a key while a Clips probe is still running.
+**Fix:**
+- In `switchTo` and `refreshProviders`: when `clipsEnabled` is true and `states.clips.status === 'error'`, call `setResults('clips', null, null)` and then `load('clips')`, not `show('clips')`.
+- In `recheckClips`: record `states.clips.seq` (or a key generation) before the await. Drop the error if the value changed in the meantime.
 
-### IN-05: SetupCard's error path dereferences `field` after the card may have unmounted
+### IN-05: SetupCard's error path dereferences `field` after the card may have unmounted (carried forward)
 
-**File:** `frontend/src/components/SetupCard.svelte:55-60`
-**Issue:** If the user switches tabs (⌘1–⌘4) while `saveKey` is pending, the keyed `SetupCard` is destroyed and `bind:this` resets `field` to null. When the save then fails, `field.focus()` throws an unhandled TypeError. On success, `onsaved(p)` still runs `keySaved`, which is mostly harmless.
-**Fix:** Use `field?.focus(); field?.select();`.
+**File:** `frontend/src/components/SetupCard.svelte:59-60`
+**Issue:** `field.focus()` and `field.select()` throw if the user switches tabs while `saveKey` is pending and the save then fails. Line 40 already uses `field?.`.
+**Fix:** `field?.focus(); field?.select();`
 
-### IN-06: A failed initial Providers() call leaves a permanently blank panel
+### IN-06: A failed initial Providers() call leaves the panel blank for good (carried forward)
 
-**File:** `frontend/src/App.svelte:128-129,170`
-**Issue:** If `Promise.all([providers(), lastProvider()])` rejects (a transport error, or `lastProvider` failing), `statuses` stays `null` and the content area renders nothing forever. `refreshProviders` also lets a rejection escape from an event handler.
-**Fix:** Wrap the boot in try/catch, fall back to `statuses = {}` with a retryable message, and catch inside `refreshProviders`.
+**File:** `frontend/src/App.svelte:128-129`, `frontend/src/App.svelte:170`
+**Issue:** If `Promise.all([providers(), lastProvider()])` rejects, `statuses` stays `null` and the content area never renders. `refreshProviders` also lets a rejection escape from the event handler.
+**Fix:** Wrap the boot in try/catch with a retryable message, and catch inside `refreshProviders`.
 
-### IN-07: The hide-after-copy timer is never cancelled
+### IN-07: The hide-after-copy timer is never cancelled (carried forward)
 
-**File:** `frontend/src/App.svelte:375`
-**Issue:** `setTimeout(hide, HIDE_AFTER_COPY_MS)` is not stored or cleared. If the panel is hidden and re-shown with the hotkey within 400 ms of a copy, the stale timer hides the freshly shown panel.
-**Fix:** Store the handle and clear it in the `panel:show` handler.
+**File:** `frontend/src/App.svelte:397`
+**Issue:** If the panel is shown again within 400 ms of a copy, `setTimeout(hide, HIDE_AFTER_COPY_MS)` hides the newly shown panel.
+**Fix:** Store the timer handle and clear it in the `panel:show` handler.
+
+### IN-08: Clips Try Again does nothing after the one re-probe (product choice, already surfaced)
+
+**File:** `internal/search/clips.go:80-90`, `frontend/src/App.svelte:312-315`
+**Issue:**
+- Once a non-429 re-probe is spent (for example, a timeout), each Try Again or ⌘2 runs `bootClips`. That makes a GIPHY trending call, which is a real request once the 10-minute cache expires. It then shows the skeleton and replays the same `lastErr`. No probe runs until relaunch or a GIPHY key change.
+- After e360050 this applies only to non-429 errors, so no stale countdown is shown.
+- When the Trigger probe times out while Clips is on screen, `refreshProviders` (line 132) spends the re-probe automatically. The user has not chosen to retry at that point.
+**Fix:** If the button stays, change its copy for the spent state (for example "Reopen Gifsmith to check Clips again"), or hide it.
+
+### IN-09: Klipy ads are shown without a label, and some of them cannot be copied (product choice, already surfaced)
+
+**File:** `internal/provider/klipy/klipy.go:98-127`
+**Issue:**
+- Ad items with GIF renditions render as ordinary tiles, with no "Sponsored" label.
+- Their previews load from whatever host the ad names.
+- Copying an ad hosted outside `klipy.com` fails the staging allowlist and shows the generic "The download failed" message.
+- A page that contains only HTML ads ends paging, even when `has_next` is true.
+- The ad policy is still pending with developers@klipy.com.
+**Fix:** Resolve the policy with Klipy before release. Consider an `IsAd` flag on `provider.Gif`.
+
+### IN-10: "Not approved for Clips" can still be inferred from a GIFs success that no longer proves anything (new)
+
+**File:** `internal/services/gifs.go:72-74`, `internal/search/clips.go:56-59`, `internal/search/clips.go:155`, `frontend/src/App.svelte:132`
+**Issue:** `proven` stays set until `Reset`, and any GIPHY success sets it, including a cached page from `search.Service`:
+- **Revocation within the cache window:** the key is revoked while the app runs, and Clips is `unknown` (an earlier probe timed out). Try Again runs `bootClips`. GIPHY trending is served from the 10-minute cache, `Trigger` keeps `proven = true`, and the re-probe's 401 is classified `disabled`. The user sees "Your GIPHY key works for GIFs, but GIPHY has to approve it for Clips" for the rest of the launch, when the real fix is a new key. The "Back to GIPHY" button shows the cached grid with no key field.
+- **A probe that still runs without any GIFs success:** `refreshProviders` (line 132) calls `recheckClips` directly, without `bootClips`. It is reached through a `providers:changed` event, for example from `keySaved('klipy')` after the user saved a Klipy key and then pressed ⌘2 before GIPHY trending returned. In that case the probe can run before any GIFs success. A valid key that is not approved for Clips then gets "GIPHY rejected your saved key", and "Go to GIPHY" now (WR-01) forces the GIPHY setup card for a working key.
+
+Both cases are unlikely. Before fc0906e every 401 was classified `disabled`, so this is narrower than it was, not a regression.
+**Fix:**
+- Call `Trigger` only on a network success. For example, have `search.Service.get` report whether it served from cache, or clear `proven` when a GIPHY call returns `KeyRejected`.
+- Route the line-132 recheck through `bootClips()` so every probe the UI starts follows a GIPHY success.
+
+### IN-11: `search.Service.Blocked` is now used only by tests (new)
+
+**File:** `internal/search/search.go:186-189`
+**Issue:** After e360050, production code calls only `BlockedErr` (main.go:63). `Blocked` is an exported wrapper used only by `search_test.go`, `clips_test.go` and `settings_test.go`.
+**Fix:** Remove it and have the tests use `BlockedErr(p) != nil`, or keep it and note that it is a test helper.
 
 ---
 
-_Reviewed: 2026-10-17T21:30:34Z_
+_Reviewed: 2026-10-17T22:02:22Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
