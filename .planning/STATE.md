@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: Gifsmith MVP
 current_phase: 1
 current_phase_name: Native Spike & Signed Dev Loop
-status: executing
-stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-10-17T15:48:01.350Z"
+status: verifying
+stopped_at: Completed 01-04-PLAN.md
+last_updated: "2026-10-17T16:38:15.049Z"
 last_activity: 2026-10-17
-last_activity_desc: Completed 01-03 (signed dev loop + ⌘Enter paste, gate approved)
-state_head: 2f1cb7e7a7f1b572a15eeeb0973c4c4f1d0fa97a
+last_activity_desc: Completed 01-04 (Phase 1 GO WITH FALLBACKS; notarization deferred to Phase 4)
+state_head: 237d787b224b62d72374824c35ea579516bede83
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -30,10 +30,10 @@ See: .planning/PROJECT.md (updated 2026-10-17)
 
 Phase: 1 (Native Spike & Signed Dev Loop) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
-Last activity: 2026-10-17 — Completed 01-03: Developer ID-signed install to ~/Applications, ⌘Enter pastes into the previous app with Accessibility (user approved); browser UAT smoke loop passes
+Status: Phase complete — ready for verification
+Last activity: 2026-10-17 — Completed 01-04: user recorded GO WITH FALLBACKS on the Developer ID-signed dev build; notarized dry run deferred to Phase 4 (Apple agreement 403)
 
-Progress: [████████░░] 75% (3/4 plans in Phase 1)
+Progress: [██████████] 100% (4/4 plans in Phase 1)
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Progress: [████████░░] 75% (3/4 plans in Phase 1)
 | Phase 1 P01 | 22min | 3 tasks | 111 files |
 | Phase 01 P02 | 4min | 2 tasks | 9 files |
 | Phase 01 P03 | 75min | 2 tasks | 17 files |
+| Phase 01 P04 | 3min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,9 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-03: TIS/HIToolbox calls must run on main (onMain); Wails bound methods run on goroutines
 - [Phase 01]: 01-03: macOS 27 has no Accessibility row in Privacy & Security; onboarding opens the Privacy_Accessibility URL (button), never describes a Settings path
 - [Phase 01]: 01-03: Task 1 (gifsmith-notary profile) deferred by user; required before 01-04
+- [Phase 01]: 01-04: Phase 1 GO WITH FALLBACKS (user) - build Phase 2 on the Developer ID-signed dev build; limits in 01-PASTE-MATRIX.md section 4
+- [Phase 01]: 01-04: Notarization deferred to Phase 4 (Apple agreement 403); notarized dry run + N15 carry over
+- [Phase 01]: 01-04: Pasteboard payload stays a single file URL; Phase 3 decides on image data only if untested apps fail
 
 ### Pending Todos
 
@@ -87,10 +91,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 1]: Notarization still unproven (plan 01-04). Developer ID-signed dev install and ⌘Enter auto-paste (ACTN-02) were proven at the 01-03 gate; N10, N13 and the untested matrix apps re-check at 01-04 UAT
+- [Phase 1→3/4]: N10, N13 and paste in Slack, Discord, Telegram, Safari/Chrome composers untested; re-check in later UAT (GO WITH FALLBACKS limit 2)
 - [Phase 2]: Klipy request shapes untested with a live key; GIPHY Clips needs per-key approval; Finer Gifs was down on 2026-10-17
 - [Phase 4]: Klipy written clearance for temp file copies (developers@klipy.com) is a pre-release gate; request early
-- [Phase 1]: gifsmith-notary keychain profile (notarytool credentials) not yet created; Apple sign-in rejected on 2026-10-17. Required before 01-04 notarization
+- [Phase 4]: Apple Developer agreement 403 (notarytool store-credentials: 'A required agreement is missing or has expired') must be resolved by the user before Phase 4 notarization; notarized dry run + N15 carried over from Phase 1
 
 ## Deferred Items
 
@@ -102,6 +106,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-17T15:48:01.325Z
-Stopped at: Completed 01-03-PLAN.md
+Last session: 2026-10-17T16:38:15.034Z
+Stopped at: Completed 01-04-PLAN.md
 Resume file: None
