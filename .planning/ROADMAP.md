@@ -36,7 +36,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. With Accessibility granted, the paste action drops the GIF straight into the app the user was in (TextEdit) with no manual ⌘V. Without it, the GIF is copied and the user is told to press ⌘V and how to grant permission. (manual, user-verified)
   5. The same behaviors hold from a signed dev build run from the bundled `.app` and from a throwaway Developer ID–signed, notarized build. A committed paste matrix records the result per target app (Slack, Messages, Mail, Discord, Notes, Telegram, Safari/Chrome composers), and the user records an explicit go/no-go. This de-risks RELS-01/RELS-02, which complete in Phase 4. (manual, user-verified)
 
-**Plans:** 2/4 plans executed
+**Plans:** 3/4 plans executed
 
 Plans:
 **Wave 1**
@@ -46,7 +46,7 @@ Plans:
 - [x] 01-02-PLAN.md — Menu-bar shell: tray menu (Open / Settings… / Quit), panel on the cursor's display
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 01-03-PLAN.md — Signed dev loop (install:dev to ~/Applications) + ⌘Enter Accessibility-gated paste; paste matrix (dev column); browser UAT smoke loop
+- [x] 01-03-PLAN.md — Signed dev loop (install:dev to ~/Applications) + ⌘Enter Accessibility-gated paste; paste matrix (dev column); browser UAT smoke loop
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 01-04-PLAN.md — Notarized + stapled throwaway build, notarized matrix column, user go/no-go recorded and committed
@@ -118,7 +118,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Native Spike & Signed Dev Loop | 2/4 | In Progress | - |
+| 1. Native Spike & Signed Dev Loop | 3/4 | In Progress | - |
 | 2. Providers, Search UI & First Run | 0/TBD | Not started | - |
 | 3. Action Pipeline & Library | 0/TBD | Not started | - |
 | 4. Settings, Shell Polish & Release | 0/TBD | Not started | - |

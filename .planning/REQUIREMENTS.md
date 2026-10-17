@@ -37,7 +37,7 @@
 ### Actions
 
 - [x] **ACTN-01**: User can copy the GIF as a file to the clipboard (default Enter action), without needing Accessibility permission
-- [ ] **ACTN-02**: User can paste the GIF directly into the app they were using; if Accessibility isn't granted, the GIF is copied and the user is told to press ⌘V and how to grant permission
+- [x] **ACTN-02**: User can paste the GIF directly into the app they were using; if Accessibility isn't granted, the GIF is copied and the user is told to press ⌘V and how to grant permission
 - [ ] **ACTN-03**: User can copy or paste the GIF link, and copy or paste GIF Markdown
 - [ ] **ACTN-04**: User can copy the page link and open the GIF page in the browser
 - [ ] **ACTN-05**: User can download the GIF to a chosen folder (default Downloads)
@@ -123,7 +123,7 @@
 | ONBD-04 | Phase 2 | Pending |
 | ONBD-05 | Phase 2 | Pending |
 | ACTN-01 | Phase 1 | Complete |
-| ACTN-02 | Phase 1 | Pending |
+| ACTN-02 | Phase 1 | Complete |
 | ACTN-03 | Phase 3 | Pending |
 | ACTN-04 | Phase 3 | Pending |
 | ACTN-05 | Phase 3 | Pending |
