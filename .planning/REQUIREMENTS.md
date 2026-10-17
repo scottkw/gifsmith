@@ -18,11 +18,11 @@
 
 - [ ] **SRCH-01**: User can search GIPHY, Klipy, and The Finer Gifs Club, switching provider from the panel; last provider is remembered
 - [ ] **SRCH-02**: GIPHY Clips appears as a provider only when the user's GIPHY key passes a Clips test call; otherwise a short explanation is shown
-- [ ] **SRCH-03**: With an empty query, user sees trending GIFs (providers that support trending)
+- [x] **SRCH-03**: With an empty query, user sees trending GIFs (providers that support trending)
 - [x] **SRCH-04**: Results show as an animated grid that loads more as the user scrolls or arrows near the end
 - [x] **SRCH-05**: User can navigate the grid entirely by keyboard (arrows, Enter, ⌘K, Esc)
-- [ ] **SRCH-06**: Searches are debounced so free keys (100 calls/hour) last; a rate-limit hit shows a clear message with when to retry
-- [ ] **SRCH-07**: Network, timeout, and provider errors show a per-provider message; one provider failing never blocks the others
+- [x] **SRCH-06**: Searches are debounced so free keys (100 calls/hour) last; a rate-limit hit shows a clear message with when to retry
+- [x] **SRCH-07**: Network, timeout, and provider errors show a per-provider message; one provider failing never blocks the others
 - [ ] **SRCH-08**: User sees recent searches when the box is empty and can rerun one
 - [ ] **SRCH-09**: User can set GIPHY content rating (default PG-13)
 
@@ -32,7 +32,7 @@
 - [ ] **ONBD-02**: Pasted key is verified with a test call before being saved
 - [ ] **ONBD-03**: API keys are stored in the macOS Keychain and never shown to the web UI or written to logs/errors
 - [ ] **ONBD-04**: "Powered by GIPHY" is shown on GIPHY/Clips results; Klipy search placeholder reads "Search KLIPY"
-- [ ] **ONBD-05**: Providers are never blended in one grid; results are never reordered or filtered (except same-page duplicates for non-Klipy)
+- [x] **ONBD-05**: Providers are never blended in one grid; results are never reordered or filtered (except same-page duplicates for non-Klipy)
 
 ### Actions
 
@@ -110,18 +110,18 @@
 | SHEL-06 | Phase 4 | Pending |
 | SRCH-01 | Phase 2 | Pending |
 | SRCH-02 | Phase 2 | Pending |
-| SRCH-03 | Phase 2 | Pending |
+| SRCH-03 | Phase 2 | Complete |
 | SRCH-04 | Phase 2 | Complete |
 | SRCH-05 | Phase 2 | Complete |
-| SRCH-06 | Phase 2 | Pending |
-| SRCH-07 | Phase 2 | Pending |
+| SRCH-06 | Phase 2 | Complete |
+| SRCH-07 | Phase 2 | Complete |
 | SRCH-08 | Phase 3 | Pending |
 | SRCH-09 | Phase 4 | Pending |
 | ONBD-01 | Phase 2 | Pending |
 | ONBD-02 | Phase 2 | Pending |
 | ONBD-03 | Phase 2 | Pending |
 | ONBD-04 | Phase 2 | Pending |
-| ONBD-05 | Phase 2 | Pending |
+| ONBD-05 | Phase 2 | Complete |
 | ACTN-01 | Phase 1 | Complete |
 | ACTN-02 | Phase 1 | Complete |
 | ACTN-03 | Phase 3 | Pending |

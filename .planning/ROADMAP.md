@@ -67,7 +67,7 @@ Plans:
   4. "Powered by GIPHY" shows on GIPHY and Clips results, and the Klipy search placeholder reads "Search KLIPY".
   5. GIPHY Clips appears as a provider only when the user's GIPHY key passes a Clips test call (otherwise a short explanation is shown). Rapid typing does not burn requests, a rate-limit hit shows a clear message with when to retry, and a network, timeout, or provider error shows a per-provider message while other providers stay usable.
 
-**Plans:** 2/6 plans executed
+**Plans:** 3/6 plans executed
 
 Plans:
 **Wave 1**
@@ -77,7 +77,7 @@ Plans:
 - [x] 02-02-PLAN.md — Virtualized grid with paging to End of results, full keyboard model, panel owns Esc and survives ⌘W (npm package gate)
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 02-03-PLAN.md — search.Service cache + 429 budget + dedupe policy; every loading/empty/error state; cancellation of superseded searches
+- [x] 02-03-PLAN.md — search.Service cache + 429 budget + dedupe policy; every loading/empty/error state; cancellation of superseded searches
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 02-04-PLAN.md — GIPHY and Klipy clients, Keychain-backed keys verified by a test call, provider status, last provider (Go, end to end via bound API)
@@ -140,6 +140,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Native Spike & Signed Dev Loop | 4/4 | Complete    | 2026-10-17 |
-| 2. Providers, Search UI & First Run | 2/6 | In Progress | - |
+| 2. Providers, Search UI & First Run | 3/6 | In Progress | - |
 | 3. Action Pipeline & Library | 0/TBD | Not started | - |
 | 4. Settings, Shell Polish & Release | 0/TBD | Not started | - |

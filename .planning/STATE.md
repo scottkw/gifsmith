@@ -5,16 +5,16 @@ milestone_name: Gifsmith MVP
 current_phase: 2
 current_phase_name: Providers, Search UI & First Run
 status: executing
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-10-17T20:09:23.271Z"
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-10-17T20:24:40.201Z"
 last_activity: 2026-10-17
 last_activity_desc: Phase 2 execution started
-state_head: 7526e47fb73a8f7b5871f6212e9cfbecbdab3b8b
+state_head: 8a1b7c52ace7271347960439e8b1c69bed1145ae
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 10
-  completed_plans: 6
+  completed_plans: 7
 ---
 
 # Project State
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-17)
 ## Current Position
 
 Phase: 2 (Providers, Search UI & First Run) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Ready to execute
 Last activity: 2026-10-17 — Phase 2 execution started
 
@@ -63,6 +63,7 @@ Progress: [███░░░░░░░] 25% (4/4 plans in Phase 1)
 | Phase 01 P04 | 3min | 2 tasks | 3 files |
 | Phase 2 P01 | 13min | 3 tasks | 31 files |
 | Phase 2 P02 | 6min | 3 tasks | 12 files |
+| Phase 2 P03 | 15min | 2 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -93,6 +94,9 @@ Recent decisions affecting current work:
 - [Phase 2]: 02-02: Paging drops stale pages via resultSeq (bumped on every result-set replacement); a failed page waits for Try Again
 - [Phase 2]: 02-02: One main mousedown handler pins focus to the search input for clicks outside text fields
 - [Phase 2]: 02-02: node tests excluded from svelte-check instead of adding @types/node
+- [Phase 2]: search.Service: 429 blocks a provider locally for max(Retry-After, 60 s); blocked calls return rate_limited with remaining seconds (0 = unknown) and no HTTP
+- [Phase 2]: Error copy is computed from (error, now, receivedAt) in lib/errors.ts; caught error text is never rendered
+- [Phase 2]: UI state is held per provider id in App.svelte; latest() slots first:<p> and page:<p> cancel superseded calls
 
 ### Pending Todos
 
@@ -115,6 +119,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-17T20:09:23.179Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-10-17T20:24:40.079Z
+Stopped at: Completed 02-03-PLAN.md
 Resume file: None
