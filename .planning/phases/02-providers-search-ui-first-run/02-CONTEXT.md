@@ -41,6 +41,12 @@ A stranger can open the panel, get set up with a key (or skip to the keyless pro
 - Copy works for GIPHY, Klipy, Finer Gifs results; Clips copy waits for Phase 3 (MP4).
 - Written compliance posture (no persistent media cache, no blending/reordering, attribution, eager staging cleanup) goes into PROJECT.md Key Decisions in this phase.
 
+### Post-research decisions (user, 2026-10-17)
+- Clips-unavailable card (C2) tells the user to request access by emailing clips@giphy.com (per GIPHY docs), with a button that opens a pre-addressed email — replaces the UI-SPEC's "dashboard" wording.
+- Klipy content_filter = medium (approximates GIPHY PG-13).
+- Copy rules accepted as defaults: drop "(HTTP n)" from E5 when status is 2xx; K4 says "later this hour" when retry time is unknown.
+- UI-SPEC user confirmations: search field above tabs; click selects / double-click copies; "Copied — press ⌘V to paste" then hide after 400 ms; rejected stored key re-shows the setup card and saving overwrites it.
+
 ### Claude's Discretion
 - Exact component breakdown of the Svelte UI, virtualization library choice per research (@tanstack/svelte-virtual), and visual spacing.
 - Klipy API shape details (native v1 API per research), Clips capability-probe mechanics, and how the request budget/cache is structured internally.
