@@ -58,6 +58,8 @@ const (
 	Network     Kind = "network"
 	Timeout     Kind = "timeout"
 	HTTP        Kind = "http" // non-2xx other than the above, or an empty/invalid body (Status = HTTP status)
+	// ClipsDisabled: Go refuses Clips calls until the user's GIPHY key passed the Clips probe (no request made).
+	ClipsDisabled Kind = "clips_disabled"
 )
 
 type Error struct {

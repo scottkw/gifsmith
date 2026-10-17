@@ -28,8 +28,10 @@ type settingsFixture struct {
 	svc    *SettingsService
 	gifs   *GifService
 	store  *settings.MemoryStore
-	hits   *atomic.Int32
+	hits   *atomic.Int32 // fixture requests, Clips routes excluded (the probe is async)
 	events *[]string
+	clips  *search.Clips
+	probes *atomic.Int32
 }
 
 // newSettings wires SettingsService and GifService the way main.go does, against fakeapi.
@@ -39,7 +41,9 @@ func newSettings(t *testing.T, base string) settingsFixture {
 	if base == "" {
 		h := fakeapi.Handler(fakeapi.Options{})
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			hits.Add(1)
+			if !strings.Contains(r.URL.Path, "/clips/") {
+				hits.Add(1)
+			}
 			h.ServeHTTP(w, r)
 		}))
 		t.Cleanup(srv.Close)
@@ -56,18 +60,29 @@ func newSettings(t *testing.T, base string) settingsFixture {
 		}
 		return &giphy.Client{BaseURL: base + "/giphy", Key: k, HTTP: hc}
 	}
+	clipsClient := &giphy.Client{BaseURL: base + "/giphy", Key: keys.Func(provider.GIPHY), HTTP: hc, Clips: true}
 	svc := search.New(map[provider.ID]provider.Provider{
 		provider.GIPHY: &giphy.Client{BaseURL: base + "/giphy", Key: keys.Func(provider.GIPHY), HTTP: hc},
+		provider.Clips: clipsClient,
 		provider.Klipy: &klipy.Client{BaseURL: base + "/klipy", Key: keys.Func(provider.Klipy), HTTP: hc},
 	}, nil)
+	var probes atomic.Int32
+	clips := &search.Clips{
+		Probe: func(ctx context.Context) error {
+			probes.Add(1)
+			return clipsClient.ProbeClips(ctx)
+		},
+		HasKey:  func() bool { _, ok := keys.Get(provider.GIPHY); return ok },
+		Blocked: func() bool { return svc.Blocked(provider.GIPHY) },
+	}
 	var mu sync.Mutex
 	events := []string{}
 	s := &SettingsService{Keys: keys, Dir: t.TempDir(), Svc: svc, NewClient: newClient, Emit: func(n string) {
 		mu.Lock()
 		defer mu.Unlock()
 		events = append(events, n)
-	}}
-	return settingsFixture{svc: s, gifs: &GifService{Svc: svc, Keys: keys}, store: store, hits: &hits, events: &events}
+	}, Clips: clips}
+	return settingsFixture{svc: s, gifs: &GifService{Svc: svc, Keys: keys, Clips: clips}, store: store, hits: &hits, events: &events, clips: clips, probes: &probes}
 }
 
 func wantProviderErr(t *testing.T, err error, kind provider.Kind, p provider.ID, status int) {
@@ -325,8 +340,14 @@ func TestProviders(t *testing.T) {
 	if len(got) != 4 {
 		t.Fatalf("after GIPHY save: %+v, want 4 slots", got)
 	}
-	if !got[0].Configured || !got[1].Configured || got[1].Clips != "unknown" || got[2].Configured {
+	if !got[0].Configured || !got[1].Configured || got[2].Configured {
 		t.Errorf("after GIPHY save: %+v", got)
+	}
+	if s := waitClips(t, f.clips); s != search.ClipsEnabled {
+		t.Errorf("clips after GIPHY save settled at %s, want enabled", s)
+	}
+	if got := f.gifs.Providers(ctx); got[1].Clips != "enabled" {
+		t.Errorf("Providers clips = %q, want enabled", got[1].Clips)
 	}
 	// The struct crossing the Wails boundary carries no key material.
 	typ := reflect.TypeFor[ProviderStatus]()
@@ -377,5 +398,165 @@ func TestLastProviderUnreadable(t *testing.T) {
 	}
 	if logs.Len() == 0 {
 		t.Error("unreadable settings file was not logged")
+	}
+}
+
+// waitClips waits for an async Clips probe to settle.
+func waitClips(t *testing.T, c *search.Clips) search.ClipsState {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if s := c.State(); s != search.ClipsChecking && s != search.ClipsUnknown {
+			return s
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	return c.State()
+}
+
+func TestProvidersClipsChecking(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	release := make(chan struct{})
+	probe := f.clips.Probe
+	f.clips.Probe = func(ctx context.Context) error { <-release; return probe(ctx) }
+	if err := f.svc.SaveKey(ctx, "giphy", "uat-key-123"); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.gifs.Providers(ctx); got[1].Clips != "checking" {
+		t.Errorf("during a slow probe: clips = %q, want checking", got[1].Clips)
+	}
+	close(release)
+	if s := waitClips(t, f.clips); s != search.ClipsEnabled {
+		t.Errorf("after the probe: %s, want enabled", s)
+	}
+}
+
+func TestSaveKeyTriggersClips(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	if err := f.svc.SaveKey(ctx, "giphy", "bad-key-123"); err == nil {
+		t.Fatal("bad key saved")
+	}
+	time.Sleep(50 * time.Millisecond)
+	if n := f.probes.Load(); n != 0 {
+		t.Errorf("failed SaveKey probed Clips %d times, want 0", n)
+	}
+	if err := f.svc.SaveKey(ctx, "giphy", "uat-key-123"); err != nil {
+		t.Fatal(err)
+	}
+	if s := waitClips(t, f.clips); s != search.ClipsEnabled || f.probes.Load() != 1 {
+		t.Errorf("after save: %s, probes %d; want enabled, 1", s, f.probes.Load())
+	}
+	// A new GIPHY key resets the result and probes again.
+	if err := f.svc.SaveKey(ctx, "giphy", "uat-key-456"); err != nil {
+		t.Fatal(err)
+	}
+	if s := waitClips(t, f.clips); s != search.ClipsEnabled || f.probes.Load() != 2 {
+		t.Errorf("after a second save: %s, probes %d; want enabled, 2", s, f.probes.Load())
+	}
+	// A Klipy save leaves Clips alone.
+	if err := f.svc.SaveKey(ctx, "klipy", "uat-key-123"); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(50 * time.Millisecond)
+	if n := f.probes.Load(); n != 2 {
+		t.Errorf("Klipy save probed Clips (probes %d, want 2)", n)
+	}
+}
+
+func TestGiphySuccessTriggersClipsOnce(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	if err := f.store.Set("giphy", "uat-key-123"); err != nil {
+		t.Fatal(err)
+	}
+	f.svc.Keys.Load()
+	if _, err := f.gifs.Search(ctx, "giphy", "boom", ""); err == nil {
+		t.Fatal("boom succeeded")
+	}
+	time.Sleep(50 * time.Millisecond)
+	if n := f.probes.Load(); n != 0 {
+		t.Errorf("a failed GIPHY call probed Clips (%d)", n)
+	}
+	for range 2 {
+		if _, err := f.gifs.Trending(ctx, "giphy", ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := f.gifs.Search(ctx, "giphy", "cats", ""); err != nil {
+		t.Fatal(err)
+	}
+	if s := waitClips(t, f.clips); s != search.ClipsEnabled || f.probes.Load() != 1 {
+		t.Errorf("after GIPHY successes: %s, probes %d; want enabled, 1", s, f.probes.Load())
+	}
+}
+
+func TestClipsRefusedUnlessEnabled(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	for _, call := range []func() (provider.Page, error){
+		func() (provider.Page, error) { return f.gifs.Search(ctx, "clips", "cat", "") },
+		func() (provider.Page, error) { return f.gifs.Trending(ctx, "clips", "") },
+	} {
+		p, err := call()
+		wantProviderErr(t, err, provider.ClipsDisabled, provider.Clips, 0)
+		if len(p.Items) != 0 {
+			t.Errorf("refused call returned %d items", len(p.Items))
+		}
+	}
+	if n := f.hits.Load(); n != 0 {
+		t.Errorf("refused Clips calls made %d fixture requests", n)
+	}
+	if err := f.svc.SaveKey(ctx, "giphy", "uat-key-123"); err != nil {
+		t.Fatal(err)
+	}
+	waitClips(t, f.clips)
+	p, err := f.gifs.Search(ctx, "clips", "cat", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Items) == 0 || !p.Items[0].IsClip || p.Items[0].Provider != provider.Clips || p.Items[0].DownloadURL != "" {
+		t.Errorf("clips search = %+v, want clip items with no download URL", p.Items)
+	}
+}
+
+func TestClipsDeniedFixture(t *testing.T) {
+	h := fakeapi.Handler(fakeapi.Options{ClipsDenied: true})
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+	f := newSettings(t, srv.URL)
+	ctx := context.Background()
+	if err := f.svc.SaveKey(ctx, "giphy", "uat-key-123"); err != nil {
+		t.Fatal(err)
+	}
+	if s := waitClips(t, f.clips); s != search.ClipsDisabled {
+		t.Errorf("denied: %s, want disabled", s)
+	}
+	if s, err := f.gifs.CheckClips(ctx); s != "disabled" || err != nil {
+		t.Errorf("CheckClips when disabled = %q, %v; want disabled, nil", s, err)
+	}
+	_, err := f.gifs.Trending(ctx, "clips", "")
+	wantProviderErr(t, err, provider.ClipsDisabled, provider.Clips, 0)
+}
+
+func TestCheckClipsUnknown(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	if err := f.store.Set("giphy", "ratelimit-key"); err != nil {
+		t.Fatal(err)
+	}
+	f.svc.Keys.Load()
+	s, err := f.gifs.CheckClips(ctx)
+	wantProviderErr(t, err, provider.RateLimited, provider.Clips, 0)
+	if s != "unknown" || f.probes.Load() != 1 {
+		t.Errorf("CheckClips = %q, probes %d; want unknown, 1", s, f.probes.Load())
+	}
+	if err := f.store.Set("giphy", "uat-key-123"); err != nil {
+		t.Fatal(err)
+	}
+	f.svc.Keys.Load()
+	if s, err := f.gifs.CheckClips(ctx); s != "enabled" || err != nil || f.probes.Load() != 2 {
+		t.Errorf("CheckClips retry = %q, %v, probes %d; want enabled, nil, 2", s, err, f.probes.Load())
 	}
 }

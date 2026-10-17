@@ -24,6 +24,7 @@ type SettingsService struct {
 	Svc       *search.Service
 	NewClient func(p provider.ID, key string) provider.Provider // a client using exactly this candidate key
 	Emit      func(name string)
+	Clips     *search.Clips
 
 	mu sync.Mutex // serializes SaveKey end to end: a verify never interleaves with another save's write
 }

@@ -22,6 +22,7 @@ type Client struct {
 	BaseURL string // https://api.giphy.com
 	Key     func() (string, bool)
 	HTTP    *http.Client
+	Clips   bool // GIPHY Clips endpoints: provider ID clips, no download URL until Phase 3 (MP4)
 }
 
 // flexInt accepts "200", 200, "" and null: GIPHY sends some numerics as strings.
@@ -126,3 +127,6 @@ func (c *Client) get(ctx context.Context, path string, v url.Values, cursor stri
 	}
 	return p, nil
 }
+
+// ProbeClips asks GIPHY whether the key is approved for Clips (skeleton).
+func (c *Client) ProbeClips(ctx context.Context) error { return nil }

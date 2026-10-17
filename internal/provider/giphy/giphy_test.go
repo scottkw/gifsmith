@@ -330,3 +330,89 @@ func TestRedaction(t *testing.T) {
 		}
 	}
 }
+
+func clipsBody(withPreview bool) string {
+	fw := `"fixed_width":{"url":"https://media.giphy.com/c1/200w.gif"},`
+	if !withPreview {
+		fw = ""
+	}
+	return `{"data":[{"id":"c1","slug":"clip-c1","title":"A clip","type":"video","images":{` + fw + `"fixed_height":{"url":"https://m/fh.gif"}},"video":{"assets":{"360p":{"url":"https://m/c1.mp4"}}}}],"pagination":{"total_count":1,"count":1,"offset":0}}`
+}
+
+func TestClipsMode(t *testing.T) {
+	c, _, last := stubClient(t, 200, nil, clipsBody(true))
+	c.Clips = true
+	for _, tc := range []struct {
+		path string
+		call func() (provider.Page, error)
+	}{
+		{"/v1/clips/search", func() (provider.Page, error) { return c.Search(context.Background(), "cat", "") }},
+		{"/v1/clips/trending", func() (provider.Page, error) { return c.Trending(context.Background(), "") }},
+	} {
+		p, err := tc.call()
+		if err != nil {
+			t.Fatalf("%s: %v", tc.path, err)
+		}
+		want := provider.Gif{Provider: provider.Clips, ID: "c1", Title: "A clip", PreviewURL: "https://media.giphy.com/c1/200w.gif", IsClip: true}
+		if len(p.Items) != 1 || p.Items[0] != want {
+			t.Errorf("%s: items = %+v, want [%+v]", tc.path, p.Items, want)
+		}
+		u := last()
+		if u == nil || u.Path != tc.path {
+			t.Fatalf("request = %v, want path %s", u, tc.path)
+		}
+		for k, want := range map[string]string{"rating": "pg-13", "bundle": "clips_grid_picker", "api_key": "uat-key-123"} {
+			if got := u.Query().Get(k); got != want {
+				t.Errorf("%s: %s = %q, want %q", tc.path, k, got, want)
+			}
+		}
+	}
+
+	s, _, _ := stubClient(t, 200, nil, clipsBody(false))
+	s.Clips = true
+	p, err := s.Search(context.Background(), "cat", "")
+	var pe *provider.Error
+	if !errors.As(err, &pe) || pe.Kind != provider.HTTP || pe.Provider != provider.Clips || len(p.Items) != 0 {
+		t.Errorf("clip without fixed_width: %+v, %#v; want clips http error", p, err)
+	}
+}
+
+func probeKind(t *testing.T, err error, kind provider.Kind, status int) {
+	t.Helper()
+	var pe *provider.Error
+	if !errors.As(err, &pe) || pe.Kind != kind || pe.Provider != provider.Clips || pe.Status != status {
+		t.Fatalf("ProbeClips err = %#v, want clips %s status %d", err, kind, status)
+	}
+}
+
+func TestProbeClips(t *testing.T) {
+	ok, _, last := stubClient(t, 200, nil, clipsBody(true))
+	if err := ok.ProbeClips(context.Background()); err != nil {
+		t.Fatalf("200: err = %v, want nil", err)
+	}
+	if u := last(); u == nil || u.Path != "/v1/clips/trending" || u.Query().Get("limit") != "1" || u.Query().Get("rating") != "pg-13" {
+		t.Errorf("probe request = %v, want /v1/clips/trending limit=1 rating=pg-13", u)
+	}
+
+	fixture, _ := fakeClient(t, "uat-key-123")
+	if err := fixture.ProbeClips(context.Background()); err != nil {
+		t.Errorf("fixture: err = %v, want nil", err)
+	}
+	srv := httptest.NewServer(fakeapi.Handler(fakeapi.Options{ClipsDenied: true}))
+	t.Cleanup(srv.Close)
+	denied := &Client{BaseURL: srv.URL + "/giphy", Key: fixedKey("uat-key-123"), HTTP: srv.Client()}
+	probeKind(t, denied.ProbeClips(context.Background()), provider.KeyRejected, 403)
+
+	for _, tc := range []struct {
+		status int
+		kind   provider.Kind
+		want   int
+	}{
+		{401, provider.KeyRejected, 401},
+		{404, provider.HTTP, 404},
+		{429, provider.RateLimited, 0},
+	} {
+		s, _, _ := stubClient(t, tc.status, nil, `{"data":[],"meta":{}}`)
+		probeKind(t, s.ProbeClips(context.Background()), tc.kind, tc.want)
+	}
+}

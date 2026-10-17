@@ -1,0 +1,228 @@
+package search
+
+import (
+	"context"
+	"errors"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"gifsmith/internal/provider"
+)
+
+// probeStub counts probes and answers with err (after release is closed, if set).
+type probeStub struct {
+	calls   atomic.Int32
+	changes atomic.Int32
+	mu      sync.Mutex
+	err     error
+	release chan struct{}
+	hasKey  atomic.Bool
+	blocked atomic.Bool
+}
+
+func (p *probeStub) probe(ctx context.Context) error {
+	p.calls.Add(1)
+	p.mu.Lock()
+	rel, err := p.release, p.err
+	p.mu.Unlock()
+	if rel != nil {
+		<-rel
+	}
+	return err
+}
+
+func (p *probeStub) setErr(err error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.err = err
+}
+
+func newClips() (*Clips, *probeStub) {
+	p := &probeStub{}
+	p.hasKey.Store(true)
+	return &Clips{Probe: p.probe, HasKey: p.hasKey.Load, Blocked: p.blocked.Load, OnChange: func() { p.changes.Add(1) }}, p
+}
+
+// settle waits for the async probe to leave "checking".
+func settle(t *testing.T, c *Clips) ClipsState {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if s := c.State(); s != ClipsChecking {
+			return s
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("clips state still checking after 2 s")
+	return ""
+}
+
+func TestClipsNoKey(t *testing.T) {
+	c, p := newClips()
+	p.hasKey.Store(false)
+	c.Trigger()
+	if s := c.State(); s != ClipsNoKey {
+		t.Errorf("state = %s, want no_key", s)
+	}
+	if n := p.calls.Load(); n != 0 {
+		t.Errorf("probed %d times without a key", n)
+	}
+	p.hasKey.Store(true)
+	c.Trigger()
+	settle(t, c)
+	p.hasKey.Store(false)
+	if s := c.State(); s != ClipsNoKey {
+		t.Errorf("after the key went away: %s, want no_key regardless of history", s)
+	}
+}
+
+func TestClipsTriggerOnce(t *testing.T) {
+	c, p := newClips()
+	if s := c.State(); s != ClipsUnknown {
+		t.Errorf("before any probe: %s, want unknown", s)
+	}
+	p.release = make(chan struct{})
+	c.Trigger()
+	if s := c.State(); s != ClipsChecking {
+		t.Errorf("during probe: %s, want checking", s)
+	}
+	close(p.release)
+	if s := settle(t, c); s != ClipsEnabled {
+		t.Errorf("after probe: %s, want enabled", s)
+	}
+	if n := p.changes.Load(); n != 2 {
+		t.Errorf("OnChange called %d times, want 2 (checking, enabled)", n)
+	}
+	c.Trigger()
+	settle(t, c)
+	if n := p.calls.Load(); n != 1 {
+		t.Errorf("probes = %d after two Triggers, want 1", n)
+	}
+}
+
+func TestClipsOutcomes(t *testing.T) {
+	for name, tc := range map[string]struct {
+		err  error
+		want ClipsState
+	}{
+		"ok":           {nil, ClipsEnabled},
+		"key_rejected": {&provider.Error{Kind: provider.KeyRejected, Provider: provider.Clips, Status: 403}, ClipsDisabled},
+		"404":          {&provider.Error{Kind: provider.HTTP, Provider: provider.Clips, Status: 404}, ClipsDisabled},
+		"rate_limited": {&provider.Error{Kind: provider.RateLimited, Provider: provider.Clips}, ClipsUnknown},
+		"network":      {&provider.Error{Kind: provider.Network, Provider: provider.Clips}, ClipsUnknown},
+		"timeout":      {&provider.Error{Kind: provider.Timeout, Provider: provider.Clips}, ClipsUnknown},
+		"500":          {&provider.Error{Kind: provider.HTTP, Provider: provider.Clips, Status: 500}, ClipsUnknown},
+		"canceled":     {context.Canceled, ClipsUnknown},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c, p := newClips()
+			p.setErr(tc.err)
+			c.Trigger()
+			if s := settle(t, c); s != tc.want {
+				t.Errorf("state = %s, want %s", s, tc.want)
+			}
+			if p.calls.Load() != 1 {
+				t.Errorf("probes = %d, want 1", p.calls.Load())
+			}
+		})
+	}
+}
+
+func TestClipsBlockedSkip(t *testing.T) {
+	c, p := newClips()
+	p.blocked.Store(true)
+	c.Trigger()
+	if s := c.State(); s != ClipsUnknown || p.calls.Load() != 0 {
+		t.Errorf("blocked: state %s, probes %d; want unknown, 0", s, p.calls.Load())
+	}
+	p.blocked.Store(false)
+	c.Trigger()
+	if s := settle(t, c); s != ClipsEnabled || p.calls.Load() != 1 {
+		t.Errorf("after the block: state %s, probes %d; want enabled, 1", s, p.calls.Load())
+	}
+}
+
+func TestClipsRecheck(t *testing.T) {
+	c, p := newClips()
+	rl := &provider.Error{Kind: provider.RateLimited, Provider: provider.Clips}
+	p.setErr(rl)
+	c.Trigger()
+	if s := settle(t, c); s != ClipsUnknown {
+		t.Fatalf("state = %s, want unknown", s)
+	}
+	s, err := c.Recheck(context.Background())
+	if s != ClipsUnknown || !errors.Is(err, rl) || p.calls.Load() != 2 {
+		t.Errorf("recheck still failing: %s, %v, probes %d; want unknown, the probe error, 2", s, err, p.calls.Load())
+	}
+	p.setErr(nil)
+	s, err = c.Recheck(context.Background())
+	if s != ClipsEnabled || err != nil || p.calls.Load() != 3 {
+		t.Errorf("recheck ok: %s, %v, probes %d; want enabled, nil, 3", s, err, p.calls.Load())
+	}
+	s, err = c.Recheck(context.Background())
+	if s != ClipsEnabled || err != nil || p.calls.Load() != 3 {
+		t.Errorf("recheck when enabled: %s, %v, probes %d; want enabled, nil, no probe", s, err, p.calls.Load())
+	}
+
+	d, dp := newClips()
+	dp.setErr(&provider.Error{Kind: provider.KeyRejected, Provider: provider.Clips, Status: 403})
+	d.Trigger()
+	settle(t, d)
+	if s, err := d.Recheck(context.Background()); s != ClipsDisabled || err != nil || dp.calls.Load() != 1 {
+		t.Errorf("recheck when disabled: %s, %v, probes %d; want disabled, nil, 1", s, err, dp.calls.Load())
+	}
+
+	b, bp := newClips()
+	bp.blocked.Store(true)
+	s, err = b.Recheck(context.Background())
+	var pe *provider.Error
+	if s != ClipsUnknown || !errors.As(err, &pe) || pe.Kind != provider.RateLimited || pe.Provider != provider.Clips || bp.calls.Load() != 0 {
+		t.Errorf("recheck while blocked: %s, %v, probes %d; want unknown, clips rate_limited, 0", s, err, bp.calls.Load())
+	}
+}
+
+func TestClipsReset(t *testing.T) {
+	c, p := newClips()
+	c.Trigger()
+	settle(t, c)
+	c.Reset()
+	if s := c.State(); s != ClipsUnknown {
+		t.Errorf("after Reset: %s, want unknown", s)
+	}
+	p.setErr(&provider.Error{Kind: provider.KeyRejected, Provider: provider.Clips, Status: 403})
+	c.Trigger()
+	if s := settle(t, c); s != ClipsDisabled || p.calls.Load() != 2 {
+		t.Errorf("after Reset + Trigger: %s, probes %d; want disabled, 2", s, p.calls.Load())
+	}
+}
+
+func TestClipsResetDropsStaleProbe(t *testing.T) {
+	c, p := newClips()
+	p.release = make(chan struct{})
+	p.setErr(&provider.Error{Kind: provider.KeyRejected, Provider: provider.Clips, Status: 403})
+	c.Trigger()
+	c.Reset() // the key changed while the old key's probe was in flight
+	close(p.release)
+	time.Sleep(50 * time.Millisecond)
+	if s := c.State(); s != ClipsUnknown {
+		t.Errorf("stale probe result landed: %s, want unknown", s)
+	}
+}
+
+func TestBlocked(t *testing.T) {
+	s, f, c := setup(provider.GIPHY)
+	if s.Blocked(provider.GIPHY) {
+		t.Error("blocked before any 429")
+	}
+	f.err = &provider.Error{Kind: provider.RateLimited, Provider: provider.GIPHY, RetryAfterSec: 120}
+	_, _ = s.Trending(ctx, provider.GIPHY, "")
+	if !s.Blocked(provider.GIPHY) || s.Blocked(provider.Klipy) {
+		t.Error("want GIPHY blocked and Klipy not")
+	}
+	c.advance(121 * time.Second)
+	if s.Blocked(provider.GIPHY) {
+		t.Error("still blocked after Retry-After")
+	}
+}

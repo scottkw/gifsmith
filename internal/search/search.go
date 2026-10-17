@@ -139,3 +139,6 @@ func dedupe(p provider.ID, pg provider.Page) provider.Page {
 	pg.Items = items
 	return pg
 }
+
+// Blocked reports whether p is inside a 429 block (skeleton).
+func (s *Service) Blocked(p provider.ID) bool { return false }

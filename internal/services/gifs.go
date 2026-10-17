@@ -15,8 +15,9 @@ var errUnknownProvider = errors.New("unknown provider")
 // GifService exposes search and trending to the webview. All provider HTTP stays
 // in Go, behind search.Service (cache, 429 budget, dedupe policy).
 type GifService struct {
-	Svc  *search.Service
-	Keys *settings.Keys
+	Svc   *search.Service
+	Keys  *settings.Keys
+	Clips *search.Clips
 }
 
 // ProviderStatus crosses to the webview: booleans and state strings only, never a key.
@@ -78,3 +79,6 @@ func logProviderErr(op, p string, err error) {
 		log.Printf("%s %s: %v", op, p, pe)
 	}
 }
+
+// CheckClips (skeleton).
+func (g *GifService) CheckClips(ctx context.Context) (string, error) { return "", nil }

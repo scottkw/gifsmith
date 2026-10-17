@@ -18,8 +18,9 @@ import (
 )
 
 type Options struct {
-	FinerDown bool          // /finer/search answers like the real host does when it is down (530, Cloudflare 1033)
-	SlowDelay time.Duration // used by the "slow" scenario word (plan 02-03)
+	FinerDown   bool          // /finer/search answers like the real host does when it is down (530, Cloudflare 1033)
+	SlowDelay   time.Duration // used by the "slow" scenario word (plan 02-03)
+	ClipsDenied bool          // /giphy/v1/clips/* answer 403, as for a key GIPHY has not approved for Clips
 }
 
 const (
