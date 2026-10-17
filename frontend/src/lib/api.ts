@@ -1,5 +1,5 @@
 // Thin facade over the generated bindings. Provider HTTP happens in Go; this only calls it.
-import { GifService } from '../../bindings/gifsmith/internal/services';
+import { ActionService, GifService, PanelService } from '../../bindings/gifsmith/internal/services';
 import type { Gif, Page } from '../../bindings/gifsmith/internal/provider';
 
 export type { Gif, Page };
@@ -13,3 +13,8 @@ export function providerError(e: unknown): ProviderErr | null {
   const c = (e as { cause?: unknown } | null)?.cause as ProviderErr | undefined;
   return c && typeof c.kind === 'string' ? c : null;
 }
+
+export const copy = (g: Gif) => ActionService.Copy(g);
+export const paste = (g: Gif) => ActionService.Paste(g);
+export const requestAccessibility = () => ActionService.RequestAccessibility();
+export const hide = () => PanelService.Hide();

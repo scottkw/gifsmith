@@ -7,22 +7,26 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as provider$0 from "../provider/models.js";
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
 /**
- * Copy puts the staged sample GIF on the clipboard as a file and hides the panel.
- * On failure the panel stays open so the frontend can show the error.
+ * Copy puts the selected GIF on the clipboard as a file. The panel stays open:
+ * the frontend shows the confirmation, then hides it.
  */
-export function Copy(): $CancellablePromise<$models.Result> {
-    return $Call.ByID(1012912345);
+export function Copy(g: provider$0.Gif): $CancellablePromise<$models.Result> {
+    return $Call.ByID(1012912345, g);
 }
 
 /**
  * Paste copies the GIF, hides the panel and posts one ⌘V to the previous app.
  * Without Accessibility it only copies and keeps the panel open with instructions.
  */
-export function Paste(): $CancellablePromise<$models.Result> {
-    return $Call.ByID(1552752055);
+export function Paste(g: provider$0.Gif): $CancellablePromise<$models.Result> {
+    return $Call.ByID(1552752055, g);
 }
 
 /**

@@ -1,21 +1,25 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { Events } from '@wailsio/runtime';
-  import { ActionService } from '../bindings/gifsmith/internal/services';
-  import { search, type Gif } from './lib/api';
+  import { copy, hide, paste, requestAccessibility, search, type Gif } from './lib/api';
 
   const PROVIDER = 'finergifs';
   const DEBOUNCE_MS = 450;
+  const HIDE_AFTER_COPY_MS = 400;
+  const COPY_FAILED = "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";
+  const CLIPS_COPY = 'Copying Clips (MP4) arrives in the next update.';
+  const BUSY = 'another action is still running'; // Go ErrBusy: a second call while one runs is ignored
 
   let input: HTMLInputElement;
   let query = $state('');
   let items = $state<Gif[]>([]);
   let selected = $state(-1);
   let status = $state('');
+  let tone = $state<'' | 'success' | 'error'>('');
+  let copying = $state(false); // one Copy/Paste in flight; a second Enter would paste twice
   let needsAccessibility = $state(false);
   // Paste hides the panel before ⌘V; a copied-only fallback message must survive to the next show.
   let keepStatus = false;
-  let busy = false; // one Copy/Paste in flight; a second Enter would paste twice
   let timer: ReturnType<typeof setTimeout> | undefined;
   let seq = 0; // only the latest search may update the grid
 
@@ -24,18 +28,32 @@
   onMount(() => {
     input.focus();
     Events.On('panel:show', () => {
-      if (!keepStatus) status = '';
+      if (!keepStatus) setStatus('');
       keepStatus = false;
       needsAccessibility = false;
       input.focus();
       input.select();
     });
-    Events.On('panel:status', (e) => {
-      status = String(e.data);
-    });
+    Events.On('panel:status', (e) => setStatus(String(e.data)));
   });
 
+  function setStatus(text: string, t: typeof tone = '') {
+    status = text;
+    tone = t;
+  }
+
+  // A transient status (copy result, error) clears on the next keystroke or selection change.
+  function clearTransient() {
+    if (!copying) setStatus('');
+  }
+
+  function select(i: number) {
+    if (i !== selected) clearTransient();
+    selected = i;
+  }
+
   function onInput() {
+    clearTransient();
     clearTimeout(timer);
     const q = query.trim();
     if ([...q].length < 2) {
@@ -58,40 +76,54 @@
       if (mine !== seq) return;
       items = [];
       selected = -1;
-      status = "Couldn't search The Finer Gifs Club.";
+      setStatus("Couldn't search The Finer Gifs Club.", 'error');
     }
   }
 
-  async function onKeydown(e: KeyboardEvent) {
+  function onKeydown(e: KeyboardEvent) {
     // Enter that commits an IME composition (WebKit: keyCode 229) is not a submit.
     if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229 || e.repeat) return;
     e.preventDefault();
-    if (busy) return;
-    busy = true;
+    run(e.metaKey ? 'paste' : 'copy');
+  }
+
+  async function run(action: 'copy' | 'paste') {
+    const g = items[selected];
+    if (copying || !g) return;
+    if (g.isClip) {
+      setStatus(CLIPS_COPY);
+      return;
+    }
+    copying = true;
+    setStatus('Copying…');
     try {
-      if (e.metaKey) {
-        const r = await ActionService.Paste();
-        status = r.message;
+      if (action === 'copy') {
+        const r = await copy(g);
+        setStatus(r.message, 'success');
+        setTimeout(hide, HIDE_AFTER_COPY_MS);
+      } else {
+        const r = await paste(g);
+        setStatus(r.message);
         needsAccessibility = r.needsAccessibility;
         keepStatus = r.copied && !r.pasted && !r.needsAccessibility;
-      } else {
-        status = (await ActionService.Copy()).message;
       }
     } catch (err) {
-      status = String(err);
+      if ((err as Error)?.message === BUSY) setStatus('');
+      else setStatus(COPY_FAILED, 'error');
     } finally {
-      busy = false;
+      copying = false;
     }
   }
 
   async function enableAutoPaste() {
     try {
-      await ActionService.RequestAccessibility();
-      status =
-        'After turning Gifsmith on, press ⌘Enter again. If it still says it is not allowed, quit Gifsmith from the menu bar and open it again.';
+      await requestAccessibility();
+      setStatus(
+        'After turning Gifsmith on, press ⌘Enter again. If it still says it is not allowed, quit Gifsmith from the menu bar and open it again.',
+      );
       needsAccessibility = false;
     } catch (err) {
-      status = String(err);
+      setStatus(String(err), 'error');
     }
     input.focus();
   }
@@ -130,9 +162,16 @@
           tabindex="-1"
           aria-selected={i === selected}
           aria-label={g.title || `GIF ${i + 1}`}
-          onclick={() => (selected = i)}
+          onclick={() => select(i)}
+          ondblclick={() => {
+            select(i);
+            run('copy');
+          }}
         >
           <img src={g.previewUrl} alt="" decoding="async" draggable="false" loading="lazy" />
+          {#if copying && i === selected}
+            <div class="overlay"><span class="spinner" role="status" aria-label="Loading"></span></div>
+          {/if}
         </div>
       {/each}
     </div>
@@ -140,7 +179,12 @@
 
   <footer>
     <span class="attribution">GIFs from The Finer Gifs Club</span>
-    <span class="center">{footerCenter}</span>
+    <span class="center {tone}">
+      {#if tone === 'success'}
+        <svg class="check" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" /></svg>
+      {/if}
+      {footerCenter}
+    </span>
     {#if needsAccessibility}
       <button onclick={enableAutoPaste}>Enable Automatic Paste…</button>
     {:else}
@@ -202,6 +246,7 @@
     padding: 16px;
   }
   .tile {
+    position: relative;
     border-radius: 8px;
     background: var(--surface);
     overflow: hidden;
@@ -215,6 +260,41 @@
   .tile[aria-selected='true'] {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
+  }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.4);
+  }
+  .spinner {
+    box-sizing: border-box;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spinner {
+      animation: none;
+      border: 0;
+      width: auto;
+      height: auto;
+      color: #fff;
+      font: var(--label);
+    }
+    .spinner::before {
+      content: '•••';
+    }
   }
   .tile img {
     width: 100%;
@@ -243,6 +323,20 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .center.success {
+    color: var(--success);
+  }
+  .center.error {
+    color: var(--destructive);
+  }
+  .check {
+    width: 12px;
+    height: 12px;
+    vertical-align: -2px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
   }
   .hints {
     color: var(--text-tertiary);

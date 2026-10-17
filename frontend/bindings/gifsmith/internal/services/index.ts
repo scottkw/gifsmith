@@ -3,9 +3,11 @@
 
 import * as ActionService from "./actionservice.js";
 import * as GifService from "./gifservice.js";
+import * as PanelService from "./panelservice.js";
 export {
     ActionService,
-    GifService
+    GifService,
+    PanelService
 };
 
 export type {
