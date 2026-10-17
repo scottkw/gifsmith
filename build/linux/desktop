@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=Gifsmith
+Comment=A gifsmith application
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/gifsmith %u
+Terminal=false
+Type=Application
+Icon=gifsmith
+Categories=Utility;
+StartupWMClass=gifsmith
+
+ 
