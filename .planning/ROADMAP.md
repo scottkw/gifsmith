@@ -6,7 +6,7 @@ Gifsmith ports the Raycast "GIF Search" extension to a standalone macOS menu bar
 
 ## Milestones
 
-- 🚧 **v1.0** Gifsmith MVP — Phases 1-4 (in progress)
+- 🚧 **v1.0** Gifsmith MVP
 
 ## Phases
 
