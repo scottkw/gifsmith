@@ -59,7 +59,7 @@
 ### Settings
 
 - [ ] **SETT-01**: Settings open in their own window, where pasting into fields works
-- [ ] **SETT-02**: User can add, test, and remove GIPHY and Klipy keys
+- [ ] **SETT-02**: User can add, test, change (replace), and remove GIPHY and Klipy keys; each key row links to the provider's key sign-up page (GIPHY developer dashboard, Klipy Partner Panel)
 - [ ] **SETT-03**: User can rebind the global hotkeys; conflicts are reported and the old binding stays until the new one registers
 - [ ] **SETT-04**: User can set grid item size (search and trending), max results, download folder, hide filename, GIPHY and Klipy locales
 - [ ] **SETT-05**: Settings shows Accessibility permission status and a button to grant it
