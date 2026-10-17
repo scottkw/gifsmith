@@ -19,8 +19,8 @@
 - [ ] **SRCH-01**: User can search GIPHY, Klipy, and The Finer Gifs Club, switching provider from the panel; last provider is remembered
 - [ ] **SRCH-02**: GIPHY Clips appears as a provider only when the user's GIPHY key passes a Clips test call; otherwise a short explanation is shown
 - [ ] **SRCH-03**: With an empty query, user sees trending GIFs (providers that support trending)
-- [ ] **SRCH-04**: Results show as an animated grid that loads more as the user scrolls or arrows near the end
-- [ ] **SRCH-05**: User can navigate the grid entirely by keyboard (arrows, Enter, ⌘K, Esc)
+- [x] **SRCH-04**: Results show as an animated grid that loads more as the user scrolls or arrows near the end
+- [x] **SRCH-05**: User can navigate the grid entirely by keyboard (arrows, Enter, ⌘K, Esc)
 - [ ] **SRCH-06**: Searches are debounced so free keys (100 calls/hour) last; a rate-limit hit shows a clear message with when to retry
 - [ ] **SRCH-07**: Network, timeout, and provider errors show a per-provider message; one provider failing never blocks the others
 - [ ] **SRCH-08**: User sees recent searches when the box is empty and can rerun one
@@ -111,8 +111,8 @@
 | SRCH-01 | Phase 2 | Pending |
 | SRCH-02 | Phase 2 | Pending |
 | SRCH-03 | Phase 2 | Pending |
-| SRCH-04 | Phase 2 | Pending |
-| SRCH-05 | Phase 2 | Pending |
+| SRCH-04 | Phase 2 | Complete |
+| SRCH-05 | Phase 2 | Complete |
 | SRCH-06 | Phase 2 | Pending |
 | SRCH-07 | Phase 2 | Pending |
 | SRCH-08 | Phase 3 | Pending |

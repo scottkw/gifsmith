@@ -5,16 +5,16 @@ milestone_name: Gifsmith MVP
 current_phase: 2
 current_phase_name: Providers, Search UI & First Run
 status: executing
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-10-17T18:53:47.948Z"
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-10-17T20:09:23.271Z"
 last_activity: 2026-10-17
 last_activity_desc: Phase 2 execution started
-state_head: f2c0870004c3c8473e94a8781c1e5103f67507b8
+state_head: 7526e47fb73a8f7b5871f6212e9cfbecbdab3b8b
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 10
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # Project State
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-17)
 ## Current Position
 
 Phase: 2 (Providers, Search UI & First Run) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-10-17 — Phase 2 execution started
 
@@ -62,6 +62,7 @@ Progress: [███░░░░░░░] 25% (4/4 plans in Phase 1)
 | Phase 01 P03 | 75min | 2 tasks | 17 files |
 | Phase 01 P04 | 3min | 2 tasks | 3 files |
 | Phase 2 P01 | 13min | 3 tasks | 31 files |
+| Phase 2 P02 | 6min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,10 @@ Recent decisions affecting current work:
 - [Phase 2]: 02-01: malformed provider responses keep their HTTP status in provider.Error (consistent with httpx invalid-JSON)
 - [Phase 2]: 02-01: staging downloads use their own http.Client bounded by Fetch's 45 s context (API client's 15 s timeout would cut multi-MB originals)
 - [Phase 2]: 02-01: VendorAllow = https + vendor host + default port only; server build adds only the fixture listener host
+- [Phase 2]: 02-02: Keys inside an open IME composition route to none for every key, not only Enter
+- [Phase 2]: 02-02: Paging drops stale pages via resultSeq (bumped on every result-set replacement); a failed page waits for Try Again
+- [Phase 2]: 02-02: One main mousedown handler pins focus to the search input for clicks outside text fields
+- [Phase 2]: 02-02: node tests excluded from svelte-check instead of adding @types/node
 
 ### Pending Todos
 
@@ -110,6 +115,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-17T18:53:47.877Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-10-17T20:09:23.179Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None
