@@ -67,11 +67,11 @@ Plans:
   4. "Powered by GIPHY" shows on GIPHY and Clips results, and the Klipy search placeholder reads "Search KLIPY".
   5. GIPHY Clips appears as a provider only when the user's GIPHY key passes a Clips test call (otherwise a short explanation is shown). Rapid typing does not burn requests, a rate-limit hit shows a clear message with when to retry, and a network, timeout, or provider error shows a per-provider message while other providers stay usable.
 
-**Plans:** 6 plans
+**Plans:** 1/6 plans executed
 
 Plans:
 **Wave 1**
-- [ ] 02-01-PLAN.md — Tracer: Finer Gifs search in Go → animated grid → Enter copies the real GIF (typed URL-free errors, staging, smoke/UAT harness)
+- [x] 02-01-PLAN.md — Tracer: Finer Gifs search in Go → animated grid → Enter copies the real GIF (typed URL-free errors, staging, smoke/UAT harness)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 02-02-PLAN.md — Virtualized grid with paging to End of results, full keyboard model, panel owns Esc and survives ⌘W (npm package gate)
@@ -87,6 +87,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 - [ ] 02-06-PLAN.md — GIPHY Clips probe and states, compliance posture in PROJECT.md, UI backstops, signed install + native UAT with real keys
+
 **UI hint**: yes
 
 **Notes**: Copy works for Finer Gifs, GIPHY, and Klipy results here; Clips file handling (MP4) lands in Phase 3 (ACTN-09), and temp-file lifecycle hardening in Phase 3 (ACTN-10). Written compliance posture goes into PROJECT.md Key Decisions in this phase. Default PG-13 rating applies to GIPHY now; the user-facing control is in Phase 4.
@@ -139,6 +140,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Native Spike & Signed Dev Loop | 4/4 | Complete    | 2026-10-17 |
-| 2. Providers, Search UI & First Run | 0/6 | Planned | - |
+| 2. Providers, Search UI & First Run | 1/6 | In Progress | - |
 | 3. Action Pipeline & Library | 0/TBD | Not started | - |
 | 4. Settings, Shell Polish & Release | 0/TBD | Not started | - |

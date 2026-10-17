@@ -5,16 +5,16 @@ milestone_name: Gifsmith MVP
 current_phase: 2
 current_phase_name: Providers, Search UI & First Run
 status: executing
-stopped_at: Phase 1 complete, ready to plan Phase 2
-last_updated: "2026-10-17T18:37:02.152Z"
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-10-17T18:53:47.948Z"
 last_activity: 2026-10-17
-last_activity_desc: Phase 1 complete, transitioned to Phase 2
-state_head: 3984366492f7c52273ce70f113976890fa4e2537
+last_activity_desc: Phase 2 execution started
+state_head: f2c0870004c3c8473e94a8781c1e5103f67507b8
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 10
-  completed_plans: 4
+  completed_plans: 5
 ---
 
 # Project State
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-10-17)
 
 ## Current Position
 
-Phase: 2 (Providers, Search UI & First Run) — READY TO EXECUTE
-Plan: Not started
+Phase: 2 (Providers, Search UI & First Run) — EXECUTING
+Plan: 2 of 6
 Status: Ready to execute
-Last activity: 2026-10-17 — Phase 1 complete, transitioned to Phase 2
+Last activity: 2026-10-17 — Phase 2 execution started
 
 Progress: [███░░░░░░░] 25% (4/4 plans in Phase 1)
 
@@ -61,6 +61,7 @@ Progress: [███░░░░░░░] 25% (4/4 plans in Phase 1)
 | Phase 01 P02 | 4min | 2 tasks | 9 files |
 | Phase 01 P03 | 75min | 2 tasks | 17 files |
 | Phase 01 P04 | 3min | 2 tasks | 3 files |
+| Phase 2 P01 | 13min | 3 tasks | 31 files |
 
 ## Accumulated Context
 
@@ -84,6 +85,9 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-04: Phase 1 GO WITH FALLBACKS (user) - build Phase 2 on the Developer ID-signed dev build; limits in 01-PASTE-MATRIX.md section 4
 - [Phase 01]: 01-04: Notarization deferred to Phase 4 (Apple agreement 403); notarized dry run + N15 carry over
 - [Phase 01]: 01-04: Pasteboard payload stays a single file URL; Phase 3 decides on image data only if untested apps fail
+- [Phase 2]: 02-01: malformed provider responses keep their HTTP status in provider.Error (consistent with httpx invalid-JSON)
+- [Phase 2]: 02-01: staging downloads use their own http.Client bounded by Fetch's 45 s context (API client's 15 s timeout would cut multi-MB originals)
+- [Phase 2]: 02-01: VendorAllow = https + vendor host + default port only; server build adds only the fixture listener host
 
 ### Pending Todos
 
@@ -106,6 +110,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-17T16:38:15.034Z
-Stopped at: Phase 1 complete, ready to plan Phase 2
+Last session: 2026-10-17T18:53:47.877Z
+Stopped at: Completed 02-01-PLAN.md
 Resume file: None
