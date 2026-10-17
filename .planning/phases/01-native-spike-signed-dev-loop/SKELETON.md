@@ -55,9 +55,10 @@ Plans cite these IDs. CONTEXT.md lists the decisions as bullets; the numbering b
 - [ ] Project scaffold — Wails v3 svelte template at repo root, pnpm, Taskfile, `go test`, `go vet`, `svelte-check` (plan 01)
 - [ ] Routing — single `/` route served from the embedded `frontend/dist` into the panel window (plan 01)
 - [ ] Data write/read — real file write (staged sample GIF) and real native write (pasteboard file URL, read back in a darwin test on a private named pasteboard) (plan 01); no database exists in this project
-- [ ] UI — text input wired to bound `ActionService.Copy` (Enter) and `ActionService.Paste` (⌘Enter) (plans 01, 02)
-- [ ] Deployment — Developer ID–signed, hardened-runtime install to `~/Applications/Gifsmith.app` via `wails3 task darwin:install:dev` (plan 02); notarized + stapled build via `wails3 task darwin:sign:notarize` (plan 03)
-- [ ] Browser UAT loop — `scripts/smoke-browser-loop.sh` (plan 02)
+- [ ] UI — text input wired to bound `ActionService.Copy` (Enter) and `ActionService.Paste` (⌘Enter) (plans 01, 03)
+- [ ] Deployment — Developer ID–signed, hardened-runtime install to `~/Applications/Gifsmith.app` via `wails3 task darwin:install:dev` (plan 03); notarized + stapled build via `wails3 task darwin:sign:notarize` (plan 04)
+- [ ] Browser UAT loop — `scripts/smoke-browser-loop.sh` (plan 03)
+- [ ] Menu-bar shell — tray menu (Open / Settings… / Quit) and cursor-screen placement (plan 02)
 
 ## Out of Scope (Deferred to Later Slices)
 

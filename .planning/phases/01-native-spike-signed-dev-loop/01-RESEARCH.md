@@ -505,12 +505,18 @@ cd frontend && GIFSMITH_BACKEND=http://localhost:8089 pnpm exec vite      # open
 | A10 | UCKeyTranslate with the command modifier resolves "Dvorak - QWERTY ⌘" to the QWERTY V | Pattern 4 | Wrong key on that layout only. Maccy special-cases the layout name |
 | A11 | Left-mouse global monitors need no AX (fallback if HideOnFocusLost misses click-away) | Open Q2 | Fallback unavailable without AX |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+All four are resolved for planning: each has an explicit gate step in 01-01 Task 3 (tracer gate human-check, numbered steps below) and a pre-authorized fallback in that task's action, so no question is left open going into execution. The empirical answers are recorded in 01-01-SUMMARY.md.
 
 1. **Does `FocusWebView` make the panel take typing immediately (and keep the frontmost app)?** Unverified. The probe attempt was confounded by user activity. Recommendation: include it in the first build, then run the user checkpoint. Use the locked fallback if needed.
+   **RESOLVED** — Gate: 01-01 Task 3 human-check steps 2-3 (menu bar still shows TextEdit; "cats" typed with no click lands in the input). Fallback: locked decision D-08 (non-activating off, record frontmost app on Show, reactivate it on Hide; pulls `FrontmostApp`/`ActivateApp` forward from plan 01-03).
 2. **Does click-away hide reliably when the user clicks a window of the already-active previous app?** `HideOnFocusLost` depends on the panel resigning key. During the probe the panel did hide after the user switched apps (weak evidence). Fallback: `[NSEvent addGlobalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown|NSEventMaskRightMouseDown]` → Hide (A11).
+   **RESOLVED** — Gate: 01-01 Task 3 human-check step 6 (click on the TextEdit window hides the panel). Fallback: NSEvent global left/right mouse-down monitor in `internal/platform` that calls Hide (A11; needs no Accessibility).
 3. **Synthetic hotkey flake:** in one of four probe launches the hotkey didn't show the panel on two tries. The cause is unknown: possibly Vorssaint active with its command bar or a keyboard feature, or user activity. Repeat the hotkey several times in the user checkpoint, with Vorssaint frontmost and with a full-screen app.
+   **RESOLVED** — Gate: 01-01 Task 3 human-check steps 5, 7 and 9 (toggle twice; full-screen app; repeated presses with Vorssaint frontmost), plus the "hotkey registered" log grep in its verify; re-checked in the 01-03/01-04 matrix rows N1, N2, N10. Fallback: the tray "Open Gifsmith" item (plan 01-02) shows the panel without the hotkey (roadmap criterion 2); a reproducible miss is a RULE 0 stop-and-report at the gate rather than an improvised fix.
 4. **Floating vs PopUpMenu level over full-screen apps on macOS 27.** Start with Floating. Switch to the docs' PopUpMenu + Stationary recipe if the overlay fails.
+   **RESOLVED** — Gate: 01-01 Task 3 human-check step 7 (panel appears over a full-screen app). Fallback: `MacWindowLevelPopUpMenu` plus `MacWindowCollectionBehaviorStationary` (research Pattern 1 docs recipe).
 
 ## Environment Availability
 
