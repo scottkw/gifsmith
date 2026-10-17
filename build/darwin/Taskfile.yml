@@ -216,6 +216,14 @@ tasks:
     cmds:
       - wails3 tool sign --input "{{.BIN_DIR}}/{{.APP_NAME}}.app" --identity "{{.SIGN_IDENTITY}}" --hardened-runtime
       - pkill -x {{.APP_NAME}} || true
+      # SIGTERM returns at once; replacing the bundle while the old instance runs lets `open` reuse it.
+      - |
+        for i in $(seq 1 50); do
+          pgrep -x {{.APP_NAME}} >/dev/null || exit 0
+          sleep 0.1
+        done
+        echo "{{.APP_NAME}} did not exit within 5s"
+        exit 1
       - case "{{.INSTALL_PATH}}" in */Applications/Gifsmith.app) ;; *) echo "refusing to install to '{{.INSTALL_PATH}}'"; exit 1;; esac
       - rm -rf "{{.INSTALL_PATH}}"
       - ditto "{{.BIN_DIR}}/{{.APP_NAME}}.app" "{{.INSTALL_PATH}}"
