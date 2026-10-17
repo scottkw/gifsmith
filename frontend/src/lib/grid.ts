@@ -2,7 +2,7 @@
 export const COLS = 4;
 
 export type Direction = 'left' | 'right' | 'up' | 'down';
-export type KeyAction = Direction | 'copy' | 'paste' | 'escape' | 'actions' | 'tab' | 'none';
+export type KeyAction = Direction | 'copy' | 'paste' | 'escape' | 'actions' | 'tab' | 'slot1' | 'slot2' | 'slot3' | 'slot4' | 'none';
 
 // ← → wrap across rows and clamp at the ends; ↑ on the first row stays; ↓ with no tile directly
 // below goes to the last tile when it sits on a later row.
@@ -37,5 +37,6 @@ export function routeKey(e: { key: string; metaKey: boolean; isComposing: boolea
   if (e.key === 'Escape') return 'escape';
   if (e.key === 'Tab') return 'tab';
   if (e.metaKey && e.key.toLowerCase() === 'k') return 'actions';
+  if (e.metaKey && ['1', '2', '3', '4'].includes(e.key)) return `slot${e.key}` as KeyAction;
   return ARROWS[e.key] ?? 'none';
 }

@@ -1,12 +1,16 @@
 // Thin facade over the generated bindings. Provider HTTP happens in Go; this only calls it.
-import { ActionService, GifService, PanelService } from '../../bindings/gifsmith/internal/services';
+import { ActionService, GifService, PanelService, SettingsService, type ProviderStatus } from '../../bindings/gifsmith/internal/services';
 import type { Gif, Page } from '../../bindings/gifsmith/internal/provider';
 import { CancelError, type CancellablePromise } from '@wailsio/runtime';
 
-export type { Gif, Page };
+export type { Gif, Page, ProviderStatus };
 
 export const search = (p: string, q: string, cursor: string) => GifService.Search(p, q, cursor);
 export const trending = (p: string, cursor: string) => GifService.Trending(p, cursor);
+// Key state arrives only as booleans; no call returns a key.
+export const providers = async () => (await GifService.Providers()) ?? [];
+export const lastProvider = () => SettingsService.LastProvider();
+export const setLastProvider = (p: string) => SettingsService.SetLastProvider(p);
 
 // One in-flight call per slot ("first:<provider>", "page:<provider>"): a new call cancels the
 // previous one (its Go ctx and HTTP request). A cancelled or superseded call resolves to

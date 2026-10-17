@@ -10,6 +10,10 @@ const fail = (msg) => {
 
 await page.setViewportSize({ width: 720, height: 480 });
 await page.goto("http://127.0.0.1:9245/");
+// Fresh state opens on GIPHY (plan 02-05); these checks run on Finer Gifs (⌘4).
+await page.locator("section.content[aria-busy=false]").waitFor({ timeout: 10000 });
+await page.keyboard.press("Meta+4");
+await page.waitForFunction("document.querySelector('input[role=combobox]').placeholder === 'Search The Finer Gifs Club'", null, { timeout: 5000 });
 const input = page.locator("input[role=combobox]");
 if ((await input.getAttribute("placeholder")) !== "Search The Finer Gifs Club") fail("placeholder");
 

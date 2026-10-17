@@ -1,12 +1,14 @@
 <script lang="ts">
-  // Centered content-area message (UI-SPEC S7–S12): optional alert icon, heading, body, one secondary button.
+  // Centered content-area message (UI-SPEC S7–S12): optional alert icon, heading, body, one button (secondary, or primary for C1).
   let {
     heading,
     body,
     icon = false,
     button = '',
+    primary = false,
     onbutton,
-  }: { heading: string; body: string; icon?: boolean; button?: string; onbutton?: () => void } = $props();
+  }: { heading: string; body: string; icon?: boolean; button?: string; primary?: boolean; onbutton?: () => void } =
+    $props();
 </script>
 
 <div class="message" role="status">
@@ -20,7 +22,7 @@
   <h2>{heading}</h2>
   <p>{body}</p>
   {#if button}
-    <button onclick={onbutton}>{button}</button>
+    <button class:primary onclick={onbutton}>{button}</button>
   {/if}
 </div>
 
@@ -67,5 +69,9 @@
     color: var(--text);
     font: 600 14px/1 var(--font);
     cursor: pointer;
+  }
+  button.primary {
+    background: var(--accent-fill);
+    color: #ffffff;
   }
 </style>
