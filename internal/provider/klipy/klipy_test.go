@@ -285,6 +285,8 @@ func TestFixtureStatuses(t *testing.T) {
 	wantKind(t, p, err, provider.RateLimited, 0, 120)
 	p, err = c.Search(context.Background(), "boom", "")
 	wantKind(t, p, err, provider.HTTP, 500, 0)
+	p, err = c.Search(context.Background(), "revoked", "")
+	wantKind(t, p, err, provider.KeyRejected, 404, 0)
 }
 
 func TestFixturePaging(t *testing.T) {

@@ -84,7 +84,8 @@ func giphyGifs(w http.ResponseWriter, r *http.Request, o Options) {
 	}
 	q := r.URL.Query()
 	key := q.Get("api_key")
-	if key == "" || strings.HasPrefix(key, "bad") {
+	// "revoked" in q stands for a stored key the vendor no longer accepts (S13 UAT).
+	if key == "" || strings.HasPrefix(key, "bad") || hasWord(q.Get("q"), "revoked") {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Retry-After", "0") // what the real host sends on 401
 		w.WriteHeader(http.StatusUnauthorized)
@@ -142,7 +143,7 @@ func klipyGifs(w http.ResponseWriter, r *http.Request, o Options) {
 		return
 	}
 	key := r.PathValue("key")
-	if strings.HasPrefix(key, "bad") {
+	if strings.HasPrefix(key, "bad") || hasWord(r.URL.Query().Get("q"), "revoked") {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound) // what the real host sends for an invalid key
 		_, _ = fmt.Fprint(w, `{"result":false,"errors":{"message":["The provided API key is invalid."]}}`)

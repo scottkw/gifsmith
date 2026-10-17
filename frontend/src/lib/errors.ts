@@ -79,11 +79,20 @@ export function pagingMessage(e: ProviderErr, now: number, receivedAt = now): st
 }
 
 // Setup card inline message (K2–K4); null = not a provider error, i.e. the Keychain write failed.
+// The message is built when the error arrives, so `now` is also the time it was received.
 export function keyMessage(e: ProviderErr | null, providerLabel: string, now: number): string {
-  return '';
+  if (!e) return "Couldn't save the key to the macOS Keychain. Try again.";
+  if (e.kind === 'key_rejected') return `${providerLabel} rejected that key. Check that you copied the whole key, then try again.`;
+  if (e.kind === 'rate_limited') {
+    const left = remaining(e, now, now);
+    const n = Math.ceil((left ?? 0) / 60);
+    const when = left === null ? 'later this hour' : left < 60 ? 'in less than a minute' : `in ${n} ${n === 1 ? 'minute' : 'minutes'}`;
+    return `${providerLabel}'s request limit was hit while checking the key. Try again ${when}.`;
+  }
+  return `Couldn't reach ${providerLabel} to check the key. Check your connection, then try again.`;
 }
 
 // K6: a stored key rejected during search or trending (S13).
 export function revokedMessage(providerLabel: string): string {
-  return '';
+  return `${providerLabel} rejected your saved key. It may have been revoked. Paste a new key to continue.`;
 }

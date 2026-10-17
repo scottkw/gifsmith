@@ -19,16 +19,18 @@
     type ProviderErr,
     type ProviderStatus,
   } from './lib/api';
-  import { errorState, pagingMessage, providerName } from './lib/errors';
+  import { errorState, pagingMessage, providerName, revokedMessage } from './lib/errors';
   import { move, nearEnd, routeKey } from './lib/grid';
   import { SLOTS, slotById, type SlotId } from './lib/providers';
   import Footer from './components/Footer.svelte';
   import ProviderTabs from './components/ProviderTabs.svelte';
   import ResultGrid from './components/ResultGrid.svelte';
+  import SetupCard from './components/SetupCard.svelte';
   import StateMessage from './components/StateMessage.svelte';
 
   const DEBOUNCE_MS = 450;
   const HIDE_AFTER_COPY_MS = 400;
+  const KEY_SAVED_MS = 2000;
   const COPY_FAILED = "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";
   const CLIPS_COPY = 'Copying Clips (MP4) arrives in the next update.';
   const AX_FAILED = "Couldn't ask macOS for Accessibility access. Try again.";
@@ -88,8 +90,14 @@
   const busy = $derived(cur.status === 'loading' || cur.status === 'refreshing');
   // S8: Finer Gifs has no trending list, so a short query shows a prompt and makes no request.
   const finerIdle = $derived(active === 'finergifs' && [...query.trim()].length < 2);
-  // Key slots without a key wait for the setup card; Clips waits for its probe (plan 02-06).
-  const needsKey = $derived(!!slot.keyProvider && statuses !== null && !statuses[active]?.configured);
+  // S1: a key slot without a key; S13: its stored key was rejected (key_missing: Go lost it meanwhile).
+  const card = $derived(
+    !!slot.keyProvider &&
+      statuses !== null &&
+      (!statuses[active]?.configured || cur.err?.kind === 'key_rejected' || cur.err?.kind === 'key_missing'),
+  );
+  const cardMessage = $derived(cur.err?.kind === 'key_rejected' ? revokedMessage(slot.keyLabel!) : '');
+  let setup = $state<SetupCard>();
   // Error copy comes only from errors.ts rows, never from the caught error's text.
   const errView = $derived(cur.status === 'error' && cur.err ? errorState(cur.err, now, cur.errAt) : null);
   const pageView = $derived(
@@ -124,8 +132,11 @@
       if (!keepStatus) setStatus('');
       keepStatus = false;
       needsAccessibility = false;
-      input.focus();
-      input.select();
+      if (card) setup?.focus();
+      else {
+        input.focus();
+        input.select();
+      }
     });
     Events.On('panel:status', (e) => setStatus(String(e.data)));
     Events.On('providers:changed', refreshProviders);
@@ -193,7 +204,26 @@
       setLastProvider(p);
       show(p);
     }
-    tick().then(() => input.focus());
+    tick().then(() => card || input.focus()); // a setup card focuses its own key field
+  }
+
+  // S1c: the card gives way at once to that provider's trending page (seeded by verification).
+  async function keySaved(p: 'giphy' | 'klipy') {
+    await refreshProviders();
+    if (p === active) query = '';
+    setResults(p, null, null);
+    runFirst(p, '');
+    const text = `${slotById(p).keyLabel} key saved`;
+    setStatus(text, 'success');
+    setTimeout(() => status === text && setStatus(''), KEY_SAVED_MS);
+    await tick();
+    if (!card) input.focus();
+  }
+
+  // "Try Finer Gifs (no key)": the keyless provider with an empty query (S8), remembered.
+  function tryFiner() {
+    query = '';
+    switchTo('finergifs');
   }
 
   // S2 (nothing shown yet) or S4 (previous results stay, spinner only) until the latest call lands.
@@ -358,6 +388,7 @@
       oncompositionend={() => onInput()}
       onkeydown={onKeydown}
       placeholder={slot.placeholder}
+      disabled={card}
       autocomplete="off"
       spellcheck="false"
       role="combobox"
@@ -373,8 +404,12 @@
   <ProviderTabs {active} {clipsEnabled} onswitch={switchTo} />
 
   <section class="content" aria-busy={statuses === null}>
-    {#if statuses === null || needsKey}
-      <!-- needsKey: the setup card (Task 2) -->
+    {#if statuses === null}
+      <!-- waiting for Providers() -->
+    {:else if card}
+      {#key `${active}:${cardMessage}`}
+        <SetupCard bind:this={setup} {slot} initialMessage={cardMessage} onsaved={keySaved} ontryfiner={tryFiner} />
+      {/key}
     {:else if active === 'clips' && !giphyKey}
       <StateMessage
         heading="Clips use your GIPHY key"
