@@ -10,7 +10,7 @@
 - [x] **SHEL-01**: User can open and close a floating search panel with a global hotkey (default three-modifier combo, e.g. ⌃⌥⌘G)
 - [x] **SHEL-02**: Panel appears over full-screen apps, takes typing immediately, and does not steal focus from the app the user was in
 - [x] **SHEL-03**: Panel closes on Esc and on click-away
-- [ ] **SHEL-04**: App lives in the menu bar with no Dock icon; menu offers Open, Settings, Quit
+- [x] **SHEL-04**: App lives in the menu bar with no Dock icon; menu offers Open, Settings, Quit
 - [ ] **SHEL-05**: User can enable launch at login
 - [ ] **SHEL-06**: User can open Favorites or Recents directly with their own hotkeys
 
@@ -105,7 +105,7 @@
 | SHEL-01 | Phase 1 | Complete |
 | SHEL-02 | Phase 1 | Complete |
 | SHEL-03 | Phase 1 | Complete |
-| SHEL-04 | Phase 1 | Pending |
+| SHEL-04 | Phase 1 | Complete |
 | SHEL-05 | Phase 4 | Pending |
 | SHEL-06 | Phase 4 | Pending |
 | SRCH-01 | Phase 2 | Pending |
