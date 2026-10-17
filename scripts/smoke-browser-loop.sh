@@ -52,15 +52,31 @@ wait_for() {
 wait_for "http://127.0.0.1:$SERVER_PORT/health" || fail "server /health not up after 30 s (see bin/smoke-server.log)"
 wait_for "http://127.0.0.1:$VITE_PORT/" || fail "vite not up after 30 s (see bin/smoke-vite.log)"
 
-BINDINGS=frontend/bindings/gifsmith/internal/services/actionservice.ts
-ID=$(awk '/export function Copy\(/{f=1} f && /\$Call\.ByID\(/{match($0, /[0-9]+/); print substr($0, RSTART, RLENGTH); exit}' "$BINDINGS")
-[ -n "$ID" ] || fail "could not find the Copy method ID in $BINDINGS"
-
+# method_id <bindings-file> <FuncName>: the numeric $Call.ByID of a generated binding.
+method_id() {
+  awk -v fn="export function $2(" 'index($0, fn) == 1 {f=1} f && /\$Call\.ByID\(/{match($0, /[0-9]+/); print substr($0, RSTART, RLENGTH); exit}' "$1"
+}
+# call <methodID> <json-args-array>: POST a bound call through the Vite proxy; body lands in $BODY, prints the HTTP code.
+call() {
+  curl -s -o "$BODY" -w '%{http_code}' -X POST "http://127.0.0.1:$VITE_PORT/wails/runtime" \
+    -H 'Content-Type: application/json' -H 'x-wails-client-id: smoke' \
+    -d "{\"object\":0,\"method\":0,\"args\":{\"call-id\":\"1\",\"methodID\":$1,\"args\":$2}}"
+}
+SVC=frontend/bindings/gifsmith/internal/services
 BODY=$(mktemp)
 trap 'rm -f "$BODY"; cleanup' EXIT
-CODE=$(curl -s -o "$BODY" -w '%{http_code}' -X POST "http://127.0.0.1:$VITE_PORT/wails/runtime" \
-  -H 'Content-Type: application/json' -H 'x-wails-client-id: smoke' \
-  -d "{\"object\":0,\"method\":0,\"args\":{\"call-id\":\"1\",\"methodID\":$ID,\"args\":[]}}")
+
+SEARCH_ID=$(method_id "$SVC/gifservice.ts" Search)
+[ -n "$SEARCH_ID" ] || fail "could not find the GifService.Search method ID"
+CODE=$(call "$SEARCH_ID" '["finergifs","dwight",""]')
+if [ "$CODE" != "200" ] || ! grep -q '"items":\[' "$BODY" || ! grep -q '/media/' "$BODY"; then
+  fail "GifService.Search via proxy: HTTP $CODE, body: $(head -c 300 "$BODY")"
+fi
+echo "GifService.Search(finergifs, dwight) via Vite proxy: HTTP 200, returned items with fixture /media/ URLs"
+
+ID=$(method_id "$SVC/actionservice.ts" Copy)
+[ -n "$ID" ] || fail "could not find the Copy method ID"
+CODE=$(call "$ID" '[]')
 if [ "$CODE" != "422" ] || ! grep -q 'not supported in this build' "$BODY"; then
   fail "ActionService.Copy via proxy: HTTP $CODE, body: $(cat "$BODY")"
 fi

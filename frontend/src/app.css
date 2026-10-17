@@ -1,0 +1,54 @@
+/* UI-SPEC tokens. Light is the default; dark follows the system appearance. */
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --surface: #f2f2f7;
+  --surface-active: #e5e5ea;
+  --hairline: rgba(0, 0, 0, 0.1);
+  --text: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #8e8e93;
+  --accent: #0068d9;
+  --accent-fill: #0068d9;
+  --destructive: #d70015;
+  --success: #1b7a35;
+
+  --font: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  /* Four sizes: Label, Body, Heading, Display */
+  --label: 400 12px/16px var(--font);
+  --body: 400 14px/1.5 var(--font);
+  --heading: 600 18px/1.2 var(--font);
+  --display: 400 22px/1.2 var(--font);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1e1e;
+    --surface: #2c2c2e;
+    --surface-active: #3a3a3c;
+    --hairline: rgba(255, 255, 255, 0.1);
+    --text: #f5f5f7;
+    --text-secondary: #a1a1a6;
+    --text-tertiary: #6e6e73;
+    --accent: #4da3ff;
+    --destructive: #ff6961;
+    --success: #30d158;
+  }
+}
+
+/* Corners come from the native frame; the root fills the window edge to edge (no border-radius). */
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: var(--body);
+  -webkit-font-smoothing: antialiased;
+}
