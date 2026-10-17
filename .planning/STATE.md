@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: Gifsmith MVP
 current_phase: 2
 current_phase_name: Providers, Search UI & First Run
-status: executing
-stopped_at: Completed 02-05-PLAN.md
-last_updated: "2026-10-17T20:55:10.955Z"
+status: verifying
+stopped_at: Completed 02-06-PLAN.md
+last_updated: "2026-10-17T21:22:55.439Z"
 last_activity: 2026-10-17
 last_activity_desc: Phase 2 execution started
-state_head: 50ff8678d19d4c72b722d4879c483d727f2f235d
+state_head: 3d7aab318a41dc05bcda6eea3cac12c2c67bf75d
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 10
-  completed_plans: 9
+  completed_plans: 10
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-17)
 
 Phase: 2 (Providers, Search UI & First Run) — EXECUTING
 Plan: 6 of 6
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-17 — Phase 2 execution started
 
 Progress: [███░░░░░░░] 25% (4/4 plans in Phase 1)
@@ -66,6 +66,7 @@ Progress: [███░░░░░░░] 25% (4/4 plans in Phase 1)
 | Phase 2 P03 | 15min | 2 tasks | 14 files |
 | Phase 02 P04 | 11min | 3 tasks | 26 files |
 | Phase 02 P05 | 12min | 2 tasks | 22 files |
+| Phase 02 P06 | 23min | 3 tasks | 22 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,9 @@ Recent decisions affecting current work:
 - [Phase 02]: After a key save the query is cleared so the box matches the trending grid (S1c); Try Finer Gifs clears it too (S8)
 - [Phase 02]: A key_rejected provider keeps its setup card across tab switches until a new key is saved (S13)
 - [Phase 02]: Keychain-failure inline copy: Couldn't save the key to the macOS Keychain. Try again.
+- [Phase 02]: 02-06: Clips is offered only after one Clips probe per launch passes, made after a GIPHY GIFs success with the same key; 401/403/404 -> disabled, transient -> unknown with one user-initiated recheck; Go refuses Clips calls unless enabled
+- [Phase 02]: 02-06: C2 primary action is an <a> 'Email clips@giphy.com ↗' opening mailto:clips@giphy.com with a subject (the only mailto in the openExternal allow-list)
+- [Phase 02]: 02-06: Native UAT approved; the user's real GIPHY key is not approved for Clips (probe checking -> disabled, C2 shown); dev logs hold no key material
 
 ### Pending Todos
 
@@ -129,6 +133,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-17T20:55:10.786Z
-Stopped at: Completed 02-05-PLAN.md
+Last session: 2026-10-17T21:22:45.916Z
+Stopped at: Completed 02-06-PLAN.md
 Resume file: None

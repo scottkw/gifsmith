@@ -67,7 +67,7 @@ Plans:
   4. "Powered by GIPHY" shows on GIPHY and Clips results, and the Klipy search placeholder reads "Search KLIPY".
   5. GIPHY Clips appears as a provider only when the user's GIPHY key passes a Clips test call (otherwise a short explanation is shown). Rapid typing does not burn requests, a rate-limit hit shows a clear message with when to retry, and a network, timeout, or provider error shows a per-provider message while other providers stay usable.
 
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans executed
 
 Plans:
 **Wave 1**
@@ -86,7 +86,7 @@ Plans:
 - [x] 02-05-PLAN.md — Provider tabs (⌘1–⌘4, remembered), attribution and placeholders, first-run setup card, revoked-key re-entry
 
 **Wave 6** *(blocked on Wave 5 completion)*
-- [ ] 02-06-PLAN.md — GIPHY Clips probe and states, compliance posture in PROJECT.md, UI backstops, signed install + native UAT with real keys
+- [x] 02-06-PLAN.md — GIPHY Clips probe and states, compliance posture in PROJECT.md, UI backstops, signed install + native UAT with real keys
 
 **UI hint**: yes
 
@@ -140,6 +140,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Native Spike & Signed Dev Loop | 4/4 | Complete    | 2026-10-17 |
-| 2. Providers, Search UI & First Run | 5/6 | In Progress | - |
+| 2. Providers, Search UI & First Run | 6/6 | In Progress | - |
 | 3. Action Pipeline & Library | 0/TBD | Not started | - |
 | 4. Settings, Shell Polish & Release | 0/TBD | Not started | - |

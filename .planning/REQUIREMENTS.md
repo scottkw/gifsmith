@@ -17,7 +17,7 @@
 ### Search
 
 - [x] **SRCH-01**: User can search GIPHY, Klipy, and The Finer Gifs Club, switching provider from the panel; last provider is remembered
-- [ ] **SRCH-02**: GIPHY Clips appears as a provider only when the user's GIPHY key passes a Clips test call; otherwise a short explanation is shown
+- [x] **SRCH-02**: GIPHY Clips appears as a provider only when the user's GIPHY key passes a Clips test call; otherwise a short explanation is shown
 - [x] **SRCH-03**: With an empty query, user sees trending GIFs (providers that support trending)
 - [x] **SRCH-04**: Results show as an animated grid that loads more as the user scrolls or arrows near the end
 - [x] **SRCH-05**: User can navigate the grid entirely by keyboard (arrows, Enter, ⌘K, Esc)
@@ -109,7 +109,7 @@
 | SHEL-05 | Phase 4 | Pending |
 | SHEL-06 | Phase 4 | Pending |
 | SRCH-01 | Phase 2 | Complete |
-| SRCH-02 | Phase 2 | Pending |
+| SRCH-02 | Phase 2 | Complete |
 | SRCH-03 | Phase 2 | Complete |
 | SRCH-04 | Phase 2 | Complete |
 | SRCH-05 | Phase 2 | Complete |
