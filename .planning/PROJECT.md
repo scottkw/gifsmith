@@ -63,7 +63,10 @@ Hotkey → type → Enter puts the right GIF on the clipboard (or into the front
 | Menu bar + hotkey, no Dock icon | Launcher-style utility | — Pending |
 | Copy GIF is default action; paste is opt-in | Copy needs no Accessibility permission | — Pending |
 | macOS only for v1 | Native glue is per-platform; ship one well | — Pending |
-| Spike first: hotkey panel → copy GIF file → paste into TextEdit | De-risk the native parts before building UI | — Pending |
+| Spike first: hotkey panel → copy GIF file → paste into TextEdit | De-risk the native parts before building UI | ✓ Good (GO WITH FALLBACKS, 2026-10-17): native architecture holds on the Developer ID–signed dev build; limits recorded in 01-PASTE-MATRIX.md §4 |
+| Wails v3 pinned at v3.0.0-beta.30 (no stable 3.0 yet) | v2 can't deliver tray, NSPanel, global hotkey or accessory policy without shims; v3 betas are nightly snapshots, so pin the exact version for Go module, `wails3` CLI and `@wailsio/runtime` (STACK.md) | ✓ Good: the Phase 1 spike ran on beta.30 with no framework blockers |
+| Pasteboard payload: single file URL | D-12: file URL only unless the matrix proves otherwise | ✓ Sufficient for TextEdit, Notes, Mail, Messages (copy and ⌘Enter, animated); Slack, Discord, Telegram, Safari/Chrome composers unverified (Phase 3 design note) |
+| Notarization deferred to Phase 4 (Apple agreement 403) | `notarytool store-credentials` returns 403 "A required agreement is missing or has expired"; the user chose to go on the signed dev build | ⚠ Open: the user must resolve the Apple Developer agreement before Phase 4; notarized dry run + N15 carry over |
 
 ## Evolution
 

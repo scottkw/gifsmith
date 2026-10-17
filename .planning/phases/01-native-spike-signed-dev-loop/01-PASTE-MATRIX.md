@@ -4,7 +4,7 @@
 |-------|-------|
 | macOS version | 27.0.1 |
 | Dev build commit | e9f1230 (gate re-test build; first signed build ce0c96d) |
-| Notarized build commit | PENDING (plan 01-04) |
+| Notarized build commit | PENDING: deferred to Phase 4 (Apple agreement 403). No notarized build exists; every "Notarized" cell below stays PENDING for the same reason |
 | Paste delay (ms) | 80 |
 | Date | 2026-10-17 |
 
@@ -52,10 +52,18 @@ Slack, Discord, Telegram and the Safari/Chrome composers were not tested in the 
 
 **macOS 27 Settings finding (for Phase 4 Settings/onboarding):** on macOS 27.0.1 the user saw no "Accessibility" row under System Settings › Privacy & Security. The permission list is reachable only via the URL `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility` (what "Enable automatic paste…" opens). Onboarding copy must not tell the user to navigate there by hand; use the button/URL.
 
+**Notarized columns:** deferred to Phase 4 (Apple agreement 403). `xcrun notarytool store-credentials gifsmith-notary … --team-id S2K7P43927` fails with "HTTP status code: 403. A required agreement is missing or has expired", even after the user accepted the developer.apple.com agreement banner and retried about 30 minutes later. No keychain profile exists, so no notarized build was made.
+
 ## 3. Payload conclusion
 
-PENDING. Is a single file URL on the pasteboard enough? Which apps need more (image data, a URL string)?
+Derived from the user's results (signed dev columns only): a single file URL (`public.file-url`) on the pasteboard is sufficient for TextEdit, Notes, Mail and Messages. Copy→⌘V and ⌘Enter both PASS, animated, in all four. Slack, Discord, Telegram and the Safari/Chrome composers are unverified, so whether any of them need image data stays open for Phase 3's pasteboard design note (D-12: file URL only unless the matrix proves otherwise). Paste delay 80 ms. Not needed: the D-08 activation fallback, a PopUpMenu window level, a mouse monitor, or the Cmd+Enter KeyBindings fallback.
 
 ## 4. Go / No-Go
 
-PENDING (filled from plan 01-04's decision).
+Decision: GO WITH FALLBACKS
+
+User's decision (2026-10-17, commit aaab9a6): go, building on the Developer ID–signed dev build. Limits:
+1. The notarized dry run (de-risking RELS-01/RELS-02; N15 and the notarized columns) is deferred to Phase 4. It is blocked on the Apple Developer account agreement 403, which the user must resolve (check membership expiry and App Store Connect agreements) before Phase 4 release work.
+2. Paste in the untested apps (Slack, Discord, Telegram, Safari composer, Chrome composer), the "Enable automatic paste…" button click (N13), and N10 on the signed build are re-checked in later UAT (Phase 3 action pipeline / Phase 4).
+3. On macOS 27.0.1 the Accessibility permission list can't be reached by browsing System Settings › Privacy & Security, only via `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility`. Phase 4 onboarding and Settings must deep-link there and never cite a path.
+4. Payload: a single file URL on the pasteboard is sufficient for TextEdit, Notes, Mail and Messages (Copy→⌘V and ⌘Enter both PASS, animated); other apps are unverified. PasteDelay 80 ms. None of these were needed: the D-08 activation fallback, a PopUpMenu level, a mouse monitor, the KeyBindings fallback.
