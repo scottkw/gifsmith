@@ -51,8 +51,13 @@ await page.waitForFunction("(document.querySelector('#tile-0 img')?.src ?? '').i
 await input.fill("revoked");
 const content = page.locator("section.content");
 await content.locator("h2", { hasText: "GIPHY rejected your saved key" }).waitFor({ timeout: 8000 });
+// WR-01: with an empty query GIPHY still holds its cached trending grid (the real revoked-key case:
+// nothing forces a new GIPHY request), so the key field must come from the carried-over rejection.
+await input.fill("");
+await content.locator("h2", { hasText: "GIPHY rejected your saved key" }).waitFor({ timeout: 3000 });
 await page.getByRole("button", { name: "Go to GIPHY" }).click();
 await placeholder("Search GIPHY");
+await page.locator(".card input").waitFor({ timeout: 3000 });
 await page.locator(".card input").fill("uat-key-456");
 await page.getByRole("button", { name: "Save Key" }).click();
 await footer.filter({ hasText: "GIPHY key saved" }).waitFor({ timeout: 8000 });

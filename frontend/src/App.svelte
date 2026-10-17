@@ -468,7 +468,12 @@
         body="Clips use your GIPHY key. Paste a new key on the GIPHY tab to continue."
         button="Go to GIPHY"
         primary
-        onbutton={() => switchTo('giphy')}
+        onbutton={() => {
+          // GIPHY's own grid may still hold cached results for this key: carry the rejection over so its card shows.
+          setResults('giphy', null, null);
+          Object.assign(states.giphy, { status: 'error', err: { kind: 'key_rejected', provider: 'giphy' }, errAt: Date.now() });
+          switchTo('giphy');
+        }}
       />
     {:else if active === 'clips' && clipsState === 'disabled'}
       <StateMessage
