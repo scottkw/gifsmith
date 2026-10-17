@@ -41,7 +41,7 @@ Sources: 02-CONTEXT.md (locked: layout, keys/first run, search & keyboard), FEAT
 │ (GIPHY ⌘1) (Clips ⌘2) (Klipy ⌘3) (Finer Gifs ⌘4)                     │  Provider tabs 36px
 ├──────────────────────────────────────────────────────────────────────┤  (1px hairline, inside the 36px)
 │ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐                                  │
-│ │ GIF  │ │ GIF  │ │ GIF  │ │ GIF  │   4 columns, tiles 168×144       │  Content area 364px
+│ │ GIF  │ │ GIF  │ │ GIF  │ │ GIF  │   4 columns, tiles 166×144       │  Content area 364px
 │ └──────┘ └──────┘ └──────┘ └──────┘   (grid / setup card /           │  (scrolls vertically)
 │ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐    empty / error / Clips card)   │
 │ └──────┘ └──────┘ └──────┘ └──────┘                                  │
@@ -53,19 +53,19 @@ Sources: 02-CONTEXT.md (locked: layout, keys/first run, search & keyboard), FEAT
 
 | Region | Height | Horizontal padding | Contents |
 |--------|--------|--------------------|----------|
-| Search bar | 48px (`box-sizing: border-box`, bottom hairline included) | 16px | 16px magnifier icon (`--text-secondary`), 12px gap, input (fills the row), 16px loading spinner pinned right when a request is in flight |
-| Provider tabs | 36px (bottom hairline included) | 12px | 4 tab pills, 4px gap, vertically centered. Each pill is 28px tall with 12px horizontal padding and contains the label plus an 8px gap plus a shortcut hint |
-| Content area | 364px | grid: 12px left/right padding, 12px top padding, 8px gap | One of: result grid, setup card, state message, Clips card |
+| Search bar | 48px (`box-sizing: border-box`, bottom hairline included) | 16px | 16px magnifier icon (`--text-secondary`), 8px gap, input (fills the row), 16px loading spinner pinned right when a request is in flight |
+| Provider tabs | 36px (bottom hairline included) | 8px | 4 tab pills, 4px gap, vertically centered. Each pill is 28px tall with 8px horizontal padding and contains the label plus an 8px gap plus a shortcut hint. Row padding 8px + pill padding 8px puts the first label on the same 16px column as the magnifier icon and the grid's left edge |
+| Content area | 364px | grid: 16px left/right padding, 16px top and bottom padding, 8px gap | One of: result grid, setup card, state message, Clips card |
 | Footer | 32px (top hairline included) | 16px | Left: attribution. Center (flex 1, 16px gap each side): selected-GIF title or status message. Right: key hints |
 
-**Tile geometry (fixed 4 columns, never computed from width):** tile width = (720 − 2×12 − 3×8) / 4 = **168px**, tile height **144px**, row stride 152px (144 + 8 gap). That is 2.3 visible rows. The partial third row is intentional and signals that the grid scrolls.
+**Tile geometry (fixed 4 columns, never computed from width):** tile width = (720 − 2×16 − 3×8) / 4 = **166px**, tile height **144px**, row stride 152px (144 + 8 gap). Visible rows = (364 − 16 top padding) / 152 = **2.3 rows**. The partial third row is intentional and signals that the grid scrolls.
 
-- The grid is virtualized by **row** (`@tanstack/svelte-virtual`, `estimateSize: () => 152`, overscan 2 rows), so only mounted rows decode GIFs (KB-9).
+- The grid is virtualized by **row** (`@tanstack/svelte-virtual`, `estimateSize: () => 152`, overscan 2 rows, `paddingStart: 16`, `paddingEnd: 16`, `scrollPaddingStart: 16`, `scrollPaddingEnd: 16`), so only mounted rows decode GIFs (KB-9).
 - Tile: `border-radius: 8px`, background `--surface`. `<img>` uses `object-fit: contain`, centered, with `decoding="async"` and `draggable="false"`. Use `contain`, not `cover`: Finer Gifs clips carry captions at the bottom edge, and cropping would hide them. Drag-out is v2 (DIFF-01).
 - The grid uses the provider's small preview rendition only (never the original).
 - No title text under tiles. The selected GIF's title shows in the footer center **[default]**.
 - Rows are top-aligned and left-aligned. One result renders as a single tile in the top-left, never centered.
-- The selection ring is drawn with `outline: 2px solid var(--accent); outline-offset: 2px`. It sits inside the 8px gap and 12px padding, so the scroll container never clips it.
+- The selection ring is drawn with `outline: 2px solid var(--accent); outline-offset: 2px`, so it extends 4px beyond the tile. That fits inside the 8px gap and the 16px outer padding. The 16px scroll padding is larger than the 4px ring extent, so a scrolled-to tile's ring stays fully inside the viewport and the scroll container never clips it.
 - Hover: tile background changes to `--surface-active`. Hover never moves the selection.
 
 ---
@@ -76,19 +76,22 @@ Declared values (all multiples of 4):
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| xs | 4px | Gap between tab pills, icon-to-text gap inside buttons |
-| sm | 8px | Grid gap, gap from tab label to shortcut hint, stack gap between card body lines |
-| md-sm | 12px | Grid outer padding, search icon-to-input gap, tab-row padding, tab-pill horizontal padding, button horizontal padding |
-| md | 16px | Search bar and footer horizontal padding, footer inter-zone gap, gap between card blocks (heading → body → field row → links row) |
+| xs | 4px | Gap between tab pills, icon-to-text gap inside buttons, gap between numbered steps |
+| sm | 8px | Grid gap, search icon-to-input gap, tab-row horizontal padding, tab-pill horizontal padding, gap from tab label to shortcut hint, stack gap between card body lines, key field to `Save Key` gap |
+| md | 16px | Search bar and footer horizontal padding, grid outer padding (left, right, top, bottom), virtualizer scroll padding, button horizontal padding, footer inter-zone gap, gap between card blocks (heading → body → field row → links row) |
 | lg | 24px | Setup / state card inner padding |
 | xl | 32px | Minimum top offset for centered state messages in the content area |
 | 2xl | 48px | Search bar height (layout constant, not a gap) |
 
 Exceptions (not spacing, listed so the checker does not flag them):
 - 1px hairline separators. 2px selection / focus ring with 2px offset.
-- Computed tile width of 168px. Tile height 144px (a multiple of 4).
-- Component heights: buttons and the key field are 32px, tab pills 28px, tab row 36px, footer 32px.
+- Computed tile width of 166px (derived from the 16px padding and 8px gap above, not a spacing value). Tile height 144px.
+- Component heights: buttons and the key field are 32px, tab pills 28px, tab row 36px, footer 32px, loading-more / end-of-results row 48px, inline message slot 16px.
+- Layout widths: setup card 456px, state copy `max-width` 432px.
+- Corner radii (not spacing): buttons and key field 6px, tiles 8px, setup card 12px.
 - Attribution image is 16px tall with auto width (about 144px).
+
+No 12px spacing value exists anywhere in this contract. Every padding, margin, and gap is 4, 8, 16, 24, or 32px.
 
 ---
 
@@ -101,7 +104,9 @@ Exactly 4 sizes and 2 weights (400 regular, 600 semibold).
 | Label | 12px | 400 | 1.33 (16px) | Footer title/status, footer key hints, tab shortcut hints (`⌘1`), Klipy/Finer Gifs attribution text, inline field errors, end-of-results row, rate-limit retry time |
 | Body | 14px | 400 (600 for buttons) | 1.5 (21px) | Tab labels (always 400, so the active tab does not change width), card and state body copy, numbered steps, key field (monospace), button labels (600) |
 | Heading | 18px | 600 | 1.2 (22px) | Setup card title, empty/error/Clips state headings |
-| Display | 20px | 400 | 1.2 (24px) | Search input text and placeholder |
+| Display | 22px | 400 | 1.2 (26px) | Search input text and placeholder |
+
+Scale steps are 12 → 14 → 18 → 22. Heading and Display differ by both size (4px) and weight (600 vs 400): Heading is the bold anchor inside a card, Display is the large light input text at the top of the panel. The 26px Display line box sits in the 48px search bar, vertically centered by flexbox (`align-items: center`), not by vertical padding.
 
 Text never goes below 12px. Long text rules: the footer title/status is one line with an ellipsis (`white-space: nowrap; overflow: hidden; text-overflow: ellipsis`). Card and state copy wraps at `max-width: 432px`. The search input scrolls horizontally (native behavior).
 
@@ -129,8 +134,8 @@ Two themes driven by `prefers-color-scheme`. Values are CSS custom properties in
 
 **Accent reserved for (exhaustive):**
 1. Selected-tile ring (2px outline)
-2. Primary button fill: "Save Key" (via `--accent-fill`)
-3. Text links: "Get a free key ↗" and "Open GIPHY Dashboard ↗"
+2. Primary button fill (via `--accent-fill`): "Save Key" (S1), "Add GIPHY Key" (C1), and "Open GIPHY Dashboard ↗" (C2, an `<a>` styled as a primary button)
+3. Text links (`--accent` text, underline on hover): "Get a free key ↗" (S1) and the inline "Try Again" link in the end row (S12a / E6)
 4. `:focus-visible` ring on buttons, links, and the key field (2px outline, 2px offset)
 5. Search input and key field caret (`caret-color`)
 
@@ -217,11 +222,17 @@ In-flight or result status (Copying…, Copied, copy error, key saved, `panel:st
 
 ## Content-Area States
 
-Exactly one state renders in the 364px content area. State messages are centered horizontally, sit at least 32px from the top, and use `max-width: 432px`, text-align center. Layout: 24px alert/check icon (when listed) → 8px → heading 18/600 → 8px → body 14/400 `--text-secondary` → 16px → button(s). Buttons are 32px tall with 12px horizontal padding, 14/600, radius 6px. Primary: `--accent-fill` with white text. Secondary: `--surface-active` with `--text`.
+Exactly one state renders in the 364px content area. State messages are centered horizontally, sit at least 32px from the top, and use `max-width: 432px`, text-align center. Layout: 24px alert/check icon (when listed) → 8px → heading 18/600 → 8px → body 14/400 `--text-secondary` → 16px → button(s). Buttons are 32px tall with 16px horizontal padding, 14/600, radius 6px. Primary: `--accent-fill` with white text. Secondary: `--surface-active` with `--text`.
+
+**Primary visual anchor per state (one focal point each):**
+- Grid states (S3, S4, S5, S6, S9a, S12a): the selected tile and its 2px accent ring.
+- No grid to select from, either because the query is empty and the provider has no trending list (S8) or because the first page is still loading (S2): the search input (22px Display text, accent caret), since typing is the next action.
+- Setup card (S1, S1a, S1b, S13): the setup card, specifically the key field and the `Save Key` primary button (the only accent-filled element on screen).
+- Message states (S7, S9, S10, S11, S12, C1, C2): the 18/600 heading, followed by the state's single button (`Try Again`, `Add GIPHY Key`, or `Open GIPHY Dashboard ↗`).
 
 | ID | State | Trigger | Visual |
 |----|-------|---------|--------|
-| S1 | Setup card (GIPHY / Klipy) | Active provider needs a key and has none | `--surface` card, radius 12px, 24px padding, width 456px, centered, 24px from top. Contents top to bottom: heading, body, numbered steps (14px, 4px apart), field row (key field flex 1 + 8px + `Save Key` primary), 8px inline message slot (12px), links row (`Get a free key ↗` link on the left, `Try Finer Gifs (no key)` secondary button on the right). Key field: 32px tall, `--bg` background, 1px `--hairline` border, radius 6px, 14px monospace, `type="text"` with `-webkit-text-security: disc`, `autocomplete="off"`, `autocapitalize="off"`, `spellcheck="false"`. Masking avoids macOS password autofill prompts. Input is trimmed. `Save Key` is disabled while the trimmed value is empty |
+| S1 | Setup card (GIPHY / Klipy) | Active provider needs a key and has none | `--surface` card, radius 12px, 24px padding, width 456px, centered, 24px from top. Contents top to bottom: heading, body, numbered steps (14px, 4px apart), field row (key field flex 1 + 8px gap + `Save Key` primary), 8px gap, inline message slot (16px tall, Label 12px text), links row (`Get a free key ↗` link on the left, `Try Finer Gifs (no key)` secondary button on the right). Key field: 32px tall, `--bg` background, 1px `--hairline` border, radius 6px, 14px monospace, `type="text"` with `-webkit-text-security: disc`, `autocomplete="off"`, `autocapitalize="off"`, `spellcheck="false"`. Masking avoids macOS password autofill prompts. Input is trimmed. `Save Key` is disabled while the trimmed value is empty |
 | S1a | Verifying | Save pressed | Key field `readonly`. Button shows a spinner plus `Verifying…` and is disabled. Links stay enabled |
 | S1b | Key rejected / verify failed | Test call 401/403, network, timeout, or 429 | Field border `--destructive`. The inline message slot shows the matching row (K2–K4) in `--destructive` with a 12px alert icon. The field keeps its text, gets focus, and has its text selected. Editing clears the message |
 | S1c | Key saved | Test call OK, saved to Keychain | Card is replaced at once by S3 (trending loading) for that provider. The footer shows the check icon plus row K5 for 2s. Focus moves to the search input |
@@ -229,7 +240,7 @@ Exactly one state renders in the 364px content area. State messages are centered
 | S3 | Trending / results (populated) | Results returned | Virtualized grid. First tile selected |
 | S4 | Refreshing | New query in flight while results are visible | Previous results stay visible and interactive (keep previous data). Spinner in the search bar. No dimming |
 | S5 | Loading more | Next page in flight | One extra 48px row after the last tile row with a 16px spinner centered |
-| S6 | End of results | Provider reports no more | One 40px row after the last tile row: label `End of results`, 12px `--text-tertiary`, centered. Not shown when fewer than 2 rows are loaded |
+| S6 | End of results | Provider reports no more | One 48px row after the last tile row: label `End of results`, 12px `--text-tertiary`, centered. Not shown when fewer than 2 rows are loaded |
 | S7 | No results | Search returned 0 | State message, no icon, rows N1 |
 | S8 | Finer Gifs idle | Finer Gifs active, query under 2 characters (it has no trending) | State message, no icon, rows N2 |
 | S9 | Rate-limited | HTTP 429 on the first page | State message with alert icon, rows E1. `Try Again` stays hidden until the retry time passes. The retry text updates once per minute |
@@ -237,10 +248,10 @@ Exactly one state renders in the 364px content area. State messages are centered
 | S10 | Network error | DNS, refused, or offline | Alert icon, rows E3, `Try Again` secondary button |
 | S11 | Timeout | Request exceeded its timeout | Alert icon, rows E4, `Try Again` |
 | S12 | Provider error | Non-2xx other than 401/403/429 | Alert icon, rows E5 (Finer Gifs: E5f), `Try Again` |
-| S12a | Error while paging | Network, timeout, or provider error on page 2+ | Results stay. The end row shows `Couldn't load more.` plus a `Try Again` text link (accent) |
+| S12a | Error while paging | Network, timeout, or provider error on page 2+ | Results stay. The 48px end row shows `Couldn't load more.` (12px `--text-secondary`), a 4px gap, then a `Try Again` text link (12px, `--accent`, accent list item 3) |
 | S13 | Saved key rejected | 401/403 during search with a stored key | S1 setup card for that provider, with row K6 pre-filled in the inline message slot (`--destructive`). Saving a new key overwrites the Keychain entry **[default: avoids a dead end before Phase 4 Settings]** |
 | C1 | Clips: no GIPHY key | Clips chosen, no GIPHY key | State message, rows C1, primary `Add GIPHY Key` (switches to GIPHY, which shows S1) |
-| C2 | Clips: key lacks access | Clips probe failed for a valid key | State message, rows C2. Primary `Open GIPHY Dashboard ↗` is rendered as a link-styled primary button. Secondary: `Back to GIPHY` |
+| C2 | Clips: key lacks access | Clips probe failed for a valid key | State message, rows C2. Primary `Open GIPHY Dashboard ↗` is an `<a>` styled as a primary button (`--accent-fill`, white text). Secondary: `Back to GIPHY` |
 
 Every error state is scoped to its own provider tab. Switching tabs shows the other provider's own state, so one failing provider never blocks the rest. Raw response bodies, URLs, and keys never render. Only the provider name and, for S12, the HTTP status code appear.
 
@@ -332,7 +343,7 @@ Applicable state considerations resolved: 22 covered, 2 backstop, 1 unresolved.
 | error | Copy action | ✅ covered | A failed copy keeps the panel open and shows E7 in the footer. A Clips tile shows E8 |
 | error | Saved key later rejected | ✅ covered | A 401/403 during search with a stored key re-shows the setup card with K6 (S13) |
 | error | Raw error leakage | ✅ covered | UI copy contains only the provider name and HTTP status. No URL, response body, or key is ever rendered |
-| populated | Result grid | ✅ covered | 4 columns of 168×144 tiles, `object-fit: contain`, first tile selected with a 2px accent ring, 2.3 rows visible, row-virtualized with overscan 2 |
+| populated | Result grid | ✅ covered | 4 columns of 166×144 tiles, `object-fit: contain`, first tile selected with a 2px accent ring, 2.3 rows visible, row-virtualized with overscan 2 |
 | partial | Result grid, paging failure | ✅ covered | A failed page 2+ keeps loaded results and shows the inline E6 / E2 row instead of replacing the grid (S9a, S12a) |
 | partial | Tile image fails to load | ✅ covered | A broken preview keeps the `--surface` tile with a centered 16px alert-circle icon in `--text-tertiary`. The tile stays selectable and copyable |
 | overflow | Result grid | ✅ covered | Vertical scroll only (`overflow-y: auto; overflow-x: hidden`), native overlay scrollbar. The selection is kept in view with `scrollToIndex` on every move |
