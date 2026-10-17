@@ -61,5 +61,11 @@ await page.keyboard.press("Meta+2");
 await placeholder("Search GIPHY Clips");
 await page.waitForFunction("(document.querySelector('#tile-0 img')?.src ?? '').includes('/media/clip-')", null, { timeout: 8000 });
 
+// WR-02: the persisted Clips tab is restored (here the probe already passed in this server process).
+await page.reload();
+await page.locator("section.content[aria-busy=false]").waitFor({ timeout: 10000 });
+await placeholder("Search GIPHY Clips");
+await page.waitForFunction("(document.querySelector('#tile-0 img')?.src ?? '').includes('/media/clip-')", null, { timeout: 8000 });
+
 if (errors.length) fail("page error: " + errors[0]);
 console.log("UAT OK");

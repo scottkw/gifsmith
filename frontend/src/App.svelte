@@ -169,11 +169,24 @@
     Events.On('providers:changed', refreshProviders);
     const [list, last] = await Promise.all([providers(), lastProvider()]);
     const st = byId(list);
-    // Persisted slot; first run (or an unavailable Clips) opens on GIPHY. Set with statuses in one step.
-    active = SLOTS.some((s) => s.id === last) && !(last === 'clips' && st.clips?.clips !== 'enabled') ? (last as SlotId) : 'giphy';
+    // Persisted slot; first run (or Clips without a GIPHY key) opens on GIPHY. Set with statuses in one step.
+    active = SLOTS.some((s) => s.id === last) && !(last === 'clips' && !st.giphy?.configured) ? (last as SlotId) : 'giphy';
     statuses = st;
-    load(active);
+    if (active === 'clips' && !clipsEnabled) bootClips();
+    else load(active);
   });
+
+  // At launch the Clips probe has not run: it waits for a GIPHY GIFs success. Fetch GIPHY trending
+  // behind the S2 skeleton to start it; refreshProviders shows Clips when the probe lands.
+  async function bootClips() {
+    await runFirst('giphy', '');
+    if (active !== 'clips' || clipsEnabled) return;
+    const g = states.giphy;
+    if (g.status === 'error') {
+      // No probe will run: show GIPHY's error here (a rejected key gets the Go to GIPHY message).
+      Object.assign(states.clips, { status: 'error', err: g.err, errAt: g.errAt });
+    } else if (clipsState === 'unknown') recheckClips(); // no probe started (one already ran): the one re-probe, or its error
+  }
 
   function setStatus(text: string, t: typeof tone = '') {
     status = text;
