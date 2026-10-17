@@ -52,6 +52,7 @@ func main() {
 	})
 	sh := shell.New(app, plat)
 	actions.Hide = sh.Hide
+	actions.Previous = sh.Previous
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)

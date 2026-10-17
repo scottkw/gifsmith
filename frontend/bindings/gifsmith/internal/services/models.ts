@@ -3,5 +3,7 @@
 
 export interface Result {
     "copied": boolean;
+    "pasted": boolean;
+    "needsAccessibility": boolean;
     "message": string;
 }

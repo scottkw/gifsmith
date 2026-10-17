@@ -21,6 +21,7 @@ type Shell struct {
 	app   *application.App
 	plat  platform.Platform
 	panel *application.WebviewWindow
+	prev  platform.App // frontmost app when the panel was last shown
 }
 
 // New creates the panel once (hidden; never closed) and registers the hotkey after start.
@@ -80,6 +81,11 @@ func (s *Shell) Toggle() {
 }
 
 func (s *Shell) Show() {
+	if app, err := s.plat.FrontmostApp(); err != nil {
+		log.Printf("frontmost app: %v", err)
+	} else {
+		s.prev = app
+	}
 	x, y := panelOrigin(s.plat.CursorScreenWorkArea(), PanelWidth, PanelHeight)
 	s.panel.SetPosition(x, y)
 	s.panel.Show()
@@ -89,3 +95,6 @@ func (s *Shell) Show() {
 }
 
 func (s *Shell) Hide() { s.panel.Hide() }
+
+// Previous is the app that was frontmost when the panel was last shown.
+func (s *Shell) Previous() platform.App { return s.prev }

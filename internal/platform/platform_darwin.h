@@ -3,3 +3,8 @@ char *gsPasteboardFileURLs(const char *pbName);
 void gsReleasePasteboard(const char *pbName);
 void gsFocusWebView(void *nsWindow);
 void gsCursorScreenVisibleFrame(int *x, int *y, int *w, int *h);
+int gsAXTrusted(int prompt);
+int gsPostCmdV(void);
+int gsFrontmostApp(int *pid, char **bundleID, char **name);
+int gsActivate(int pid);
+int gsOpenAXSettings(void);

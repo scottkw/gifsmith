@@ -46,6 +46,46 @@ func (darwin) CursorScreenWorkArea() Rect {
 	return Rect{X: int(x), Y: int(y), Width: int(w), Height: int(h)}
 }
 
+func (darwin) FrontmostApp() (App, error) {
+	var pid C.int
+	var bid, name *C.char
+	if C.gsFrontmostApp(&pid, &bid, &name) == 0 {
+		return App{}, errors.New("no frontmost app")
+	}
+	defer C.free(unsafe.Pointer(bid))
+	defer C.free(unsafe.Pointer(name))
+	return App{BundleID: C.GoString(bid), Name: C.GoString(name), PID: int(pid)}, nil
+}
+
+func (darwin) ActivateApp(pid int) error {
+	if C.gsActivate(C.int(pid)) == 0 {
+		return fmt.Errorf("could not activate pid %d", pid)
+	}
+	return nil
+}
+
+func (darwin) AccessibilityTrusted(prompt bool) bool {
+	p := C.int(0)
+	if prompt {
+		p = 1
+	}
+	return C.gsAXTrusted(p) != 0
+}
+
+func (darwin) OpenAccessibilitySettings() error {
+	if C.gsOpenAXSettings() == 0 {
+		return errors.New("could not open Accessibility settings")
+	}
+	return nil
+}
+
+func (darwin) PasteShortcut() error {
+	if C.gsPostCmdV() == 0 {
+		return errors.New("could not post ⌘V")
+	}
+	return nil
+}
+
 // The helpers below take a pasteboard name ("" = general) so tests can use a private one;
 // they live here because _test.go files cannot use cgo.
 

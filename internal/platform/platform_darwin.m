@@ -2,6 +2,8 @@
 
 // Manual reference counting (cgo does not enable ARC).
 #import <Cocoa/Cocoa.h>
+#import <Carbon/Carbon.h>
+#import <ApplicationServices/ApplicationServices.h>
 #include <string.h>
 #include "platform_darwin.h"
 
@@ -92,4 +94,90 @@ void gsCursorScreenVisibleFrame(int *x, int *y, int *w, int *h) {
         *w = (int)vf.size.width;
         *h = (int)vf.size.height;
     });
+}
+
+int gsAXTrusted(int prompt) {
+    int trusted = 0;
+    @autoreleasepool {
+        NSDictionary *o = @{(__bridge NSString *)kAXTrustedCheckOptionPrompt: prompt ? @YES : @NO};
+        trusted = AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)o) ? 1 : 0;
+    }
+    return trusted;
+}
+
+// Key that types 'v' while ⌘ is held, so "Dvorak – QWERTY ⌘" resolves to the QWERTY key.
+// Same TIS + UCKeyTranslate scan as Wails keyCodeForChar (global_shortcut_darwin.go).
+static CGKeyCode vKeyCode(void) {
+    CGKeyCode found = kVK_ANSI_V;
+    TISInputSourceRef src = TISCopyCurrentKeyboardLayoutInputSource();
+    if (src == NULL) return found;
+    CFDataRef data = (CFDataRef)TISGetInputSourceProperty(src, kTISPropertyUnicodeKeyLayoutData);
+    if (data != NULL) {
+        const UCKeyboardLayout *layout = (const UCKeyboardLayout *)CFDataGetBytePtr(data);
+        UInt32 kbdType = LMGetKbdType();
+        for (UInt16 code = 0; code < 128; code++) {
+            UInt32 dead = 0;
+            UniChar chars[4];
+            UniCharCount len = 0;
+            OSStatus st = UCKeyTranslate(layout, code, kUCKeyActionDown, (cmdKey >> 8) & 0xFF,
+                                         kbdType, kUCKeyTranslateNoDeadKeysBit, &dead, 4, &len, chars);
+            if (st == noErr && len == 1 && (chars[0] == 'v' || chars[0] == 'V')) { found = code; break; }
+        }
+    }
+    CFRelease(src);
+    return found;
+}
+
+// One ⌘V from a private source (its modifier state is independent of keys the user holds).
+// Call only after the AX check, Hide and the paste delay.
+int gsPostCmdV(void) {
+    CGEventSourceRef src = CGEventSourceCreate(kCGEventSourceStatePrivate);
+    if (src == NULL) return 0;
+    CGKeyCode v = vKeyCode();
+    CGEventRef down = CGEventCreateKeyboardEvent(src, v, true);
+    CGEventRef up = CGEventCreateKeyboardEvent(src, v, false);
+    int ok = down != NULL && up != NULL;
+    if (ok) {
+        CGEventSetFlags(down, kCGEventFlagMaskCommand);
+        CGEventSetFlags(up, kCGEventFlagMaskCommand);
+        CGEventPost(kCGSessionEventTap, down);
+        CGEventPost(kCGSessionEventTap, up);
+    }
+    if (down) CFRelease(down);
+    if (up) CFRelease(up);
+    CFRelease(src);
+    return ok;
+}
+
+// Caller frees *bundleID and *name.
+int gsFrontmostApp(int *pid, char **bundleID, char **name) {
+    __block int ok = 0;
+    onMain(^{ @autoreleasepool {
+        NSRunningApplication *a = [[NSWorkspace sharedWorkspace] frontmostApplication];
+        if (a == nil) return;
+        *pid = a.processIdentifier;
+        *bundleID = strdup(a.bundleIdentifier ? a.bundleIdentifier.UTF8String : "");
+        *name = strdup(a.localizedName ? a.localizedName.UTF8String : "");
+        ok = 1;
+    }});
+    return ok;
+}
+
+// Best effort: since macOS 14 activation is cooperative and may be declined.
+int gsActivate(int pid) {
+    __block int ok = 0;
+    onMain(^{ @autoreleasepool {
+        NSRunningApplication *a = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
+        ok = (a != nil && [a activateWithOptions:0]) ? 1 : 0;
+    }});
+    return ok;
+}
+
+int gsOpenAXSettings(void) {
+    __block int ok = 0;
+    onMain(^{ @autoreleasepool {
+        NSURL *u = [NSURL URLWithString:@"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"];
+        ok = [[NSWorkspace sharedWorkspace] openURL:u] ? 1 : 0;
+    }});
+    return ok;
 }

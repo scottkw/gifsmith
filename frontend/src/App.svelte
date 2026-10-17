@@ -5,11 +5,13 @@
 
   let input: HTMLInputElement;
   let status = $state('');
+  let needsAccessibility = $state(false);
 
   onMount(() => {
     input.focus();
     Events.On('panel:show', () => {
       status = '';
+      needsAccessibility = false;
       input.focus();
       input.select();
     });
@@ -19,16 +21,37 @@
   });
 
   async function onKeydown(e: KeyboardEvent) {
-    if (e.key !== 'Enter' || e.metaKey) return;
+    if (e.key !== 'Enter') return;
     e.preventDefault();
     try {
-      status = (await ActionService.Copy()).message;
+      if (e.metaKey) {
+        const r = await ActionService.Paste();
+        status = r.message;
+        needsAccessibility = r.needsAccessibility;
+      } else {
+        status = (await ActionService.Copy()).message;
+      }
     } catch (err) {
       status = String(err);
     }
+  }
+
+  async function enableAutoPaste() {
+    try {
+      await ActionService.RequestAccessibility();
+      status =
+        'After turning Gifsmith on, press ⌘Enter again. If it still says it is not allowed, quit Gifsmith from the menu bar and open it again.';
+      needsAccessibility = false;
+    } catch (err) {
+      status = String(err);
+    }
+    input.focus();
   }
 </script>
 
 <input bind:this={input} onkeydown={onKeydown} placeholder="Search GIFs" autocomplete="off" />
 <img src="/sample.gif" width="120" height="120" alt="sample GIF" />
 <p>{status}</p>
+{#if needsAccessibility}
+  <button onclick={enableAutoPaste}>Enable automatic paste…</button>
+{/if}

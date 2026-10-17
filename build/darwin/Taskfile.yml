@@ -6,6 +6,10 @@ includes:
 vars:
   # Docker image for cross-compilation (used when building on non-macOS)
   CROSS_IMAGE: wails-cross
+  # Stable Developer ID identity so TCC (Accessibility) grants survive rebuilds (D-10).
+  SIGN_IDENTITY: "Developer ID Application: Ken Scott (S2K7P43927)"
+  INSTALL_PATH:
+    sh: echo "$HOME/Applications/Gifsmith.app"
 
 tasks:
   build:
@@ -204,6 +208,19 @@ tasks:
       - codesign --force --deep --sign - "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app"
       - codesign --verify --deep --strict "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app"
       - '"{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/MacOS/{{.APP_NAME}}"'
+
+  install:dev:
+    summary: Build, Developer ID-sign (hardened runtime) and install to ~/Applications/Gifsmith.app
+    deps:
+      - task: package
+    cmds:
+      - wails3 tool sign --input "{{.BIN_DIR}}/{{.APP_NAME}}.app" --identity "{{.SIGN_IDENTITY}}" --hardened-runtime
+      - pkill -x {{.APP_NAME}} || true
+      - case "{{.INSTALL_PATH}}" in */Applications/Gifsmith.app) ;; *) echo "refusing to install to '{{.INSTALL_PATH}}'"; exit 1;; esac
+      - rm -rf "{{.INSTALL_PATH}}"
+      - ditto "{{.BIN_DIR}}/{{.APP_NAME}}.app" "{{.INSTALL_PATH}}"
+      - ': > "{{.ROOT_DIR}}/{{.BIN_DIR}}/install-dev.log"'
+      - open --stderr "{{.ROOT_DIR}}/{{.BIN_DIR}}/install-dev.log" "{{.INSTALL_PATH}}"
 
   sign:
     summary: Signs the application bundle with Developer ID

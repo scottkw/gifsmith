@@ -16,3 +16,19 @@ import * as $models from "./models.js";
 export function Copy(): $CancellablePromise<$models.Result> {
     return $Call.ByID(1012912345);
 }
+
+/**
+ * Paste copies the GIF, hides the panel and posts one ⌘V to the previous app.
+ * Without Accessibility it only copies and keeps the panel open with instructions.
+ */
+export function Paste(): $CancellablePromise<$models.Result> {
+    return $Call.ByID(1552752055);
+}
+
+/**
+ * RequestAccessibility raises the macOS prompt and, if still untrusted, opens the settings pane.
+ * Only an explicit button click calls this.
+ */
+export function RequestAccessibility(): $CancellablePromise<boolean> {
+    return $Call.ByID(2791695815);
+}

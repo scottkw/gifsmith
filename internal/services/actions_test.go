@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 	"testing"
+	"time"
 
 	"gifsmith/internal/platform"
 )
@@ -53,6 +54,91 @@ func TestCopyTwiceUsesSamePath(t *testing.T) {
 	}
 	want := []string{"CopyFile:" + sample, "hide", "CopyFile:" + sample, "hide"}
 	if !slices.Equal(f.Calls, want) {
+		t.Errorf("calls = %q, want %q", f.Calls, want)
+	}
+}
+
+var prevApp = platform.App{BundleID: "com.apple.TextEdit", Name: "TextEdit", PID: 42}
+
+func newPasteService(f *platform.Fake) *ActionService {
+	s := newService(f)
+	s.Previous = func() platform.App { return prevApp }
+	s.Sleep = func(d time.Duration) { f.Note("sleep:" + d.String()) }
+	return s
+}
+
+func TestPasteWithoutAccessibility(t *testing.T) {
+	f := &platform.Fake{}
+	r, err := newPasteService(f).Paste(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.Copied || !r.NeedsAccessibility || r.Pasted || r.Message == "" {
+		t.Errorf("result = %+v, want Copied+NeedsAccessibility with a message", r)
+	}
+	if want := []string{"CopyFile:" + sample, "AccessibilityTrusted:false"}; !slices.Equal(f.Calls, want) {
+		t.Errorf("calls = %q, want %q", f.Calls, want)
+	}
+}
+
+func TestPasteTrustedOrder(t *testing.T) {
+	f := &platform.Fake{Trusted: true, Frontmost: prevApp}
+	r, err := newPasteService(f).Paste(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.Copied || !r.Pasted {
+		t.Errorf("result = %+v, want Copied+Pasted", r)
+	}
+	want := []string{"CopyFile:" + sample, "AccessibilityTrusted:false", "hide", "sleep:80ms", "FrontmostApp", "PasteShortcut"}
+	if !slices.Equal(f.Calls, want) {
+		t.Errorf("calls = %q, want %q", f.Calls, want)
+	}
+}
+
+func TestPasteReactivatesPrevious(t *testing.T) {
+	f := &platform.Fake{Trusted: true, Frontmost: platform.App{BundleID: "com.other", PID: 7}}
+	if _, err := newPasteService(f).Paste(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"CopyFile:" + sample, "AccessibilityTrusted:false", "hide", "sleep:80ms", "FrontmostApp", "ActivateApp:42", "sleep:80ms", "PasteShortcut"}
+	if !slices.Equal(f.Calls, want) {
+		t.Errorf("calls = %q, want %q", f.Calls, want)
+	}
+}
+
+func TestPasteCopyError(t *testing.T) {
+	f := &platform.Fake{Trusted: true, CopyErr: errors.New("pasteboard write failed")}
+	r, err := newPasteService(f).Paste(context.Background())
+	if !errors.Is(err, f.CopyErr) {
+		t.Errorf("err = %v, want %v", err, f.CopyErr)
+	}
+	if r.Copied || r.Pasted {
+		t.Errorf("result = %+v on copy error", r)
+	}
+	if want := []string{"CopyFile:" + sample}; !slices.Equal(f.Calls, want) {
+		t.Errorf("calls = %q, want %q", f.Calls, want)
+	}
+}
+
+func TestPastePostError(t *testing.T) {
+	f := &platform.Fake{Trusted: true, Frontmost: prevApp, PasteErr: errors.New("could not post")}
+	r, err := newPasteService(f).Paste(context.Background())
+	if !errors.Is(err, f.PasteErr) {
+		t.Errorf("err = %v, want %v", err, f.PasteErr)
+	}
+	if !r.Copied || r.Pasted {
+		t.Errorf("result = %+v, want Copied, not Pasted", r)
+	}
+}
+
+func TestRequestAccessibilityOpensSettings(t *testing.T) {
+	f := &platform.Fake{}
+	ok, err := newPasteService(f).RequestAccessibility(context.Background())
+	if err != nil || ok {
+		t.Errorf("got (%v, %v), want (false, nil)", ok, err)
+	}
+	if want := []string{"AccessibilityTrusted:true", "OpenAccessibilitySettings"}; !slices.Equal(f.Calls, want) {
 		t.Errorf("calls = %q, want %q", f.Calls, want)
 	}
 }
