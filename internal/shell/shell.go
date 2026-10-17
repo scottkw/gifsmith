@@ -8,6 +8,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
+	"github.com/wailsapp/wails/v3/pkg/icons"
 )
 
 const (
@@ -43,6 +44,21 @@ func New(app *application.App, plat platform.Platform) *Shell {
 			WindowLevel: application.MacWindowLevelFloating,
 		},
 	})
+
+	// Tray is built here, not in the hotkey handler, so Open works even if the hotkey fails.
+	// No window is attached: with only a menu, a click opens the menu.
+	tray := app.SystemTray.New()
+	tray.SetTemplateIcon(icons.SystrayMacTemplate)
+	menu := app.NewMenu()
+	menu.Add("Open Gifsmith").OnClick(func(*application.Context) { s.Show() })
+	menu.Add("Settings…").OnClick(func(*application.Context) {
+		s.Show()
+		app.Event.Emit("panel:status", "Settings window ships in Phase 4")
+	})
+	menu.AddSeparator()
+	menu.Add("Quit Gifsmith").OnClick(func(*application.Context) { app.Quit() })
+	tray.SetMenu(menu)
+	log.Printf("tray menu ready")
 
 	// Registered once the app runs so an OS rejection comes back here instead of the error handler.
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
