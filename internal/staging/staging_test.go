@@ -229,3 +229,33 @@ func TestVendorAllow(t *testing.T) {
 		}
 	}
 }
+
+// A redirect is checked against the allowlist on every hop (WR-03).
+func TestFetchRedirectAllowlist(t *testing.T) {
+	var offHits atomic.Int32
+	off := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { offHits.Add(1) }))
+	t.Cleanup(off.Close)
+	media := fakeapi.Handler(fakeapi.Options{})
+	s, base, _ := newStore(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/media/away.gif":
+			http.Redirect(w, r, off.URL+"/x.gif", http.StatusFound)
+		case "/media/home.gif":
+			http.Redirect(w, r, "/media/office-7.gif", http.StatusFound)
+		case "/media/loop.gif":
+			http.Redirect(w, r, "/media/loop.gif", http.StatusFound)
+		default:
+			media.ServeHTTP(w, r)
+		}
+	}))
+	_, err := s.Fetch(context.Background(), gif(base, "away", "Away"))
+	if !errors.Is(err, ErrNotAllowed) || offHits.Load() != 0 {
+		t.Errorf("redirect off the allowlist: err %v, off-host hits %d; want ErrNotAllowed, 0", err, offHits.Load())
+	}
+	if _, err := s.Fetch(context.Background(), gif(base, "home", "Home")); err != nil {
+		t.Errorf("redirect within the allowlist: %v", err)
+	}
+	if _, err := s.Fetch(context.Background(), gif(base, "loop", "Loop")); !errors.Is(err, ErrNotAllowed) {
+		t.Errorf("redirect loop: %v, want ErrNotAllowed", err)
+	}
+}

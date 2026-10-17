@@ -64,7 +64,17 @@ func (s *Store) Fetch(ctx context.Context, g provider.Gif) (string, error) {
 		return "", ErrNotAllowed
 	}
 	req.Header.Set("User-Agent", httpx.UserAgent)
-	resp, err := s.HTTP.Do(req)
+	hc := *s.HTTP // every redirect hop must pass the same allowlist
+	hc.CheckRedirect = func(r *http.Request, via []*http.Request) error {
+		if len(via) >= 5 || !allow(g.Provider, r.URL) {
+			return ErrNotAllowed
+		}
+		return nil
+	}
+	resp, err := hc.Do(req)
+	if errors.Is(err, ErrNotAllowed) {
+		return "", ErrNotAllowed
+	}
 	if err != nil {
 		return "", ErrDownload
 	}
