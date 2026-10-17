@@ -28,10 +28,10 @@
 
 ### Onboarding & Compliance
 
-- [ ] **ONBD-01**: First run opens on GIPHY with an inline setup card to paste a key, plus a "Try Finer Gifs (no key)" button
+- [x] **ONBD-01**: First run opens on GIPHY with an inline setup card to paste a key, plus a "Try Finer Gifs (no key)" button
 - [x] **ONBD-02**: Pasted key is verified with a test call before being saved
 - [x] **ONBD-03**: API keys are stored in the macOS Keychain and never shown to the web UI or written to logs/errors
-- [ ] **ONBD-04**: "Powered by GIPHY" is shown on GIPHY/Clips results; Klipy search placeholder reads "Search KLIPY"
+- [x] **ONBD-04**: "Powered by GIPHY" is shown on GIPHY/Clips results; Klipy search placeholder reads "Search KLIPY"
 - [x] **ONBD-05**: Providers are never blended in one grid; results are never reordered or filtered (except same-page duplicates for non-Klipy)
 
 ### Actions
@@ -117,10 +117,10 @@
 | SRCH-07 | Phase 2 | Complete |
 | SRCH-08 | Phase 3 | Pending |
 | SRCH-09 | Phase 4 | Pending |
-| ONBD-01 | Phase 2 | Pending |
+| ONBD-01 | Phase 2 | Complete |
 | ONBD-02 | Phase 2 | Complete |
 | ONBD-03 | Phase 2 | Complete |
-| ONBD-04 | Phase 2 | Pending |
+| ONBD-04 | Phase 2 | Complete |
 | ONBD-05 | Phase 2 | Complete |
 | ACTN-01 | Phase 1 | Complete |
 | ACTN-02 | Phase 1 | Complete |

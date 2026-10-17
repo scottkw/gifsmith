@@ -5,16 +5,16 @@ milestone_name: Gifsmith MVP
 current_phase: 2
 current_phase_name: Providers, Search UI & First Run
 status: executing
-stopped_at: Completed 02-04-PLAN.md
-last_updated: "2026-10-17T20:40:05.507Z"
+stopped_at: Completed 02-05-PLAN.md
+last_updated: "2026-10-17T20:55:10.955Z"
 last_activity: 2026-10-17
 last_activity_desc: Phase 2 execution started
-state_head: d5b18b003340ee30ce184c51c19ac36bab4a03f2
+state_head: 50ff8678d19d4c72b722d4879c483d727f2f235d
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 10
-  completed_plans: 8
+  completed_plans: 9
 ---
 
 # Project State
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-17)
 ## Current Position
 
 Phase: 2 (Providers, Search UI & First Run) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 Status: Ready to execute
 Last activity: 2026-10-17 — Phase 2 execution started
 
@@ -65,6 +65,7 @@ Progress: [███░░░░░░░] 25% (4/4 plans in Phase 1)
 | Phase 2 P02 | 6min | 3 tasks | 12 files |
 | Phase 2 P03 | 15min | 2 tasks | 14 files |
 | Phase 02 P04 | 11min | 3 tasks | 26 files |
+| Phase 02 P05 | 12min | 2 tasks | 22 files |
 
 ## Accumulated Context
 
@@ -102,6 +103,10 @@ Recent decisions affecting current work:
 - [Phase 02]: LastProvider reads settings.json per call; invalid or unknown id reads as first run
 - [Phase 02]: SetLastProvider does not share the SaveKey mutex (temp+rename keeps writes whole)
 - [Phase 02]: fakeapi scenario words read from q plus the key, so SaveKey/trending can be driven into 429/500/slow in UAT
+- [Phase 02]: Setup card width 560 (not 456): at 456 it overran the 364px content area by 21px and K2-K6 overflowed the one-line message slot
+- [Phase 02]: After a key save the query is cleared so the box matches the trending grid (S1c); Try Finer Gifs clears it too (S8)
+- [Phase 02]: A key_rejected provider keeps its setup card across tab switches until a new key is saved (S13)
+- [Phase 02]: Keychain-failure inline copy: Couldn't save the key to the macOS Keychain. Try again.
 
 ### Pending Todos
 
@@ -124,6 +129,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-17T20:40:05.368Z
-Stopped at: Completed 02-04-PLAN.md
+Last session: 2026-10-17T20:55:10.786Z
+Stopped at: Completed 02-05-PLAN.md
 Resume file: None
