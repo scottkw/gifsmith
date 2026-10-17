@@ -304,7 +304,7 @@ func TestClipsShareGiphyBudget(t *testing.T) {
 	}
 
 	err = s.Guard(provider.Clips, func() error { t.Fatal("Guard called into a block"); return nil })
-	rateLimited(t, err)
+	_ = rateLimited(t, err)
 
 	cl.err = nil
 	s.Invalidate(provider.GIPHY)
