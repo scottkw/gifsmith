@@ -24,6 +24,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 ## Phase Details
 
 ### Phase 1: Native Spike & Signed Dev Loop
+
 **Goal**: The three unproven native behaviors work on this Mac (typing into a non-activating panel, full-screen overlay, and copy/paste of a GIF file into the previous app), from a stable signed identity, so the architecture is confirmed before any real UI is built.
 **Mode:** mvp
 **Depends on**: Nothing (first phase)
@@ -34,18 +35,27 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Pressing Enter in the panel puts a bundled sample GIF on the clipboard as a file, and ⌘V pastes it as an animated GIF into TextEdit, with Accessibility permission NOT granted. (manual, user-verified)
   4. With Accessibility granted, the paste action drops the GIF straight into the app the user was in (TextEdit) with no manual ⌘V. Without it, the GIF is copied and the user is told to press ⌘V and how to grant permission. (manual, user-verified)
   5. The same behaviors hold from a signed dev build run from the bundled `.app` and from a throwaway Developer ID–signed, notarized build. A committed paste matrix records the result per target app (Slack, Messages, Mail, Discord, Notes, Telegram, Safari/Chrome composers), and the user records an explicit go/no-go. This de-risks RELS-01/RELS-02, which complete in Phase 4. (manual, user-verified)
+
 **Plans:** 4 plans
 
 Plans:
+**Wave 1**
 - [ ] 01-01-PLAN.md — Walking skeleton: scaffold + identity, then ⌃⌥⌘G non-activating panel → Enter copies sample GIF as a file (tracer gate)
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 01-02-PLAN.md — Menu-bar shell: tray menu (Open / Settings… / Quit), panel on the cursor's display
+
+**Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 01-03-PLAN.md — Signed dev loop (install:dev to ~/Applications) + ⌘Enter Accessibility-gated paste; paste matrix (dev column); browser UAT smoke loop
+
+**Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 01-04-PLAN.md — Notarized + stapled throwaway build, notarized matrix column, user go/no-go recorded and committed
 
 **Manual verification**: Required for every criterion above. Panel focus, full-screen overlay, Accessibility prompt, and real paste cannot be exercised by dev-browser. Phase scaffolding also pins Wails v3 `v3.0.0-beta.30` with pnpm, proves the `-tags server` browser→bindings loop used for UAT in Phases 2-3, and settles min-macOS/arch (macOS 13+, arm64).
 **Research flag**: Highest care. Use `/gsd-plan-phase --research-phase 1`; research is done, the work is hands-on spike.
 
 ### Phase 2: Providers, Search UI & First Run
+
 **Goal**: A stranger can open the panel, get set up with a key (or skip to the keyless provider), search or browse trending GIFs on any available provider in a fast keyboard-driven animated grid, and Enter copies the GIF, with vendor-required attribution and honest error handling.
 **Mode:** mvp
 **Depends on**: Phase 1 (go decision, signed dev loop, copy-GIF-as-file primitive, server-mode UAT loop)
@@ -56,6 +66,7 @@ Plans:
   3. First run opens on GIPHY with an inline setup card. Pasting a key is verified with a test call before it is saved (a bad key is rejected with a clear message), and "Try Finer Gifs (no key)" works without any key. Saved keys live in the macOS Keychain and never appear in the UI, logs, or error text.
   4. "Powered by GIPHY" shows on GIPHY and Clips results, and the Klipy search placeholder reads "Search KLIPY".
   5. GIPHY Clips appears as a provider only when the user's GIPHY key passes a Clips test call (otherwise a short explanation is shown). Rapid typing does not burn requests, a rate-limit hit shows a clear message with when to retry, and a network, timeout, or provider error shows a per-provider message while other providers stay usable.
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -63,6 +74,7 @@ Plans:
 **Research flag**: Needs `/gsd-plan-phase --research-phase 2`. Short live-key probing session for Klipy request shapes, Clips approval behavior, the system-proxy choice, and a Finer Gifs re-probe (it was down 2026-10-17).
 
 ### Phase 3: Action Pipeline & Library
+
 **Goal**: Every action the Raycast extension offered works on the selected GIF, and favorites, recents, details, and recent searches put the GIFs a user reuses one keystroke away, even offline or rate-limited.
 **Mode:** mvp
 **Depends on**: Phase 2
@@ -73,6 +85,7 @@ Plans:
   3. Temp files used for copy, paste, and download are removed promptly, and Klipy temp files are removed eagerly, so the staging folder does not accumulate GIFs.
   4. The user can add or remove a favorite, and every successful copy or paste appears in Recents (most recent first, capped). Favorites and Recents are browsable grouped by provider (never blended), items can be removed from Recents, and both render from saved metadata with no API calls.
   5. The user can open a details view for a GIF (title, size, dimensions, tags, source links), and an empty search box shows recent searches that can be rerun.
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -80,6 +93,7 @@ Plans:
 **Research flag**: Needs a short design note on pasteboard representation (informed by the Phase 1 paste matrix) and Clips handling before coding. Library and details are standard patterns.
 
 ### Phase 4: Settings, Shell Polish & Release
+
 **Goal**: Everything is configurable from a proper Settings window with hotkeys that can be rebound and launch at login, and a stranger can install a signed, notarized build on a clean Mac and use it within vendor and license obligations.
 **Mode:** mvp
 **Depends on**: Phase 3
@@ -90,6 +104,7 @@ Plans:
   3. The user can set grid item size (search and trending), max results, download folder, hide filename, GIPHY and Klipy locales, GIPHY content rating (default PG-13), and the default Enter and ⌘Enter actions, and changes take effect on next use.
   4. A Developer ID–signed, notarized DMG installs and runs on a clean user account (Gatekeeper accepts it, permissions start fresh) on macOS 13+ Apple Silicon. (manual, user-verified)
   5. The About screen credits the original MIT-licensed Raycast extension and its authors, and Klipy file actions stay disabled (link and Markdown only) unless written clearance from Klipy is recorded.
+
 **Plans**: TBD
 **UI hint**: yes
 
