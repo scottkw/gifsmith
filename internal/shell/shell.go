@@ -3,6 +3,7 @@ package shell
 
 import (
 	"log"
+	"sync"
 
 	"gifsmith/internal/platform"
 
@@ -21,7 +22,10 @@ type Shell struct {
 	app   *application.App
 	plat  platform.Platform
 	panel *application.WebviewWindow
-	prev  platform.App // frontmost app when the panel was last shown
+	// Hotkey, menu and bound calls each run on their own goroutine; mu serialises
+	// Toggle/Show/Hide and guards prev.
+	mu   sync.Mutex
+	prev platform.App // frontmost app when the panel was last shown
 }
 
 // New creates the panel once (hidden; never closed) and registers the hotkey after start.
@@ -73,14 +77,22 @@ func New(app *application.App, plat platform.Platform) *Shell {
 }
 
 func (s *Shell) Toggle() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.panel.IsVisible() {
-		s.Hide()
+		s.panel.Hide()
 		return
 	}
-	s.Show()
+	s.show()
 }
 
 func (s *Shell) Show() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.show()
+}
+
+func (s *Shell) show() {
 	app, err := s.plat.FrontmostApp()
 	if err != nil {
 		log.Printf("frontmost app: %v", err)
@@ -95,7 +107,15 @@ func (s *Shell) Show() {
 	s.app.Event.Emit("panel:show")
 }
 
-func (s *Shell) Hide() { s.panel.Hide() }
+func (s *Shell) Hide() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.panel.Hide()
+}
 
 // Previous is the app that was frontmost when the panel was last shown.
-func (s *Shell) Previous() platform.App { return s.prev }
+func (s *Shell) Previous() platform.App {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.prev
+}
