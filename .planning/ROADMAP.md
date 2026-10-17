@@ -34,7 +34,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Pressing Enter in the panel puts a bundled sample GIF on the clipboard as a file, and ⌘V pastes it as an animated GIF into TextEdit, with Accessibility permission NOT granted. (manual, user-verified)
   4. With Accessibility granted, the paste action drops the GIF straight into the app the user was in (TextEdit) with no manual ⌘V. Without it, the GIF is copied and the user is told to press ⌘V and how to grant permission. (manual, user-verified)
   5. The same behaviors hold from a signed dev build run from the bundled `.app` and from a throwaway Developer ID–signed, notarized build. A committed paste matrix records the result per target app (Slack, Messages, Mail, Discord, Notes, Telegram, Safari/Chrome composers), and the user records an explicit go/no-go. This de-risks RELS-01/RELS-02, which complete in Phase 4. (manual, user-verified)
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Walking skeleton: scaffold + ⌃⌥⌘G non-activating panel → Enter copies sample GIF as a file; tray menu, cursor-screen placement
+- [ ] 01-02-PLAN.md — Signed dev loop (install:dev to ~/Applications) + ⌘Enter Accessibility-gated paste; paste matrix (dev column); browser UAT smoke loop
+- [ ] 01-03-PLAN.md — Notarized + stapled throwaway build, notarized matrix column, user go/no-go recorded and committed
 
 **Manual verification**: Required for every criterion above. Panel focus, full-screen overlay, Accessibility prompt, and real paste cannot be exercised by dev-browser. Phase scaffolding also pins Wails v3 `v3.0.0-beta.30` with pnpm, proves the `-tags server` browser→bindings loop used for UAT in Phases 2-3, and settles min-macOS/arch (macOS 13+, arm64).
 **Research flag**: Highest care. Use `/gsd-plan-phase --research-phase 1`; research is done, the work is hands-on spike.
@@ -97,7 +102,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Native Spike & Signed Dev Loop | 0/TBD | Not started | - |
+| 1. Native Spike & Signed Dev Loop | 0/3 | Planned | - |
 | 2. Providers, Search UI & First Run | 0/TBD | Not started | - |
 | 3. Action Pipeline & Library | 0/TBD | Not started | - |
 | 4. Settings, Shell Polish & Release | 0/TBD | Not started | - |
