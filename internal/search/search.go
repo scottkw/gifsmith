@@ -39,13 +39,14 @@ type Service struct {
 	mu      sync.Mutex // never held across a provider call
 	cache   map[string]entry
 	blocked map[provider.ID]block
+	gen     map[provider.ID]int // per budget, bumped by Invalidate: an old key's late answer is never recorded
 }
 
 func New(providers map[provider.ID]provider.Provider, now func() time.Time) *Service {
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{providers: providers, now: now, cache: map[string]entry{}, blocked: map[provider.ID]block{}}
+	return &Service{providers: providers, now: now, cache: map[string]entry{}, blocked: map[provider.ID]block{}, gen: map[provider.ID]int{}}
 }
 
 func (s *Service) Search(ctx context.Context, p provider.ID, q, cursor string) (provider.Page, error) {
@@ -86,19 +87,20 @@ func (s *Service) Invalidate(p provider.ID) {
 		}
 	}
 	delete(s.blocked, budget(p))
+	s.gen[budget(p)]++
 }
 
 // Guard runs an uncached call (the Clips probe) inside p's 429 budget: refused
 // while blocked, and a 429 it returns blocks the budget like any other request.
 func (s *Service) Guard(p provider.ID, call func() error) error {
 	s.mu.Lock()
-	err := s.blockedErr(p)
+	err, gen := s.blockedErr(p), s.gen[budget(p)]
 	s.mu.Unlock()
 	if err != nil {
 		return err
 	}
 	err = call()
-	s.noteRateLimit(p, err)
+	s.noteRateLimit(p, gen, err)
 	return err
 }
 
@@ -116,14 +118,17 @@ func (s *Service) blockedErr(p provider.ID) error {
 	return &provider.Error{Kind: provider.RateLimited, Provider: p, RetryAfterSec: retry}
 }
 
-// noteRateLimit blocks p's budget when err is a 429.
-func (s *Service) noteRateLimit(p provider.ID, err error) {
+// noteRateLimit blocks p's budget when err is a 429 for the key generation gen.
+func (s *Service) noteRateLimit(p provider.ID, gen int, err error) {
 	var pe *provider.Error
-	if errors.As(err, &pe) && pe.Kind == provider.RateLimited {
-		wait := max(time.Duration(pe.RetryAfterSec)*time.Second, MinBlock)
-		s.mu.Lock()
+	if !errors.As(err, &pe) || pe.Kind != provider.RateLimited {
+		return
+	}
+	wait := max(time.Duration(pe.RetryAfterSec)*time.Second, MinBlock)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.gen[budget(p)] == gen {
 		s.blocked[budget(p)] = block{until: s.now().Add(wait), known: pe.RetryAfterSec > 0}
-		s.mu.Unlock()
 	}
 }
 
@@ -143,16 +148,19 @@ func (s *Service) get(p provider.ID, rest string, ttl time.Duration, call func(p
 		s.mu.Unlock()
 		return e.page, nil
 	}
+	gen := s.gen[budget(p)]
 	s.mu.Unlock()
 
 	pg, err := call(pr)
 	if err != nil {
-		s.noteRateLimit(p, err)
+		s.noteRateLimit(p, gen, err)
 		return pg, err // errors and cancellations are never cached
 	}
 	pg = dedupe(p, pg)
 	s.mu.Lock()
-	s.cache[key] = entry{pg, s.now().Add(ttl)}
+	if s.gen[budget(p)] == gen { // the key changed mid-flight: answer the caller, never cache the old key's page
+		s.cache[key] = entry{pg, s.now().Add(ttl)}
+	}
 	s.mu.Unlock()
 	return pg, nil
 }

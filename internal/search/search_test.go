@@ -323,3 +323,54 @@ func TestClipsShareGiphyBudget(t *testing.T) {
 		t.Error("a Guard 429 did not block the GIPHY budget")
 	}
 }
+
+// gatedProv blocks each call until release, then answers with page or err.
+type gatedProv struct {
+	started chan struct{}
+	release chan struct{}
+	page    provider.Page
+	err     error
+}
+
+func (g *gatedProv) answer() (provider.Page, error) {
+	g.started <- struct{}{}
+	<-g.release
+	return g.page, g.err
+}
+
+func (g *gatedProv) Search(context.Context, string, string) (provider.Page, error) { return g.answer() }
+func (g *gatedProv) Trending(context.Context, string) (provider.Page, error)       { return g.answer() }
+
+// A request made with the old key that lands after Invalidate must not restore
+// its 429 block or overwrite the new key's seeded page (WR-01).
+func TestInvalidateDropsInFlightResult(t *testing.T) {
+	for name, tc := range map[string]struct {
+		page provider.Page
+		err  error
+	}{
+		"429":     {err: &provider.Error{Kind: provider.RateLimited, Provider: provider.GIPHY, RetryAfterSec: 600}},
+		"success": {page: page("old")},
+	} {
+		t.Run(name, func(t *testing.T) {
+			g := &gatedProv{started: make(chan struct{}), release: make(chan struct{}), page: tc.page, err: tc.err}
+			s := New(map[provider.ID]provider.Provider{provider.GIPHY: g}, nil)
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				_, _ = s.Trending(ctx, provider.GIPHY, "")
+			}()
+			<-g.started
+			s.Invalidate(provider.GIPHY) // SaveKey: new key stored, then Invalidate + Seed
+			s.Seed(provider.GIPHY, "", page("new"))
+			close(g.release)
+			<-done
+			if s.Blocked(provider.GIPHY) {
+				t.Error("the old key's 429 blocked the new key")
+			}
+			pg, err := s.Trending(ctx, provider.GIPHY, "")
+			if err != nil || !slices.Equal(ids(pg), []string{"new"}) {
+				t.Errorf("trending after the late answer = %v, %v; want the seeded [new]", ids(pg), err)
+			}
+		})
+	}
+}
