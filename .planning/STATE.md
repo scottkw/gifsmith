@@ -5,16 +5,16 @@ milestone_name: Gifsmith MVP
 current_phase: 1
 current_phase_name: Native Spike & Signed Dev Loop
 status: executing
-stopped_at: Roadmap created; ready to run `/gsd-plan-phase 1`
-last_updated: "2026-10-17T14:02:31.629Z"
+stopped_at: Completed 01-01-PLAN.md
+last_updated: "2026-10-17T14:25:52.407Z"
 last_activity: 2026-10-17
-last_activity_desc: Roadmap created (4 phases, 45/45 v1 requirements mapped)
-state_head: 133cf8da30f2495a23876941be50f8393a262cc2
+last_activity_desc: Completed 01-01 tracer (user approved gate)
+state_head: 797032f40f700ed988b77eebd9f46783b9fbee76
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 4
-  completed_plans: 0
+  completed_plans: 1
 ---
 
 # Project State
@@ -24,16 +24,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-17)
 
 **Core value:** Hotkey → type → Enter puts the right GIF on the clipboard (or into the frontmost app) in seconds, without Raycast.
-**Current focus:** Phase 1 — Native Spike & Signed Dev Loop (hard go/no-go gate)
+**Current focus:** Phase 1 — Native Spike & Signed Dev Loop
 
 ## Current Position
 
-Phase: 1 (Native Spike & Signed Dev Loop) — READY TO EXECUTE
-Plan: 0 of TBD in current phase
+Phase: 1 (Native Spike & Signed Dev Loop) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-10-17 — Roadmap created (4 phases, 45/45 v1 requirements mapped)
+Last activity: 2026-10-17 — Completed 01-01 tracer: hotkey panel takes typing, overlays full-screen, Enter copies GIF file, ⌘V pastes in TextEdit (user approved)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 25% (1/4 plans in Phase 1)
 
 ## Performance Metrics
 
@@ -53,6 +53,11 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 1 P01 | 22min | 3 tasks | 111 files |
 
 ## Accumulated Context
 
@@ -65,6 +70,8 @@ Recent decisions affecting current work:
 - [Roadmap]: Phase 1 is a hard go/no-go gate and owns ACTN-01/ACTN-02 (native copy/paste proof); Phase 2 wires them to real search results
 - [Roadmap]: Wails v3 `v3.0.0-beta.30` pinned exactly; pnpm from the first command; Developer ID signed dev builds from day one
 - [Roadmap]: No persistent media cache in v1 (favorites store metadata snapshots only); providers never blended in one grid
+- [Phase 1]: No pre-authorized fallback needed: NonActivating panel + Focus + makeFirstResponder(WKWebView) takes typing; Floating level + FullScreenAuxiliary overlays full-screen; HideOnFocusLost handles click-away
+- [Phase 1]: Pasteboard calls run on the calling thread in an autorelease pool; only FocusWebView hops to the main run loop
 
 ### Pending Todos
 
@@ -72,7 +79,7 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 1]: Panel typing/focus, full-screen overlay, and ⌘V paste are unproven on macOS 27; manual user verification required
+- [Phase 1]: Auto-paste into the frontmost app (ACTN-02, Accessibility) and Developer ID signing still unproven (plans 01-03/01-04); typing/focus, full-screen overlay and manual ⌘V paste were proven at the 01-01 tracer gate
 - [Phase 2]: Klipy request shapes untested with a live key; GIPHY Clips needs per-key approval; Finer Gifs was down on 2026-10-17
 - [Phase 4]: Klipy written clearance for temp file copies (developers@klipy.com) is a pre-release gate; request early
 
@@ -86,6 +93,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-17
-Stopped at: Roadmap created; ready to run `/gsd-plan-phase 1`
+Last session: 2026-10-17T14:25:52.385Z
+Stopped at: Completed 01-01-PLAN.md
 Resume file: None

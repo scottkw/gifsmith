@@ -7,9 +7,9 @@
 
 ### Shell
 
-- [ ] **SHEL-01**: User can open and close a floating search panel with a global hotkey (default three-modifier combo, e.g. ⌃⌥⌘G)
-- [ ] **SHEL-02**: Panel appears over full-screen apps, takes typing immediately, and does not steal focus from the app the user was in
-- [ ] **SHEL-03**: Panel closes on Esc and on click-away
+- [x] **SHEL-01**: User can open and close a floating search panel with a global hotkey (default three-modifier combo, e.g. ⌃⌥⌘G)
+- [x] **SHEL-02**: Panel appears over full-screen apps, takes typing immediately, and does not steal focus from the app the user was in
+- [x] **SHEL-03**: Panel closes on Esc and on click-away
 - [ ] **SHEL-04**: App lives in the menu bar with no Dock icon; menu offers Open, Settings, Quit
 - [ ] **SHEL-05**: User can enable launch at login
 - [ ] **SHEL-06**: User can open Favorites or Recents directly with their own hotkeys
@@ -36,7 +36,7 @@
 
 ### Actions
 
-- [ ] **ACTN-01**: User can copy the GIF as a file to the clipboard (default Enter action), without needing Accessibility permission
+- [x] **ACTN-01**: User can copy the GIF as a file to the clipboard (default Enter action), without needing Accessibility permission
 - [ ] **ACTN-02**: User can paste the GIF directly into the app they were using; if Accessibility isn't granted, the GIF is copied and the user is told to press ⌘V and how to grant permission
 - [ ] **ACTN-03**: User can copy or paste the GIF link, and copy or paste GIF Markdown
 - [ ] **ACTN-04**: User can copy the page link and open the GIF page in the browser
@@ -102,9 +102,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SHEL-01 | Phase 1 | Pending |
-| SHEL-02 | Phase 1 | Pending |
-| SHEL-03 | Phase 1 | Pending |
+| SHEL-01 | Phase 1 | Complete |
+| SHEL-02 | Phase 1 | Complete |
+| SHEL-03 | Phase 1 | Complete |
 | SHEL-04 | Phase 1 | Pending |
 | SHEL-05 | Phase 4 | Pending |
 | SHEL-06 | Phase 4 | Pending |
@@ -122,7 +122,7 @@
 | ONBD-03 | Phase 2 | Pending |
 | ONBD-04 | Phase 2 | Pending |
 | ONBD-05 | Phase 2 | Pending |
-| ACTN-01 | Phase 1 | Pending |
+| ACTN-01 | Phase 1 | Complete |
 | ACTN-02 | Phase 1 | Pending |
 | ACTN-03 | Phase 3 | Pending |
 | ACTN-04 | Phase 3 | Pending |
