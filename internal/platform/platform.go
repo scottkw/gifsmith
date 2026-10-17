@@ -31,7 +31,8 @@ type Platform interface {
 	ActivateApp(pid int) error
 	// AccessibilityTrusted reports the AX grant; prompt=true raises the system prompt.
 	AccessibilityTrusted(prompt bool) bool
-	// OpenAccessibilitySettings opens System Settings › Privacy & Security › Accessibility.
+	// OpenAccessibilitySettings opens the Accessibility app-permission list
+	// (x-apple.systempreferences:…?Privacy_Accessibility; macOS 27 shows no such Settings path).
 	OpenAccessibilitySettings() error
 	// PasteShortcut posts one ⌘V (key down + key up) to the frontmost app.
 	PasteShortcut() error

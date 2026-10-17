@@ -78,6 +78,10 @@ func TestPasteWithoutAccessibility(t *testing.T) {
 	if !r.Copied || !r.NeedsAccessibility || r.Pasted || r.Message == "" {
 		t.Errorf("result = %+v, want Copied+NeedsAccessibility with a message", r)
 	}
+	// Point at the button, not a Settings path (macOS 27 has no Privacy & Security › Accessibility).
+	if !strings.Contains(r.Message, "Enable automatic paste…") || strings.Contains(r.Message, "System Settings") {
+		t.Errorf("message = %q, want it to name the Enable automatic paste… button and no Settings path", r.Message)
+	}
 	// App.svelte shows "Enable automatic paste…" off this exact JSON key (models.ts Result).
 	if b, _ := json.Marshal(r); !strings.Contains(string(b), `"needsAccessibility":true`) {
 		t.Errorf("JSON = %s, want \"needsAccessibility\":true", b)

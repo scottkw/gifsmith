@@ -107,6 +107,7 @@ int gsAXTrusted(int prompt) {
 
 // Key that types 'v' while ⌘ is held, so "Dvorak – QWERTY ⌘" resolves to the QWERTY key.
 // Same TIS + UCKeyTranslate scan as Wails keyCodeForChar (global_shortcut_darwin.go).
+// Main thread only: TIS calls off it trap (SIGTRAP in TISCopyCurrentKeyboardLayoutInputSource).
 static CGKeyCode vKeyCode(void) {
     CGKeyCode found = kVK_ANSI_V;
     TISInputSourceRef src = TISCopyCurrentKeyboardLayoutInputSource();
@@ -133,7 +134,8 @@ static CGKeyCode vKeyCode(void) {
 int gsPostCmdV(void) {
     CGEventSourceRef src = CGEventSourceCreate(kCGEventSourceStatePrivate);
     if (src == NULL) return 0;
-    CGKeyCode v = vKeyCode();
+    __block CGKeyCode v;
+    onMain(^{ v = vKeyCode(); });
     CGEventRef down = CGEventCreateKeyboardEvent(src, v, true);
     CGEventRef up = CGEventCreateKeyboardEvent(src, v, false);
     int ok = down != NULL && up != NULL;

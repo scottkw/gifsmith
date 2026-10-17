@@ -47,7 +47,7 @@ func (a *ActionService) Paste(ctx context.Context) (Result, error) {
 	}
 	if !a.Platform.AccessibilityTrusted(false) {
 		log.Printf("paste: accessibility not trusted, copied only (UI shows Enable automatic paste…)")
-		return Result{Copied: true, NeedsAccessibility: true, Message: "Copied — press ⌘V to paste. To paste automatically, turn on Gifsmith in System Settings › Privacy & Security › Accessibility."}, nil
+		return Result{Copied: true, NeedsAccessibility: true, Message: "Copied — press ⌘V to paste. To paste automatically, click Enable automatic paste… and turn on Gifsmith."}, nil
 	}
 	sleep := a.Sleep
 	if sleep == nil {
