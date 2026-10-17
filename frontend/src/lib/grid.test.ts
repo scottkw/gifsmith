@@ -57,3 +57,12 @@ test('routeKey leaves IME composition keys and repeated Enter alone', () => {
   assert.equal(key('ArrowDown', { isComposing: true }), 'none');
   assert.equal(key('Escape', { keyCode: 229 }), 'none');
 });
+
+test('routeKey maps Cmd+1..Cmd+4 to provider slots', () => {
+  assert.equal(key('1', { metaKey: true }), 'slot1');
+  assert.equal(key('2', { metaKey: true }), 'slot2');
+  assert.equal(key('3', { metaKey: true }), 'slot3');
+  assert.equal(key('4', { metaKey: true }), 'slot4');
+  assert.equal(key('5', { metaKey: true }), 'none');
+  assert.equal(key('1'), 'none');
+});
