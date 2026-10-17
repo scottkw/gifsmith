@@ -688,16 +688,21 @@ Media URLs point at `http://127.0.0.1:<fakeport>/media/<n>.gif`, a handful of sm
 | A9 | Klipy 429 uses status 429 (undocumented) | Klipy section | Low: other statuses fall to the generic HTTP error state |
 | A10 | Search cache TTL 5 min (trending 10 min is locked) | Pattern 4 | Low |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **UI-SPEC C2 copy vs GIPHY docs (Clips approval).**
    - Known: GIPHY says "Access to Clips endpoints is only available upon approval. Please reach out to clips@giphy.com to request permission." C2 says "Request Clips access in the GIPHY developer dashboard" and its primary button opens the dashboard.
    - Unclear: whether the dashboard has any Clips request flow.
    - Recommendation: change the C2 body to "…GIPHY has to approve it for Clips. Email clips@giphy.com to request access, then reopen Gifsmith." Keep `Open GIPHY Dashboard ↗` or swap it for a `mailto:` link. Needs a quick user confirmation because UI-SPEC is approved.
+   - **RESOLVED (user, 2026-10-17):** C2 tells the user to email clips@giphy.com with a mailto button — see 02-CONTEXT.md Post-research decisions; implemented in 02-06.
 2. **E5 copy for "HTTP 200" errors.** GIPHY's synthetic empty-200 and invalid JSON map to `kind: http` with status 200, which E5 would render as "returned an error (HTTP 200)". Recommendation: omit the "(HTTP n)" parenthetical when status is 2xx (a discretion-level copy tweak), or accept it as honest.
+   - **RESOLVED:** omit "(HTTP n)" when status is 2xx — 02-CONTEXT.md Post-research decisions; 02-03.
 3. **Klipy content filter.** CONTEXT fixes GIPHY at PG-13 but says nothing about Klipy. Recommendation: send `content_filter=medium` [ASSUMED] and confirm with the user; Phase 4 can expose it.
+   - **RESOLVED (user):** content_filter=medium — 02-CONTEXT.md Post-research decisions; 02-04.
 4. **K4 copy with unknown Retry-After.** K4 always contains `{n} minutes`. When unknown, use the E1 wording "later this hour". A trivial copy rule.
+   - **RESOLVED:** "later this hour" when Retry-After is unknown — 02-CONTEXT.md Post-research decisions; 02-03.
 5. **Will Finer Gifs return?** Unknown. The design treats it as optional; UAT can only show E5f against the real host unless it recovers. The fakeapi covers the success path.
+   - **RESOLVED (by design):** provider optional; fakeapi covers the success path; UAT records the live status — 02-01/02-03.
 
 ## Environment Availability
 
