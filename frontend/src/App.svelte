@@ -239,6 +239,7 @@
   async function keySaved(p: 'giphy' | 'klipy') {
     await refreshProviders();
     if (p === active) query = '';
+    if (p === 'giphy') setResults('clips', null, null); // Clips use this key: drop the old key's results and errors
     setResults(p, null, null);
     runFirst(p, '');
     const text = `${slotById(p).keyLabel} key saved`;
@@ -444,6 +445,15 @@
         heading="Clips use your GIPHY key"
         body="Add a GIPHY key first. Gifsmith checks it for Clips access automatically."
         button="Add GIPHY Key"
+        primary
+        onbutton={() => switchTo('giphy')}
+      />
+    {:else if active === 'clips' && (cur.err?.kind === 'key_rejected' || cur.err?.kind === 'key_missing')}
+      <!-- Clips have no key card of their own: errorState() has no row for key errors. -->
+      <StateMessage
+        heading="GIPHY rejected your saved key"
+        body="Clips use your GIPHY key. Paste a new key on the GIPHY tab to continue."
+        button="Go to GIPHY"
         primary
         onbutton={() => switchTo('giphy')}
       />

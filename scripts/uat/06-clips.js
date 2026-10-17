@@ -47,5 +47,19 @@ for (const key of ["Enter", "Meta+Enter"]) {
 await input.fill("cats");
 await page.waitForFunction("(document.querySelector('#tile-0 img')?.src ?? '').includes('/media/clip-')", null, { timeout: 8000 });
 
+// CR-02: a GIPHY key rejected on the Clips tab shows a way back, not a blank area.
+await input.fill("revoked");
+const content = page.locator("section.content");
+await content.locator("h2", { hasText: "GIPHY rejected your saved key" }).waitFor({ timeout: 8000 });
+await page.getByRole("button", { name: "Go to GIPHY" }).click();
+await placeholder("Search GIPHY");
+await page.locator(".card input").fill("uat-key-456");
+await page.getByRole("button", { name: "Save Key" }).click();
+await footer.filter({ hasText: "GIPHY key saved" }).waitFor({ timeout: 8000 });
+await page.waitForFunction("!document.querySelectorAll('[role=tab]')[1].hasAttribute('aria-disabled')", null, { timeout: 5000 });
+await page.keyboard.press("Meta+2");
+await placeholder("Search GIPHY Clips");
+await page.waitForFunction("(document.querySelector('#tile-0 img')?.src ?? '').includes('/media/clip-')", null, { timeout: 8000 });
+
 if (errors.length) fail("page error: " + errors[0]);
 console.log("UAT OK");
