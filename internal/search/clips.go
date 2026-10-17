@@ -27,14 +27,14 @@ const probeTimeout = 15 * time.Second
 type Clips struct {
 	Probe    func(ctx context.Context) error
 	HasKey   func() bool
-	Blocked  func() bool // GIPHY is inside a 429 block: never probe into it
-	OnChange func()      // optional; called after every state change
+	Blocked  func() error // GIPHY's rate_limited error while its 429 block lasts, else nil: never probe into it
+	OnChange func()       // optional; called after every state change
 
 	mu        sync.Mutex
 	state     ClipsState // "" until a probe starts: reported as unknown
 	triggered bool       // Trigger's probe ran or is running since the last Reset
 	proven    bool       // a GIFs call succeeded with this key, so a 401 from the probe means "not approved"
-	rechecked bool       // Recheck spent its one re-probe since the last Reset (only a probe after proven counts)
+	rechecked bool       // Recheck spent its one re-probe since the last Reset (only a probe after proven, and not a 429)
 	lastErr   error      // the last probe's error, replayed once the re-probe is spent
 	gen       int        // bumped by Reset so a probe for an old key cannot land
 }
@@ -72,8 +72,10 @@ func (c *Clips) Trigger() {
 // at most once per key per launch. It returns the new state, plus the probe
 // error (or, once the re-probe is spent, the last one) when still unknown.
 func (c *Clips) Recheck(ctx context.Context) (ClipsState, error) {
-	if c.HasKey() && c.Blocked() && c.State() == ClipsUnknown {
-		return ClipsUnknown, &provider.Error{Kind: provider.RateLimited, Provider: provider.Clips}
+	if c.HasKey() && c.State() == ClipsUnknown {
+		if err := c.Blocked(); err != nil {
+			return ClipsUnknown, err
+		}
 	}
 	gen, ok := c.start(true)
 	if !ok {
@@ -107,7 +109,7 @@ func (c *Clips) Reset() {
 // no Trigger probe yet and none running (Trigger) or an unknown result and no
 // re-probe yet (Recheck). A Recheck before any GIFs success never spends either.
 func (c *Clips) start(recheck bool) (int, bool) {
-	if !c.HasKey() || c.Blocked() {
+	if !c.HasKey() || c.Blocked() != nil {
 		return 0, false
 	}
 	c.mu.Lock()
@@ -133,6 +135,10 @@ func (c *Clips) finish(gen int, err error) ClipsState {
 	}
 	s := classify(err, c.proven)
 	c.state, c.lastErr = s, err
+	var pe *provider.Error
+	if errors.As(err, &pe) && pe.Kind == provider.RateLimited {
+		c.rechecked = false // a 429 says nothing about Clips, and the block already spaces the next probe
+	}
 	c.mu.Unlock()
 	c.changed()
 	return s

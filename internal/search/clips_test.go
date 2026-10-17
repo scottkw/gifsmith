@@ -42,7 +42,14 @@ func (p *probeStub) setErr(err error) {
 func newClips() (*Clips, *probeStub) {
 	p := &probeStub{}
 	p.hasKey.Store(true)
-	return &Clips{Probe: p.probe, HasKey: p.hasKey.Load, Blocked: p.blocked.Load, OnChange: func() { p.changes.Add(1) }}, p
+	return &Clips{Probe: p.probe, HasKey: p.hasKey.Load, Blocked: p.blockedErr, OnChange: func() { p.changes.Add(1) }}, p
+}
+
+func (p *probeStub) blockedErr() error {
+	if p.blocked.Load() {
+		return &provider.Error{Kind: provider.RateLimited, Provider: provider.Clips, RetryAfterSec: 90}
+	}
+	return nil
 }
 
 // settle waits for the async probe to leave "checking".
@@ -146,7 +153,7 @@ func TestClipsBlockedSkip(t *testing.T) {
 
 func TestClipsRecheck(t *testing.T) {
 	c, p := newClips()
-	rl := &provider.Error{Kind: provider.RateLimited, Provider: provider.Clips}
+	rl := &provider.Error{Kind: provider.Timeout, Provider: provider.Clips} // a 429 never spends the re-probe (WR-03)
 	p.setErr(rl)
 	c.Trigger()
 	if s := settle(t, c); s != ClipsUnknown {
@@ -245,7 +252,7 @@ func TestClipsProbe429BlocksRecheck(t *testing.T) {
 			})
 		},
 		HasKey:  func() bool { return true },
-		Blocked: func() bool { return svc.Blocked(provider.GIPHY) },
+		Blocked: func() error { return svc.BlockedErr(provider.Clips) },
 	}
 	c.Trigger()
 	if s := settle(t, c); s != ClipsUnknown {
@@ -303,5 +310,49 @@ func TestClipsRecheckBeforeGifsSuccess(t *testing.T) {
 	close(ep.release)
 	if s := <-done; s != ClipsDisabled || ep.calls.Load() != 1 {
 		t.Errorf("Trigger during a pre-success recheck: %s, probes %d; want disabled, 1", s, ep.calls.Load())
+	}
+}
+
+// WR-03: a rate-limited re-probe does not spend the re-probe (the block already spaces it),
+// and a Recheck inside the block carries the block's countdown.
+func TestClipsRateLimitedRecheckKeepsReprobe(t *testing.T) {
+	svc, _, clk := setup(provider.GIPHY)
+	var probes atomic.Int32
+	var mu sync.Mutex
+	var next error
+	answer := func(err error) {
+		mu.Lock()
+		defer mu.Unlock()
+		next = err
+	}
+	c := &Clips{
+		Probe: func(context.Context) error {
+			probes.Add(1)
+			mu.Lock()
+			err := next
+			mu.Unlock()
+			return svc.Guard(provider.Clips, func() error { return err })
+		},
+		HasKey:  func() bool { return true },
+		Blocked: func() error { return svc.BlockedErr(provider.Clips) },
+	}
+	answer(&provider.Error{Kind: provider.Timeout, Provider: provider.Clips})
+	c.Trigger() // the GIFs-success probe times out
+	if s := settle(t, c); s != ClipsUnknown {
+		t.Fatalf("state = %s, want unknown", s)
+	}
+	answer(&provider.Error{Kind: provider.RateLimited, Provider: provider.Clips, RetryAfterSec: 120})
+	var pe *provider.Error
+	if s, err := c.Recheck(context.Background()); s != ClipsUnknown || !errors.As(err, &pe) || pe.Kind != provider.RateLimited || probes.Load() != 2 {
+		t.Fatalf("rate-limited re-probe: %s, %v, probes %d; want unknown, rate_limited, 2", s, err, probes.Load())
+	}
+	clk.advance(30 * time.Second)
+	if s, err := c.Recheck(context.Background()); s != ClipsUnknown || !errors.As(err, &pe) || pe.RetryAfterSec != 90 || probes.Load() != 2 {
+		t.Errorf("recheck inside the block: %s, %v, probes %d; want unknown, rate_limited with 90 s left, no probe", s, err, probes.Load())
+	}
+	clk.advance(91 * time.Second)
+	answer(nil)
+	if s, err := c.Recheck(context.Background()); s != ClipsEnabled || err != nil || probes.Load() != 3 {
+		t.Errorf("recheck after the block: %s, %v, probes %d; want enabled, nil, 3 (the 429 did not spend the re-probe)", s, err, probes.Load())
 	}
 }

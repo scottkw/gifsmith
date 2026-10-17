@@ -60,7 +60,7 @@ func main() {
 			return svc.Guard(provider.Clips, func() error { return clipsClient.ProbeClips(ctx) })
 		},
 		HasKey:  func() bool { _, ok := keys.Get(provider.GIPHY); return ok },
-		Blocked: func() bool { return svc.Blocked(provider.GIPHY) },
+		Blocked: func() error { return svc.BlockedErr(provider.Clips) },
 	}
 	gifs := &services.GifService{Svc: svc, Keys: keys, Clips: clips}
 	settingsSvc := &services.SettingsService{Keys: keys, Dir: d.ConfigDir, Svc: svc, Clips: clips, NewClient: func(p provider.ID, key string) provider.Provider {

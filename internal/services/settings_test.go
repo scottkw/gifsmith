@@ -73,7 +73,7 @@ func newSettings(t *testing.T, base string) settingsFixture {
 			return svc.Guard(provider.Clips, func() error { return clipsClient.ProbeClips(ctx) }) // as main.go
 		},
 		HasKey:  func() bool { _, ok := keys.Get(provider.GIPHY); return ok },
-		Blocked: func() bool { return svc.Blocked(provider.GIPHY) },
+		Blocked: func() error { return svc.BlockedErr(provider.Clips) }, // as main.go
 	}
 	var mu sync.Mutex
 	events := []string{}

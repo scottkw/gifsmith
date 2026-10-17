@@ -185,7 +185,12 @@ func dedupe(p provider.ID, pg provider.Page) provider.Page {
 
 // Blocked reports whether p's budget is inside a 429 block.
 func (s *Service) Blocked(p provider.ID) bool {
+	return s.BlockedErr(p) != nil
+}
+
+// BlockedErr is p's rate_limited error (with the seconds left, when known) while its budget is blocked, else nil.
+func (s *Service) BlockedErr(p provider.ID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.blockedErr(p) != nil
+	return s.blockedErr(p)
 }
