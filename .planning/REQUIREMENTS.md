@@ -102,12 +102,57 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| SHEL-01 | Phase 1 | Pending |
+| SHEL-02 | Phase 1 | Pending |
+| SHEL-03 | Phase 1 | Pending |
+| SHEL-04 | Phase 1 | Pending |
+| SHEL-05 | Phase 4 | Pending |
+| SHEL-06 | Phase 4 | Pending |
+| SRCH-01 | Phase 2 | Pending |
+| SRCH-02 | Phase 2 | Pending |
+| SRCH-03 | Phase 2 | Pending |
+| SRCH-04 | Phase 2 | Pending |
+| SRCH-05 | Phase 2 | Pending |
+| SRCH-06 | Phase 2 | Pending |
+| SRCH-07 | Phase 2 | Pending |
+| SRCH-08 | Phase 3 | Pending |
+| SRCH-09 | Phase 4 | Pending |
+| ONBD-01 | Phase 2 | Pending |
+| ONBD-02 | Phase 2 | Pending |
+| ONBD-03 | Phase 2 | Pending |
+| ONBD-04 | Phase 2 | Pending |
+| ONBD-05 | Phase 2 | Pending |
+| ACTN-01 | Phase 1 | Pending |
+| ACTN-02 | Phase 1 | Pending |
+| ACTN-03 | Phase 3 | Pending |
+| ACTN-04 | Phase 3 | Pending |
+| ACTN-05 | Phase 3 | Pending |
+| ACTN-06 | Phase 3 | Pending |
+| ACTN-07 | Phase 3 | Pending |
+| ACTN-08 | Phase 4 | Pending |
+| ACTN-09 | Phase 3 | Pending |
+| ACTN-10 | Phase 3 | Pending |
+| ACTN-11 | Phase 3 | Pending |
+| LIBR-01 | Phase 3 | Pending |
+| LIBR-02 | Phase 3 | Pending |
+| LIBR-03 | Phase 3 | Pending |
+| LIBR-04 | Phase 3 | Pending |
+| LIBR-05 | Phase 3 | Pending |
+| SETT-01 | Phase 4 | Pending |
+| SETT-02 | Phase 4 | Pending |
+| SETT-03 | Phase 4 | Pending |
+| SETT-04 | Phase 4 | Pending |
+| SETT-05 | Phase 4 | Pending |
+| RELS-01 | Phase 4 | Pending |
+| RELS-02 | Phase 4 | Pending |
+| RELS-03 | Phase 4 | Pending |
+| RELS-04 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 45 total
-- Mapped to phases: 0
-- Unmapped: 45 ⚠️
+- Mapped to phases: 45 (Phase 1: 6, Phase 2: 12, Phase 3: 14, Phase 4: 13)
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-10-17*
-*Last updated: 2026-10-17 after initial definition*
+*Last updated: 2026-10-17 after roadmap creation (traceability filled)*
