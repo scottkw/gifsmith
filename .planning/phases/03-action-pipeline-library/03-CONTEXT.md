@@ -38,6 +38,13 @@ Every action the Raycast extension offered works on the selected GIF (⌘K actio
 - Square crop: center crop in Go (`image/gif`, lossless — proven in research), on demand at copy time, staged like a normal copy; busy indicator after 300 ms; GIFs over 15 MB show "too large to crop".
 - Staging holds only the latest file; wiped at launch and at quit; Klipy staged files deleted right after the paste completes or on the next copy. Downloads never go through staging.
 
+### Post-research decisions (user, 2026-10-17)
+- Clips Copy/Paste Link and Markdown use the Clip's GIF rendition URL (matches the extension; Markdown renders as an image), not the MP4 URL. Copy/Paste GIF for Clips still puts the 720p MP4 file on the clipboard.
+- Klipy staged files are deleted 30 s after a paste, on the next copy, or at quit — whichever comes first — and never delete a newer staged copy of the same GIF. User re-checks Klipy paste in Messages and Slack at UAT.
+- A recent search becomes a chip only if it returned at least one result (plus the copy-or-1.5 s-idle rule).
+- Defaults accepted from research: Finer Gifs "Source" (TheTVDB) link omitted; Copy Page Link / Open in Browser only offered for GIPHY and Clips (Klipy has no verifiable page URL — never construct one); server build switches to `platform.Fake` so headless UAT can exercise successful copies and Recents (update the smoke 422 check and 01-tracer E7 expectation in the same plan).
+- UI-SPEC open questions use the spec's defaults (footer attribution follows the selected item's provider; ⌘R Show in Finder; library tabs not restored at launch; ←/→ step in Details; "Download GIF/MP4"; no Undo for removed chips; Clips Details shows GIF preview + MP4 badge).
+
 ### Claude's Discretion
 - Storage format/location for favorites, recents and recent searches (JSON in the app's settings dir, atomic writes like Phase 2 prefs) and the metadata snapshot shape.
 - Exact popover component structure, shortcut-conflict handling with existing keys, toast/Undo implementation, and how the Clips 720p rendition is chosen when 720p is missing (nearest available).
