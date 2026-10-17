@@ -24,7 +24,8 @@
   });
 
   async function onKeydown(e: KeyboardEvent) {
-    if (e.key !== 'Enter') return;
+    // Enter that commits an IME composition (WebKit: keyCode 229) is not a submit.
+    if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229 || e.repeat) return;
     e.preventDefault();
     try {
       if (e.metaKey) {
