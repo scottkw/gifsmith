@@ -22,8 +22,7 @@
   const broken = $derived(brokenSrc === gif.previewUrl);
 </script>
 
-<!-- Keyboard selection goes through the combobox input (aria-activedescendant), never tile focus;
-     mousedown preventDefault keeps focus in the input when a tile is clicked. -->
+<!-- Keyboard selection goes through the combobox input (aria-activedescendant), never tile focus. -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
   class="tile"
@@ -32,7 +31,6 @@
   tabindex="-1"
   aria-selected={selected}
   aria-label={gif.title || `GIF ${index + 1}`}
-  onmousedown={(e) => e.preventDefault()}
   onclick={() => onselect(index)}
   ondblclick={() => oncopy(index)}
 >

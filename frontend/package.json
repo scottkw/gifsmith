@@ -9,7 +9,7 @@
     "build": "vite build --mode production",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "test": "node --test src/lib/*.test.ts"
+    "test": "node --test --test-reporter=tap src/lib/*.test.ts"
   },
   "dependencies": {
     "@tanstack/svelte-virtual": "3.13.47",

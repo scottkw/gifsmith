@@ -50,8 +50,10 @@ test('routeKey maps Enter, Escape, Cmd+K, Tab and arrows', () => {
   assert.equal(key('a'), 'none');
 });
 
-test('routeKey ignores IME and repeated Enter', () => {
+test('routeKey leaves IME composition keys and repeated Enter alone', () => {
   assert.equal(key('Enter', { isComposing: true }), 'none');
   assert.equal(key('Enter', { keyCode: 229 }), 'none');
   assert.equal(key('Enter', { repeat: true }), 'none');
+  assert.equal(key('ArrowDown', { isComposing: true }), 'none');
+  assert.equal(key('Escape', { keyCode: 229 }), 'none');
 });

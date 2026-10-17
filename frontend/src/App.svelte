@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { Events } from '@wailsio/runtime';
   import { copy, hide, paste, requestAccessibility, search, type Gif, type Page } from './lib/api';
+  import { move, nearEnd, routeKey } from './lib/grid';
   import ResultGrid from './components/ResultGrid.svelte';
 
   const PROVIDER = 'finergifs';
@@ -59,7 +60,9 @@
     selected = i;
   }
 
-  function onInput() {
+  // No search while an IME composition is open; compositionend calls this again.
+  function onInput(e?: Event) {
+    if ((e as InputEvent | undefined)?.isComposing) return;
     clearTransient();
     clearTimeout(timer);
     const q = query.trim();
@@ -117,11 +120,33 @@
     loadMore();
   }
 
+  // Every routed key is preventDefault-ed: arrows must not move the caret, and an Esc the page
+  // lets through would reach the native panel's cancelOperation.
   function onKeydown(e: KeyboardEvent) {
-    // Enter that commits an IME composition (WebKit: keyCode 229) is not a submit.
-    if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229 || e.repeat) return;
+    const a = routeKey(e);
+    if (a === 'none') return;
     e.preventDefault();
-    run(e.metaKey ? 'paste' : 'copy');
+    switch (a) {
+      case 'left':
+      case 'right':
+      case 'up':
+      case 'down':
+        if (!items.length) return;
+        select(move(selected, a, items.length));
+        if (nearEnd(selected, items.length)) loadMore();
+        return;
+      case 'copy':
+      case 'paste':
+        run(a);
+        return;
+      case 'escape':
+        if (query) {
+          query = '';
+          onInput();
+        } else hide(); // no-op in the server build; nothing here depends on it
+        return;
+      // 'actions' (⌘K, Phase 3 action menu) and 'tab': bound, no effect yet.
+    }
   }
 
   async function run(action: 'copy' | 'paste') {
@@ -166,7 +191,9 @@
   }
 </script>
 
-<main>
+<!-- Clicks anywhere except a text field keep focus in the search input (the grid never takes focus). -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<main onmousedown={(e) => e.target instanceof HTMLInputElement || e.preventDefault()}>
   <header class="search">
     <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
       <circle cx="7" cy="7" r="4.5" />
@@ -176,6 +203,7 @@
       bind:this={input}
       bind:value={query}
       oninput={onInput}
+      oncompositionend={() => onInput()}
       onkeydown={onKeydown}
       placeholder="Search The Finer Gifs Club"
       autocomplete="off"

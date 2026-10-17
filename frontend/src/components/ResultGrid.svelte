@@ -79,7 +79,7 @@
           <span class="note">End of results</span>
         {:else if extra === 'error'}
           <span class="note secondary">Couldn't load more.</span>
-          <button class="link" onmousedown={(e) => e.preventDefault()} onclick={onretrypage}>Try Again</button>
+          <button class="link" onclick={onretrypage}>Try Again</button>
         {/if}
       </div>
     {/each}

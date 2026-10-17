@@ -39,7 +39,7 @@ func New(app *application.App, plat platform.Platform) *Shell {
 		Frameless:       true,
 		Hidden:          true,
 		DisableResize:   true,
-		HideOnEscape:    true,
+		HideOnEscape:    false, // the page owns Esc: clear the query first, then PanelService.Hide
 		HideOnFocusLost: true,
 		Mac: application.MacWindow{
 			WindowClass:      application.MacWindowClassPanel,
@@ -49,6 +49,19 @@ func New(app *application.App, plat platform.Platform) *Shell {
 			WindowLevel: application.MacWindowLevelFloating,
 		},
 	})
+	// NSPanel cancelOperation or ⌘W must never destroy the only panel. s.panel.Hide directly,
+	// not s.Hide: this runs inside a window callback and must not take s.mu.
+	s.panel.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
+		e.Cancel()
+		s.panel.Hide()
+	})
+
+	// Replaces Wails' default menu: no File (⌘W), View (⌘R reload, zoom) or Window (⌘M).
+	// App keeps ⌘Q/⌘H; Edit keeps ⌘X/⌘C/⌘V/⌘A/⌘Z for text fields.
+	appMenu := app.NewMenu()
+	appMenu.AddRole(application.AppMenu)
+	appMenu.AddRole(application.EditMenu)
+	app.Menu.SetApplicationMenu(appMenu)
 
 	// Tray is built here, not in the hotkey handler, so Open works even if the hotkey fails.
 	// No window is attached: with only a menu, a click opens the menu.
