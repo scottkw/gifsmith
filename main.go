@@ -49,6 +49,8 @@ func main() {
 		Services: []application.Service{application.NewService(actions)},
 		Assets:   application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
 		Mac:      application.MacOptions{ActivationPolicy: application.ActivationPolicyAccessory},
+		// Used only by -tags server builds (browser UAT); WAILS_SERVER_PORT overrides.
+		Server: application.ServerOptions{Host: "localhost", Port: 8089},
 	})
 	sh := shell.New(app, plat)
 	actions.Hide = sh.Hide
