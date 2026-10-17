@@ -6,8 +6,31 @@
     {
       "layers" : [
         {
-          "image-name" : "gifsmith_glyph.svg",
-          "name" : "gifsmith_glyph",
+          "image-name" : "front_card.svg",
+          "name" : "front_card",
+          "position" : {
+            "scale" : 1.0,
+            "translation-in-points" : [
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "image-name-specializations" : [
+            {
+              "value" : "back_frame.svg"
+            },
+            {
+              "appearance" : "dark",
+              "value" : "back_frame_light.svg"
+            },
+            {
+              "appearance" : "tinted",
+              "value" : "back_frame_light.svg"
+            }
+          ],
+          "name" : "back_frame",
           "position" : {
             "scale" : 1.0,
             "translation-in-points" : [
