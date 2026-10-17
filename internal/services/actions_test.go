@@ -136,6 +136,37 @@ func TestPasteDeclinedReactivationCopiesOnly(t *testing.T) {
 	}
 }
 
+// An unknown target (Shell clears prev when its lookup fails) must not get a blind ⌘V.
+func TestPasteUnknownTargetCopiesOnly(t *testing.T) {
+	f := &platform.Fake{Trusted: true, Frontmost: prevApp}
+	s := newPasteService(f)
+	s.Previous = func() platform.App { return platform.App{} }
+	r, err := s.Paste(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.Copied || r.Pasted || r.Message == "" {
+		t.Errorf("result = %+v, want Copied, not Pasted, with a message", r)
+	}
+	if slices.Contains(f.Calls, "PasteShortcut") {
+		t.Errorf("⌘V posted with no remembered target: calls = %q", f.Calls)
+	}
+}
+
+func TestPasteFrontmostErrorCopiesOnly(t *testing.T) {
+	f := &platform.Fake{Trusted: true, Frontmost: prevApp, FrontmostErr: errors.New("no frontmost app")}
+	r, err := newPasteService(f).Paste(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.Copied || r.Pasted || r.Message == "" {
+		t.Errorf("result = %+v, want Copied, not Pasted, with a message", r)
+	}
+	if slices.Contains(f.Calls, "PasteShortcut") || slices.Contains(f.Calls, "ActivateApp:42") {
+		t.Errorf("acted on a failed frontmost lookup: calls = %q", f.Calls)
+	}
+}
+
 func TestPasteCopyError(t *testing.T) {
 	f := &platform.Fake{Trusted: true, CopyErr: errors.New("pasteboard write failed")}
 	r, err := newPasteService(f).Paste(context.Background())

@@ -69,18 +69,26 @@ func (a *ActionService) Paste(ctx context.Context) (Result, error) {
 	}
 	a.Hide()
 	sleep(PasteDelay)
+	// Never post ⌘V into an app the user did not pick: an unknown target or a failed lookup copies only.
 	prev := a.Previous()
-	if prev.PID != 0 {
-		if front, err := a.Platform.FrontmostApp(); err == nil && front.PID != prev.PID {
-			if err := a.Platform.ActivateApp(prev.PID); err != nil {
-				log.Printf("reactivate %s: %v", prev.Name, err)
-			}
-			sleep(PasteDelay)
-			// macOS 14+ may decline the activation; never post ⌘V into an app the user did not pick.
-			if now, err := a.Platform.FrontmostApp(); err != nil || now.PID != prev.PID {
-				log.Printf("paste: could not return to %q, copied only", prev.Name)
-				return Result{Copied: true, Message: "Copied — press ⌘V to paste (could not return to " + prev.Name + ")"}, nil
-			}
+	if prev.PID == 0 {
+		log.Printf("paste: no remembered target, copied only")
+		return Result{Copied: true, Message: "Copied — press ⌘V to paste"}, nil
+	}
+	front, err := a.Platform.FrontmostApp()
+	if err != nil {
+		log.Printf("paste: frontmost app: %v, copied only", err)
+		return Result{Copied: true, Message: "Copied — press ⌘V to paste"}, nil
+	}
+	if front.PID != prev.PID {
+		if err := a.Platform.ActivateApp(prev.PID); err != nil {
+			log.Printf("reactivate %s: %v", prev.Name, err)
+		}
+		sleep(PasteDelay)
+		// macOS 14+ may decline the activation.
+		if now, err := a.Platform.FrontmostApp(); err != nil || now.PID != prev.PID {
+			log.Printf("paste: could not return to %q, copied only", prev.Name)
+			return Result{Copied: true, Message: "Copied — press ⌘V to paste (could not return to " + prev.Name + ")"}, nil
 		}
 	}
 	if err := a.Platform.PasteShortcut(); err != nil {

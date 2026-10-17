@@ -15,6 +15,8 @@ type Fake struct {
 	Trusted   bool
 	Frontmost App
 	PasteErr  error
+	// FrontmostErr makes FrontmostApp fail (nil frontmostApplication during app switches or at the lock screen).
+	FrontmostErr error
 	// ActivateSetsFrontmost makes ActivateApp succeed; otherwise it is declined (Frontmost unchanged).
 	ActivateSetsFrontmost bool
 }
@@ -39,6 +41,9 @@ func (f *Fake) CursorScreenWorkArea() Rect {
 
 func (f *Fake) FrontmostApp() (App, error) {
 	f.Note("FrontmostApp")
+	if f.FrontmostErr != nil {
+		return App{}, f.FrontmostErr
+	}
 	return f.Frontmost, nil
 }
 
