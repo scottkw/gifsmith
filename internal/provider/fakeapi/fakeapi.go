@@ -40,12 +40,15 @@ func finerSearch(w http.ResponseWriter, r *http.Request, o Options) {
 	}
 	q := r.URL.Query()
 	start, _ := strconv.Atoi(q.Get("start"))
+	if Scenario(w, r, q.Get("q"), start <= 0, o) {
+		return
+	}
 	size, err := strconv.Atoi(q.Get("size"))
 	if err != nil || size <= 0 {
 		size = 10
 	}
 	found := finerTotal
-	if strings.Contains(q.Get("q"), "empty") {
+	if hasWord(q.Get("q"), "empty") {
 		found = 0
 	}
 	type fields struct {
@@ -63,6 +66,52 @@ func finerSearch(w http.ResponseWriter, r *http.Request, o Options) {
 		results = append(results, result{ID: strconv.Itoa(n), Fields: fields{Name: id, Text: "Office moment " + strconv.Itoa(n), Fileid: id}})
 	}
 	writeJSON(w, map[string]any{"hits": map[string]int{"found": found, "start": start}, "results": results})
+}
+
+func hasWord(q, word string) bool { return strings.Contains(strings.ToLower(q), word) }
+
+// Scenario answers the vendor-neutral scenario words found in the query
+// (case-insensitive) and reports whether it wrote the response. "empty" is
+// per route because the zero-result body is vendor-specific.
+//
+//	ratelimit -> 429 + Retry-After: 120     noretry  -> 429 without Retry-After
+//	slow      -> sleep o.SlowDelay, then normal   boom -> 500
+//	blank     -> 200 with an empty body
+//	pagelimit -> later pages 429 + Retry-After: 120; pageboom -> later pages 500
+func Scenario(w http.ResponseWriter, r *http.Request, q string, firstPage bool, o Options) bool {
+	switch {
+	case hasWord(q, "pageboom"):
+		if !firstPage {
+			w.WriteHeader(http.StatusInternalServerError)
+			return true
+		}
+	case hasWord(q, "pagelimit"):
+		if !firstPage {
+			w.Header().Set("Retry-After", "120")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return true
+		}
+	case hasWord(q, "ratelimit"):
+		w.Header().Set("Retry-After", "120")
+		w.WriteHeader(http.StatusTooManyRequests)
+		return true
+	case hasWord(q, "noretry"):
+		w.WriteHeader(http.StatusTooManyRequests)
+		return true
+	case hasWord(q, "boom"):
+		w.WriteHeader(http.StatusInternalServerError)
+		return true
+	case hasWord(q, "blank"):
+		w.WriteHeader(http.StatusOK)
+		return true
+	case hasWord(q, "slow"):
+		select {
+		case <-time.After(o.SlowDelay):
+		case <-r.Context().Done(): // the client gave up; do not hold the handler
+			return true
+		}
+	}
+	return false
 }
 
 // media serves a tiny 2-frame animated GIF whose colour is derived from the file name.

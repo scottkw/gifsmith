@@ -6,39 +6,41 @@ import (
 	"log"
 
 	"gifsmith/internal/provider"
+	"gifsmith/internal/search"
 )
 
 var errUnknownProvider = errors.New("unknown provider")
 
-// GifService exposes search and trending to the webview. All provider HTTP stays in Go.
+// GifService exposes search and trending to the webview. All provider HTTP stays
+// in Go, behind search.Service (cache, 429 budget, dedupe policy).
 type GifService struct {
-	Providers map[provider.ID]provider.Provider
+	Svc *search.Service
 }
 
-func (s *GifService) get(p string) (provider.Provider, error) {
+func parse(p string) (provider.ID, error) {
 	id, ok := provider.ParseID(p)
-	if !ok || s.Providers[id] == nil {
-		return nil, errUnknownProvider
+	if !ok {
+		return "", errUnknownProvider
 	}
-	return s.Providers[id], nil
+	return id, nil
 }
 
 func (s *GifService) Search(ctx context.Context, p, q, cursor string) (provider.Page, error) {
-	pr, err := s.get(p)
+	id, err := parse(p)
 	if err != nil {
 		return provider.Page{}, err
 	}
-	page, err := pr.Search(ctx, q, cursor)
+	page, err := s.Svc.Search(ctx, id, q, cursor)
 	logProviderErr("search", p, err)
 	return page, err
 }
 
 func (s *GifService) Trending(ctx context.Context, p, cursor string) (provider.Page, error) {
-	pr, err := s.get(p)
+	id, err := parse(p)
 	if err != nil {
 		return provider.Page{}, err
 	}
-	page, err := pr.Trending(ctx, cursor)
+	page, err := s.Svc.Trending(ctx, id, cursor)
 	logProviderErr("trending", p, err)
 	return page, err
 }

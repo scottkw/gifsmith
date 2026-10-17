@@ -21,7 +21,10 @@ func wire() deps {
 	if err != nil {
 		log.Fatal(err)
 	}
-	h := fakeapi.Handler(fakeapi.Options{FinerDown: os.Getenv("FAKE_FINER") == "down"})
+	h := fakeapi.Handler(fakeapi.Options{
+		FinerDown: os.Getenv("FAKE_FINER") == "down",
+		SlowDelay: 5 * time.Second, // past the 3 s client timeout below, so "slow" times out quickly
+	})
 	go func() { log.Fatal(http.Serve(ln, h)) }()
 	host := ln.Addr().String()
 	log.Printf("fixture server: http://%s", host)

@@ -9,6 +9,7 @@ import (
 	"gifsmith/internal/platform"
 	"gifsmith/internal/provider"
 	"gifsmith/internal/provider/finergifs"
+	"gifsmith/internal/search"
 	"gifsmith/internal/services"
 	"gifsmith/internal/shell"
 	"gifsmith/internal/staging"
@@ -37,9 +38,9 @@ func main() {
 	stage := &staging.Store{Dir: d.StagingDir, HTTP: &http.Client{}, Allow: d.Allow}
 	actions := &services.ActionService{Platform: plat, Staging: stage}
 	panel := &services.PanelService{}
-	gifs := &services.GifService{Providers: map[provider.ID]provider.Provider{
+	gifs := &services.GifService{Svc: search.New(map[provider.ID]provider.Provider{
 		provider.FinerGifs: &finergifs.Client{BaseURL: d.FinerBase, MediaBase: d.FinerMedia, HTTP: d.HTTP},
-	}}
+	}, nil)}
 
 	// No ApplicationShouldTerminateAfterLastWindowClosed: the hidden panel counts as closed.
 	app := application.New(application.Options{

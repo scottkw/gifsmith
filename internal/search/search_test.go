@@ -37,7 +37,7 @@ func (f *fakeProv) n() int {
 
 type clock struct{ t time.Time }
 
-func (c *clock) now() time.Time            { return c.t }
+func (c *clock) now() time.Time          { return c.t }
 func (c *clock) advance(d time.Duration) { c.t = c.t.Add(d) }
 
 func page(ids ...string) provider.Page {
