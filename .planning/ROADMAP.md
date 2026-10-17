@@ -109,7 +109,8 @@ Plans:
 **UI hint**: yes
 
 **Manual verification**: Criteria 2 and 4 need user-run native checks (global shortcut registration, login item, clean-account install). Klipy clearance (developers@klipy.com) is a pre-release gate and must be requested before this phase's release work.
-**Research flag**: Standard patterns apart from accessory-app Settings/Edit-menu quirks. The Phase 1 notarization dry run means release is a gate, not a discovery. If planning shows this phase is too large, release (RELS-01..04) can split into its own phase.
+**Carried over from Phase 1**: the notarized dry run (`darwin:sign:notarize`, staple, spctl/stapler, designated-requirement diff) and paste-matrix N15 plus the notarized columns; blocked on the Apple Developer agreement 403 until the user resolves it.
+**Research flag**: Standard patterns apart from accessory-app Settings/Edit-menu quirks. The Phase 1 notarization dry run was deferred here, so notarization is still a discovery until it runs. If planning shows this phase is too large, release (RELS-01..04) can split into its own phase.
 
 ## Progress
 
