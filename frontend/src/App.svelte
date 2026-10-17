@@ -176,16 +176,24 @@
     else load(active);
   });
 
-  // At launch the Clips probe has not run: it waits for a GIPHY GIFs success. Fetch GIPHY trending
-  // behind the S2 skeleton to start it; refreshProviders shows Clips when the probe lands.
+  // The Clips probe only means something after a GIPHY GIFs success with the key. Fetch GIPHY
+  // trending (usually cached) behind the S2 skeleton to give it one, then re-probe once if that
+  // did not start a probe; refreshProviders shows Clips when the probe lands.
   async function bootClips() {
-    await runFirst('giphy', '');
-    if (active !== 'clips' || clipsEnabled) return;
-    const g = states.giphy;
-    if (g.status === 'error') {
+    const s = states.clips;
+    s.status = 'idle';
+    s.err = null;
+    try {
+      await trending('giphy', '');
+    } catch (e) {
+      if (active !== 'clips' || clipsEnabled) return;
       // No probe will run: show GIPHY's error here (a rejected key gets the Go to GIPHY message).
-      Object.assign(states.clips, { status: 'error', err: g.err, errAt: g.errAt });
-    } else if (clipsState === 'unknown') recheckClips(); // no probe started (one already ran): the one re-probe, or its error
+      s.status = 'error';
+      s.err = providerError(e) ?? { kind: 'http', provider: 'giphy' };
+      now = s.errAt = Date.now();
+      return;
+    }
+    if (active === 'clips' && !clipsEnabled) recheckClips();
   }
 
   function setStatus(text: string, t: typeof tone = '') {
@@ -242,7 +250,7 @@
       clearTransient();
       selected = states[p].items.length ? 0 : -1;
       setLastProvider(p);
-      if (p === 'clips' && clipsState === 'unknown') recheckClips();
+      if (p === 'clips' && clipsState === 'unknown') bootClips();
       else show(p);
     }
     tick().then(() => card || input.focus()); // a setup card focuses its own key field
@@ -302,7 +310,7 @@
   }
 
   function retry() {
-    if (active === 'clips' && !clipsEnabled) recheckClips();
+    if (active === 'clips' && !clipsEnabled) bootClips(); // GIPHY first: it may be what failed
     else runFirst(active, cur.q);
   }
 

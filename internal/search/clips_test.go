@@ -257,3 +257,51 @@ func TestClipsProbe429BlocksRecheck(t *testing.T) {
 		t.Errorf("recheck after a probe 429: %s, %v, probes %d; want unknown, rate_limited, 1", s, err, probes.Load())
 	}
 }
+
+// WR-02: a Recheck before the launch's first GIFs success (offline at login, ⌘2 early)
+// spends neither the re-probe nor the GIFs-success probe, and its 401 is not "not approved".
+func TestClipsRecheckBeforeGifsSuccess(t *testing.T) {
+	c, p := newClips()
+	timeout := &provider.Error{Kind: provider.Timeout, Provider: provider.Clips}
+	p.setErr(timeout)
+	for i := int32(1); i <= 2; i++ {
+		if s, err := c.Recheck(context.Background()); s != ClipsUnknown || !errors.Is(err, timeout) || p.calls.Load() != i {
+			t.Fatalf("pre-success recheck %d: %s, %v, probes %d; want unknown, the timeout, %d", i, s, err, p.calls.Load(), i)
+		}
+	}
+	p.setErr(nil)
+	c.Trigger() // GIPHY GIFs succeeded once the network came back
+	if s := settle(t, c); s != ClipsEnabled || p.calls.Load() != 3 {
+		t.Errorf("Trigger after pre-success rechecks: %s, probes %d; want enabled, 3", s, p.calls.Load())
+	}
+
+	d, dp := newClips()
+	rejected := &provider.Error{Kind: provider.KeyRejected, Provider: provider.Clips, Status: 401}
+	dp.setErr(rejected)
+	if s, err := d.Recheck(context.Background()); s != ClipsUnknown || !errors.Is(err, rejected) {
+		t.Errorf("pre-success 401: %s, %v; want unknown and the key_rejected error (a bad key gets 401 too)", s, err)
+	}
+	d.Trigger()
+	if s := settle(t, d); s != ClipsDisabled || dp.calls.Load() != 2 {
+		t.Errorf("401 after a GIFs success: %s, probes %d; want disabled, 2", s, dp.calls.Load())
+	}
+
+	// A GIFs success while a pre-success Recheck is in flight: no second probe, and the
+	// in-flight 401 now counts as "not approved".
+	e, ep := newClips()
+	ep.setErr(rejected)
+	ep.release = make(chan struct{})
+	done := make(chan ClipsState)
+	go func() {
+		s, _ := e.Recheck(context.Background())
+		done <- s
+	}()
+	for e.State() != ClipsChecking {
+		time.Sleep(time.Millisecond)
+	}
+	e.Trigger()
+	close(ep.release)
+	if s := <-done; s != ClipsDisabled || ep.calls.Load() != 1 {
+		t.Errorf("Trigger during a pre-success recheck: %s, probes %d; want disabled, 1", s, ep.calls.Load())
+	}
+}

@@ -32,8 +32,9 @@ type Clips struct {
 
 	mu        sync.Mutex
 	state     ClipsState // "" until a probe starts: reported as unknown
-	probed    bool       // a probe ran or is running since the last Reset
-	rechecked bool       // Recheck spent its one re-probe since the last Reset
+	triggered bool       // Trigger's probe ran or is running since the last Reset
+	proven    bool       // a GIFs call succeeded with this key, so a 401 from the probe means "not approved"
+	rechecked bool       // Recheck spent its one re-probe since the last Reset (only a probe after proven counts)
 	lastErr   error      // the last probe's error, replayed once the re-probe is spent
 	gen       int        // bumped by Reset so a probe for an old key cannot land
 }
@@ -50,8 +51,12 @@ func (c *Clips) State() ClipsState {
 	return c.state
 }
 
-// Trigger starts the launch's single probe in the background; later calls are no-ops.
+// Trigger runs after a GIFs success with the key. It starts the launch's single
+// probe in the background; later calls (or calls while a probe runs) only note the success.
 func (c *Clips) Trigger() {
+	c.mu.Lock()
+	c.proven = true
+	c.mu.Unlock()
 	gen, ok := c.start(false)
 	if !ok {
 		return
@@ -94,24 +99,25 @@ func (c *Clips) Recheck(ctx context.Context) (ClipsState, error) {
 func (c *Clips) Reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.state, c.probed, c.rechecked, c.lastErr = "", false, false, nil
+	c.state, c.triggered, c.proven, c.rechecked, c.lastErr = "", false, false, false, nil
 	c.gen++
 }
 
 // start moves to checking if a probe may run: a key, no 429 block, and either
-// no probe yet (Trigger) or an unknown result and no re-probe yet (Recheck).
+// no Trigger probe yet and none running (Trigger) or an unknown result and no
+// re-probe yet (Recheck). A Recheck before any GIFs success never spends either.
 func (c *Clips) start(recheck bool) (int, bool) {
 	if !c.HasKey() || c.Blocked() {
 		return 0, false
 	}
 	c.mu.Lock()
 	unknown := c.state == "" || c.state == ClipsUnknown
-	if (recheck && (!unknown || c.rechecked)) || (!recheck && c.probed) {
+	if (recheck && (!unknown || c.rechecked)) || (!recheck && (c.triggered || c.state == ClipsChecking)) {
 		c.mu.Unlock()
 		return 0, false
 	}
-	c.probed = true
-	c.rechecked = c.rechecked || recheck
+	c.triggered = c.triggered || !recheck
+	c.rechecked = c.rechecked || (recheck && c.proven)
 	c.state = ClipsChecking
 	gen := c.gen
 	c.mu.Unlock()
@@ -120,26 +126,27 @@ func (c *Clips) start(recheck bool) (int, bool) {
 }
 
 func (c *Clips) finish(gen int, err error) ClipsState {
-	s := classify(err)
 	c.mu.Lock()
 	if gen != c.gen {
 		c.mu.Unlock()
 		return ClipsUnknown
 	}
+	s := classify(err, c.proven)
 	c.state, c.lastErr = s, err
 	c.mu.Unlock()
 	c.changed()
 	return s
 }
 
-// classify: 401/403 (key_rejected) or 404 after a GIFs success means "not approved";
-// rate limits, network, timeouts and anything else leave the answer unknown.
-func classify(err error) ClipsState {
+// classify: 401/403 (key_rejected) or 404 after a GIFs success means "not approved"
+// (before one, a bad key gets the same answer); rate limits, network, timeouts and
+// anything else leave the answer unknown.
+func classify(err error, proven bool) ClipsState {
 	if err == nil {
 		return ClipsEnabled
 	}
 	var pe *provider.Error
-	if errors.As(err, &pe) && (pe.Kind == provider.KeyRejected || (pe.Kind == provider.HTTP && pe.Status == 404)) {
+	if proven && errors.As(err, &pe) && (pe.Kind == provider.KeyRejected || (pe.Kind == provider.HTTP && pe.Status == 404)) {
 		return ClipsDisabled
 	}
 	return ClipsUnknown
