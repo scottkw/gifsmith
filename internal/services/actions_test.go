@@ -2,8 +2,10 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -75,6 +77,10 @@ func TestPasteWithoutAccessibility(t *testing.T) {
 	}
 	if !r.Copied || !r.NeedsAccessibility || r.Pasted || r.Message == "" {
 		t.Errorf("result = %+v, want Copied+NeedsAccessibility with a message", r)
+	}
+	// App.svelte shows "Enable automatic paste…" off this exact JSON key (models.ts Result).
+	if b, _ := json.Marshal(r); !strings.Contains(string(b), `"needsAccessibility":true`) {
+		t.Errorf("JSON = %s, want \"needsAccessibility\":true", b)
 	}
 	if want := []string{"CopyFile:" + sample, "AccessibilityTrusted:false"}; !slices.Equal(f.Calls, want) {
 		t.Errorf("calls = %q, want %q", f.Calls, want)

@@ -34,6 +34,7 @@ func (a *ActionService) Copy(ctx context.Context) (Result, error) {
 	if err := a.Platform.CopyFile(a.SamplePath); err != nil {
 		return Result{}, err
 	}
+	log.Printf("copy: copied, hiding panel")
 	a.Hide()
 	return Result{Copied: true, Message: "Copied GIF — paste with ⌘V"}, nil
 }
@@ -45,6 +46,7 @@ func (a *ActionService) Paste(ctx context.Context) (Result, error) {
 		return Result{}, err
 	}
 	if !a.Platform.AccessibilityTrusted(false) {
+		log.Printf("paste: accessibility not trusted, copied only (UI shows Enable automatic paste…)")
 		return Result{Copied: true, NeedsAccessibility: true, Message: "Copied — press ⌘V to paste. To paste automatically, turn on Gifsmith in System Settings › Privacy & Security › Accessibility."}, nil
 	}
 	sleep := a.Sleep
@@ -64,6 +66,7 @@ func (a *ActionService) Paste(ctx context.Context) (Result, error) {
 	if err := a.Platform.PasteShortcut(); err != nil {
 		return Result{Copied: true}, err
 	}
+	log.Printf("paste: posted ⌘V (previous app %q)", a.Previous().Name)
 	return Result{Copied: true, Pasted: true, Message: "Pasted GIF"}, nil
 }
 
@@ -71,7 +74,9 @@ func (a *ActionService) Paste(ctx context.Context) (Result, error) {
 // Only an explicit button click calls this.
 func (a *ActionService) RequestAccessibility(ctx context.Context) (bool, error) {
 	if a.Platform.AccessibilityTrusted(true) {
+		log.Printf("request accessibility: already trusted")
 		return true, nil
 	}
+	log.Printf("request accessibility: prompted, opening the Accessibility pane")
 	return false, a.Platform.OpenAccessibilitySettings()
 }
