@@ -108,8 +108,9 @@ func TestMapping(t *testing.T) {
 		PreviewURL:  "https://static.klipy.com/ii/935d7ab9d8c6202580a668421940ec81/14/af/y6iepZM7.gif",
 		DownloadURL: "https://static.klipy.com/ii/935d7ab9d8c6202580a668421940ec81/14/af/um0L4dFH.gif",
 	}
-	if len(p.Items) != 1 || p.Items[0] != want {
-		t.Fatalf("items = %+v, want only [%+v] (the ad is not mapped)", p.Items, want)
+	ad := provider.Gif{Provider: provider.Klipy, ID: "sponsored-1", Title: "Sponsored", PreviewURL: "https://ads.example.test/sm.gif", DownloadURL: "https://ads.example.test/hd.gif"}
+	if len(p.Items) != 2 || p.Items[0] != want || p.Items[1] != ad {
+		t.Fatalf("items = %+v, want [%+v %+v] (an ad with GIF renditions stays in place; one without is skipped)", p.Items, want, ad)
 	}
 	if p.Next != "2" {
 		t.Errorf("Next = %q, want \"2\"", p.Next)
@@ -203,6 +204,13 @@ func TestPaging(t *testing.T) {
 	}
 	if !strings.Contains(last(), "page=1") {
 		t.Errorf("empty cursor sent %s, want page=1", last())
+	}
+
+	// A page with nothing renderable ends paging: an empty page with a cursor makes the grid fetch again at once.
+	c, _, _ = stubClient(t, 200, `{"result":true,"data":{"data":[{"slug":"ad","type":"ad","content":"<div></div>"}],"current_page":1,"has_next":true}}`)
+	p, err = c.Search(context.Background(), "cat", "")
+	if err != nil || len(p.Items) != 0 || p.Next != "" {
+		t.Errorf("page of only unrenderable items = %+v, %v; want no items and no Next", p, err)
 	}
 
 	for _, cur := range []string{"x", "0", "-1"} {

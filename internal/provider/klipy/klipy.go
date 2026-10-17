@@ -97,13 +97,15 @@ func (c *Client) get(ctx context.Context, kind string, v url.Values, cursor stri
 	items := make([]provider.Gif, 0, len(r.Data.Data))
 	skipped := 0
 	for _, d := range r.Data.Data {
-		if d.Type != "gif" {
-			skipped++ // ads; surfaced in the log rather than silently dropped
-			continue
-		}
 		dl := d.File.HD.GIF.URL
 		if dl == "" {
 			dl = d.File.MD.GIF.URL
+		}
+		// Klipy forbids filtering results, so any item with GIF renditions (ads included) is
+		// kept in place. An item without them (e.g. an HTML ad) has nothing a GIF grid can show.
+		if d.Type != "gif" && (d.File.SM.GIF.URL == "" || dl == "") {
+			skipped++ // surfaced in the log rather than silently dropped
+			continue
 		}
 		if d.File.SM.GIF.URL == "" || dl == "" {
 			return provider.Page{}, bad(status)
@@ -118,7 +120,7 @@ func (c *Client) get(ctx context.Context, kind string, v url.Values, cursor stri
 		log.Printf("klipy: skipped %d non-gif items", skipped)
 	}
 	p := provider.Page{Items: items}
-	if r.Data.HasNext {
+	if r.Data.HasNext && len(items) > 0 { // an empty page with has_next would make the grid fetch again at once
 		cur := r.Data.CurrentPage
 		if cur < 1 {
 			cur = page

@@ -7,5 +7,6 @@
             "webp": {"url": "https://static.klipy.com/ii/935d7ab9d8c6202580a668421940ec81/14/af/SE72470w.webp", "width": 220, "height": 220, "size": 80118}}},
    "tags": [], "type": "gif", "blur_preview": "data:image/jpeg;base64,..."},
   {"id": 9007199254740993, "slug": "sponsored-1", "title": "Sponsored", "type": "ad",
-   "file": {"sm": {"gif": {"url": "https://ads.example.test/sm.gif"}}, "hd": {"gif": {"url": "https://ads.example.test/hd.gif"}}}}],
+   "file": {"sm": {"gif": {"url": "https://ads.example.test/sm.gif"}}, "hd": {"gif": {"url": "https://ads.example.test/hd.gif"}}}},
+  {"id": 9007199254740995, "slug": "sponsored-2", "type": "ad", "content": "<div>ad</div>", "width": 300, "height": 250}],
   "current_page": 1, "per_page": 24, "has_next": true}}
