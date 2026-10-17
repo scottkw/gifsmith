@@ -1,29 +1,38 @@
 {
   "fill" : {
-    "automatic-gradient" : "extended-gray:1.00000,1.00000"
+    "solid" : "srgb:0.96471,0.95686,0.93725,1.00000"
   },
   "groups" : [
     {
       "layers" : [
         {
-          "fill-specializations" : [
+          "image-name" : "front_card.svg",
+          "name" : "front_card",
+          "position" : {
+            "scale" : 1.0,
+            "translation-in-points" : [
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "image-name-specializations" : [
+            {
+              "value" : "back_frame.svg"
+            },
             {
               "appearance" : "dark",
-              "value" : {
-                "solid" : "srgb:0.92143,0.92145,0.92144,1.00000"
-              }
+              "value" : "back_frame_light.svg"
             },
             {
               "appearance" : "tinted",
-              "value" : {
-                "solid" : "srgb:0.83742,0.83744,0.83743,1.00000"
-              }
+              "value" : "back_frame_light.svg"
             }
           ],
-          "image-name" : "wails_icon_vector.svg",
-          "name" : "wails_icon_vector",
+          "name" : "back_frame",
           "position" : {
-            "scale" : 0.85,
+            "scale" : 1.0,
             "translation-in-points" : [
               0.0,
               0.0
@@ -32,12 +41,12 @@
         }
       ],
       "shadow" : {
-        "kind" : "neutral",
+        "kind" : "none",
         "opacity" : 0.5
       },
-      "specular" : true,
+      "specular" : false,
       "translucency" : {
-        "enabled" : true,
+        "enabled" : false,
         "value" : 0.5
       }
     }

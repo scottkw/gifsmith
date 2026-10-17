@@ -1,5 +1,5 @@
-// Package services holds the methods bound to the webview. They take no paths or
-// URLs from JS: the only file they can touch is SamplePath, fixed in Go.
+// Package services holds the methods bound to the webview. They take no paths from
+// JS, and the only URL they fetch is a Gif's DownloadURL that passes the staging allowlist.
 package services
 
 import (
@@ -10,10 +10,15 @@ import (
 	"time"
 
 	"gifsmith/internal/platform"
+	"gifsmith/internal/provider"
+	"gifsmith/internal/staging"
 )
 
 // ErrBusy is returned when another action is still running (each bound call has its own goroutine).
 var ErrBusy = errors.New("another action is still running")
+
+// ErrClipsCopy: Clips are MP4, and file copy for them ships in Phase 3.
+var ErrClipsCopy = errors.New("copying Clips arrives in a later update")
 
 // PasteDelay is the wait between hiding the panel (or reactivating the previous app) and ⌘V.
 const PasteDelay = 80 * time.Millisecond
@@ -26,37 +31,56 @@ type Result struct {
 }
 
 type ActionService struct {
-	Platform   platform.Platform
-	SamplePath string
-	Hide       func()
-	Previous   func() platform.App
-	Sleep      func(time.Duration) // nil means time.Sleep
-	busy       sync.Mutex          // one action at a time: no racing pasteboard writes, no double ⌘V
+	Platform platform.Platform
+	Staging  *staging.Store
+	Hide     func()
+	Previous func() platform.App
+	Sleep    func(time.Duration) // nil means time.Sleep
+	busy     sync.Mutex          // one action at a time: no racing pasteboard writes, no double ⌘V
 }
 
-// Copy puts the staged sample GIF on the clipboard as a file and hides the panel.
-// On failure the panel stays open so the frontend can show the error.
-func (a *ActionService) Copy(ctx context.Context) (Result, error) {
+// stage downloads g and puts its file URL on the pasteboard. Older staged files
+// are swept only after that succeeds: until then the clipboard may point at one.
+func (a *ActionService) stage(ctx context.Context, g provider.Gif) error {
+	if g.IsClip {
+		return ErrClipsCopy
+	}
+	path, err := a.Staging.Fetch(ctx, g)
+	if err != nil {
+		log.Printf("stage %s: %v", g.Provider, err)
+		return err
+	}
+	if err := a.Platform.CopyFile(path); err != nil {
+		return err
+	}
+	if err := a.Staging.Sweep(path); err != nil {
+		log.Printf("staging sweep: %v", err)
+	}
+	return nil
+}
+
+// Copy puts the selected GIF on the clipboard as a file. The panel stays open:
+// the frontend shows the confirmation, then hides it.
+func (a *ActionService) Copy(ctx context.Context, g provider.Gif) (Result, error) {
 	if !a.busy.TryLock() {
 		return Result{}, ErrBusy
 	}
 	defer a.busy.Unlock()
-	if err := a.Platform.CopyFile(a.SamplePath); err != nil {
+	if err := a.stage(ctx, g); err != nil {
 		return Result{}, err
 	}
-	log.Printf("copy: copied, hiding panel")
-	a.Hide()
-	return Result{Copied: true, Message: "Copied GIF — paste with ⌘V"}, nil
+	log.Printf("copy: staged and copied")
+	return Result{Copied: true, Message: "Copied — press ⌘V to paste"}, nil
 }
 
 // Paste copies the GIF, hides the panel and posts one ⌘V to the previous app.
 // Without Accessibility it only copies and keeps the panel open with instructions.
-func (a *ActionService) Paste(ctx context.Context) (Result, error) {
+func (a *ActionService) Paste(ctx context.Context, g provider.Gif) (Result, error) {
 	if !a.busy.TryLock() {
 		return Result{}, ErrBusy
 	}
 	defer a.busy.Unlock()
-	if err := a.Platform.CopyFile(a.SamplePath); err != nil {
+	if err := a.stage(ctx, g); err != nil {
 		return Result{}, err
 	}
 	if !a.Platform.AccessibilityTrusted(false) {

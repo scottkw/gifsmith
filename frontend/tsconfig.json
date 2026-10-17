@@ -13,7 +13,12 @@
      */
     "allowJs": true,
     "checkJs": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    /* node --test needs explicit .ts imports (type stripping); nothing is emitted by tsc. */
+    "allowImportingTsExtensions": true,
+    "noEmit": true
   },
   "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte", "bindings"],
+  /* Tests run under node --test; @types/node is not a dependency, so svelte-check skips them. */
+  "exclude": ["src/**/*.test.ts"],
 }

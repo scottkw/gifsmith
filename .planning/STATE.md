@@ -2,20 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: Gifsmith MVP
-current_phase: 2
-current_phase_name: Providers, Search UI & First Run
+current_phase: 3
+current_phase_name: Action Pipeline & Library
 status: planning
-stopped_at: Phase 1 complete, ready to plan Phase 2
-last_updated: "2026-10-17T17:09:35.436Z"
+stopped_at: Phase 2 complete, ready to plan Phase 3
+last_updated: "2026-10-17T23:05:08.531Z"
 last_activity: 2026-10-17
-last_activity_desc: Phase 1 complete, transitioned to Phase 2
-state_head: 17de2338ddc8aa3c8c8fc82d7fca8543512649bb
+last_activity_desc: Phase 2 complete, transitioned to Phase 3
+state_head: 2958cc84051f54fdc661273a333dad4e9c9d13b1
 progress:
   total_phases: 4
-  completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
-  percent: 25
+  completed_phases: 2
+  total_plans: 10
+  completed_plans: 10
+  percent: 50
 ---
 
 # Project State
@@ -25,21 +25,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-17)
 
 **Core value:** Hotkey → type → Enter puts the right GIF on the clipboard (or into the frontmost app) in seconds, without Raycast.
-**Current focus:** Phase 2 — Providers, Search UI & First Run
+**Current focus:** Phase 3 — Action Pipeline & Library
 
 ## Current Position
 
-Phase: 2 — Providers, Search UI & First Run
+Phase: 3 — Action Pipeline & Library
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-10-17 — Phase 1 complete, transitioned to Phase 2
+Last activity: 2026-10-17 — Phase 2 complete, transitioned to Phase 3
 
-Progress: [███░░░░░░░] 25% (4/4 plans in Phase 1)
+Progress: [█████░░░░░] 50% (2/4 phases; 10/10 planned plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
+- Total plans completed: 10
 - Average duration: - min
 - Total execution time: 0.0 hours
 
@@ -48,6 +48,7 @@ Progress: [███░░░░░░░] 25% (4/4 plans in Phase 1)
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 | 4 | - | - |
+| 2 | 6 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -62,6 +63,12 @@ Progress: [███░░░░░░░] 25% (4/4 plans in Phase 1)
 | Phase 01 P02 | 4min | 2 tasks | 9 files |
 | Phase 01 P03 | 75min | 2 tasks | 17 files |
 | Phase 01 P04 | 3min | 2 tasks | 3 files |
+| Phase 2 P01 | 13min | 3 tasks | 31 files |
+| Phase 2 P02 | 6min | 3 tasks | 12 files |
+| Phase 2 P03 | 15min | 2 tasks | 14 files |
+| Phase 02 P04 | 11min | 3 tasks | 26 files |
+| Phase 02 P05 | 12min | 2 tasks | 22 files |
+| Phase 02 P06 | 23min | 3 tasks | 22 files |
 
 ## Accumulated Context
 
@@ -85,6 +92,30 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-04: Phase 1 GO WITH FALLBACKS (user) - build Phase 2 on the Developer ID-signed dev build; limits in 01-PASTE-MATRIX.md section 4
 - [Phase 01]: 01-04: Notarization deferred to Phase 4 (Apple agreement 403); notarized dry run + N15 carry over
 - [Phase 01]: 01-04: Pasteboard payload stays a single file URL; Phase 3 decides on image data only if untested apps fail
+- [Phase 2]: 02-01: malformed provider responses keep their HTTP status in provider.Error (consistent with httpx invalid-JSON)
+- [Phase 2]: 02-01: staging downloads use their own http.Client bounded by Fetch's 45 s context (API client's 15 s timeout would cut multi-MB originals)
+- [Phase 2]: 02-01: VendorAllow = https + vendor host + default port only; server build adds only the fixture listener host
+- [Phase 2]: 02-02: Keys inside an open IME composition route to none for every key, not only Enter
+- [Phase 2]: 02-02: Paging drops stale pages via resultSeq (bumped on every result-set replacement); a failed page waits for Try Again
+- [Phase 2]: 02-02: One main mousedown handler pins focus to the search input for clicks outside text fields
+- [Phase 2]: 02-02: node tests excluded from svelte-check instead of adding @types/node
+- [Phase 2]: search.Service: 429 blocks a provider locally for max(Retry-After, 60 s); blocked calls return rate_limited with remaining seconds (0 = unknown) and no HTTP
+- [Phase 2]: Error copy is computed from (error, now, receivedAt) in lib/errors.ts; caught error text is never rendered
+- [Phase 2]: UI state is held per provider id in App.svelte; latest() slots first:<p> and page:<p> cancel superseded calls
+- [Phase 02]: GIPHY rendition width/height/size not decoded until Phase 3; flexInt decodes total_count
+- [Phase 02]: LastProvider reads settings.json per call; invalid or unknown id reads as first run
+- [Phase 02]: SetLastProvider does not share the SaveKey mutex (temp+rename keeps writes whole)
+- [Phase 02]: fakeapi scenario words read from q plus the key, so SaveKey/trending can be driven into 429/500/slow in UAT
+- [Phase 02]: Setup card width 560 (not 456): at 456 it overran the 364px content area by 21px and K2-K6 overflowed the one-line message slot
+- [Phase 02]: After a key save the query is cleared so the box matches the trending grid (S1c); Try Finer Gifs clears it too (S8)
+- [Phase 02]: A key_rejected provider keeps its setup card across tab switches until a new key is saved (S13)
+- [Phase 02]: Keychain-failure inline copy: Couldn't save the key to the macOS Keychain. Try again.
+- [Phase 02]: 02-06: Clips is offered only after one Clips probe per launch passes, made after a GIPHY GIFs success with the same key; 401/403/404 -> disabled, transient -> unknown with one user-initiated recheck; Go refuses Clips calls unless enabled
+- [Phase 02]: 02-06: C2 primary action is an <a> 'Email clips@giphy.com ↗' opening mailto:clips@giphy.com with a subject (the only mailto in the openExternal allow-list)
+- [Phase 02]: 02-06: Native UAT approved; the user's real GIPHY key is not approved for Clips (probe checking -> disabled, C2 shown); dev logs hold no key material
+- [Phase 2 close]: Klipy items with GIF renditions (ads included) stay in place (WR-04); persisted Clips tab restored when a GIPHY key exists (WR-02) — both accepted verification overrides
+- [Phase 2 close]: GIPHY and Clips share one 429 budget; Clips probed at most once per key after a GIPHY GIFs success; a rate-limited re-check does not spend the re-probe; staging downloads check the allowlist on every redirect
+- [Phase 2 close]: MVP mode dropped for Phases 2–4; 11 Info-level review items left open in 02-REVIEW-DISPOSITION.md
 
 ### Pending Todos
 
@@ -93,9 +124,17 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 1→3/4]: N10, N13 and paste in Slack, Discord, Telegram, Safari/Chrome composers untested; re-check in later UAT (GO WITH FALLBACKS limit 2)
-- [Phase 2]: Klipy request shapes untested with a live key; GIPHY Clips needs per-key approval; Finer Gifs was down on 2026-10-17
-- [Phase 4]: Klipy written clearance for temp file copies (developers@klipy.com) is a pre-release gate; request early
+- [Phase 2→]: The user's GIPHY key is not approved for Clips (C2 shown); approval via clips@giphy.com is a user action
+- [Phase 2→]: The Finer Gifs Club API was down on 2026-10-17; Phase 2 UAT accepted either results or the down message, so availability is still unconfirmed
+- [Phase 4]: Klipy written clearance for temp file copies (developers@klipy.com) is a pre-release gate; request early, and ask about labelling Klipy ads (IN-09)
+- [Phase 2→4]: Public repo github.com/scottkw/gifsmith holds only the MIT LICENSE; push code after the Phase 2 merge to main and add the Raycast GIF Search authors' MIT notice to LICENSE
 - [Phase 4]: Apple Developer agreement 403 (notarytool store-credentials: 'A required agreement is missing or has expired') must be resolved by the user before Phase 4 notarization; notarized dry run + N15 carried over from Phase 1
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 261017-npc | Wire designed app and menu bar icons into the build | 2026-10-17 | dbe648e | [261017-npc-wire-designed-app-and-menu-bar-icons-int](./quick/261017-npc-wire-designed-app-and-menu-bar-icons-int/) |
 
 ## Deferred Items
 
@@ -107,6 +146,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-17T16:38:15.034Z
-Stopped at: Phase 1 complete, ready to plan Phase 2
+Last session: 2026-10-17T23:06:34.000Z
+Stopped at: Phase 2 complete, ready to plan Phase 3
 Resume file: None

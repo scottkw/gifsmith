@@ -8,9 +8,11 @@
     "build:dev": "vite build --minify false --mode development",
     "build": "vite build --mode production",
     "preview": "vite preview",
-    "check": "svelte-check --tsconfig ./tsconfig.json"
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "node --test --test-reporter=tap src/lib/*.test.ts"
   },
   "dependencies": {
+    "@tanstack/svelte-virtual": "3.13.47",
     "@wailsio/runtime": "3.0.0-beta.30"
   },
   "devDependencies": {

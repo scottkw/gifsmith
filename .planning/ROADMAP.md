@@ -17,7 +17,7 @@ Gifsmith ports the Raycast "GIF Search" extension to a standalone macOS menu bar
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Native Spike & Signed Dev Loop** - Hard go/no-go gate: hotkey panel → copy GIF file → paste into TextEdit, from signed and notarized builds (completed 2026-10-17)
-- [ ] **Phase 2: Providers, Search UI & First Run** - Vertical slice: search/trending → animated grid → copy, across Finer Gifs, GIPHY, Klipy (and Clips), with key setup and attribution
+- [x] **Phase 2: Providers, Search UI & First Run** - Vertical slice: search/trending → animated grid → copy, across Finer Gifs, GIPHY, Klipy (and Clips), with key setup and attribution (completed 2026-10-17)
 - [ ] **Phase 3: Action Pipeline & Library** - Every extension action (link, Markdown, download, square crop, ⌘K menu) plus favorites, recents, details, and recent searches
 - [ ] **Phase 4: Settings, Shell Polish & Release** - Settings window, rebindable hotkeys, launch at login, then a signed, notarized DMG that installs on a clean Mac
 
@@ -57,7 +57,6 @@ Plans:
 ### Phase 2: Providers, Search UI & First Run
 
 **Goal**: A stranger can open the panel, get set up with a key (or skip to the keyless provider), search or browse trending GIFs on any available provider in a fast keyboard-driven animated grid, and Enter copies the GIF, with vendor-required attribution and honest error handling.
-**Mode:** mvp
 **Depends on**: Phase 1 (go decision, signed dev loop, copy-GIF-as-file primitive, server-mode UAT loop)
 **Requirements**: SRCH-01, SRCH-02, SRCH-03, SRCH-04, SRCH-05, SRCH-06, SRCH-07, ONBD-01, ONBD-02, ONBD-03, ONBD-04, ONBD-05
 **Success Criteria** (what must be TRUE):
@@ -67,7 +66,27 @@ Plans:
   4. "Powered by GIPHY" shows on GIPHY and Clips results, and the Klipy search placeholder reads "Search KLIPY".
   5. GIPHY Clips appears as a provider only when the user's GIPHY key passes a Clips test call (otherwise a short explanation is shown). Rapid typing does not burn requests, a rate-limit hit shows a clear message with when to retry, and a network, timeout, or provider error shows a per-provider message while other providers stay usable.
 
-**Plans**: TBD
+**Plans:** 6/6 plans complete
+
+Plans:
+**Wave 1**
+- [x] 02-01-PLAN.md — Tracer: Finer Gifs search in Go → animated grid → Enter copies the real GIF (typed URL-free errors, staging, smoke/UAT harness)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 02-02-PLAN.md — Virtualized grid with paging to End of results, full keyboard model, panel owns Esc and survives ⌘W (npm package gate)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 02-03-PLAN.md — search.Service cache + 429 budget + dedupe policy; every loading/empty/error state; cancellation of superseded searches
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 02-04-PLAN.md — GIPHY and Klipy clients, Keychain-backed keys verified by a test call, provider status, last provider (Go, end to end via bound API)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 02-05-PLAN.md — Provider tabs (⌘1–⌘4, remembered), attribution and placeholders, first-run setup card, revoked-key re-entry
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [x] 02-06-PLAN.md — GIPHY Clips probe and states, compliance posture in PROJECT.md, UI backstops, signed install + native UAT with real keys
+
 **UI hint**: yes
 
 **Notes**: Copy works for Finer Gifs, GIPHY, and Klipy results here; Clips file handling (MP4) lands in Phase 3 (ACTN-09), and temp-file lifecycle hardening in Phase 3 (ACTN-10). Written compliance posture goes into PROJECT.md Key Decisions in this phase. Default PG-13 rating applies to GIPHY now; the user-facing control is in Phase 4.
@@ -76,7 +95,6 @@ Plans:
 ### Phase 3: Action Pipeline & Library
 
 **Goal**: Every action the Raycast extension offered works on the selected GIF, and favorites, recents, details, and recent searches put the GIFs a user reuses one keystroke away, even offline or rate-limited.
-**Mode:** mvp
 **Depends on**: Phase 2
 **Requirements**: ACTN-03, ACTN-04, ACTN-05, ACTN-06, ACTN-07, ACTN-09, ACTN-10, ACTN-11, LIBR-01, LIBR-02, LIBR-03, LIBR-04, LIBR-05, SRCH-08
 **Success Criteria** (what must be TRUE):
@@ -95,13 +113,12 @@ Plans:
 ### Phase 4: Settings, Shell Polish & Release
 
 **Goal**: Everything is configurable from a proper Settings window with hotkeys that can be rebound and launch at login, and a stranger can install a signed, notarized build on a clean Mac and use it within vendor and license obligations.
-**Mode:** mvp
 **Depends on**: Phase 3
-**Requirements**: SETT-01, SETT-02, SETT-03, SETT-04, SETT-05, SRCH-09, ACTN-08, SHEL-05, SHEL-06, RELS-01, RELS-02, RELS-03, RELS-04
+**Requirements**: SETT-01, SETT-02, SETT-03, SETT-04, SETT-05, SETT-06, SRCH-09, ACTN-08, SHEL-05, SHEL-06, RELS-01, RELS-02, RELS-03, RELS-04
 **Success Criteria** (what must be TRUE):
-  1. Choosing Settings from the menu bar menu opens a separate Settings window where pasting into fields works. There the user can add, test, and remove GIPHY and Klipy keys, and see Accessibility permission status with a button to grant it.
+  1. Choosing Settings from the menu bar menu opens a separate Settings window where pasting into fields works. There the user can add, test, change, and remove GIPHY and Klipy keys (each with a link to that provider's key sign-up page), and see Accessibility permission status with a button to grant it.
   2. The user can rebind the global hotkeys; a conflict is reported and the old binding stays until the new one registers. Favorites and Recents each open directly with their own hotkeys, and the user can turn launch at login on or off. (manual, user-verified)
-  3. The user can set grid item size (search and trending), max results, download folder, hide filename, GIPHY and Klipy locales, GIPHY content rating (default PG-13), and the default Enter and ⌘Enter actions, and changes take effect on next use.
+  3. The user can set grid item size (search and trending), max results, download folder, hide filename, GIPHY and Klipy locales, GIPHY content rating (default PG-13), the default Enter and ⌘Enter actions, and the window theme (Light, Dark, or System), and changes take effect on next use.
   4. A Developer ID–signed, notarized DMG installs and runs on a clean user account (Gatekeeper accepts it, permissions start fresh) on macOS 13+ Apple Silicon. (manual, user-verified)
   5. The About screen credits the original MIT-licensed Raycast extension and its authors, and Klipy file actions stay disabled (link and Markdown only) unless written clearance from Klipy is recorded.
 
@@ -120,6 +137,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Native Spike & Signed Dev Loop | 4/4 | Complete    | 2026-10-17 |
-| 2. Providers, Search UI & First Run | 0/TBD | Not started | - |
+| 2. Providers, Search UI & First Run | 6/6 | Complete    | 2026-10-17 |
 | 3. Action Pipeline & Library | 0/TBD | Not started | - |
 | 4. Settings, Shell Polish & Release | 0/TBD | Not started | - |

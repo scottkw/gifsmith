@@ -1,0 +1,261 @@
+package staging
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"unicode/utf8"
+
+	"gifsmith/internal/provider"
+	"gifsmith/internal/provider/fakeapi"
+)
+
+// newStore serves h (fakeapi media by default) and allows only that server's host.
+func newStore(t *testing.T, h http.Handler) (*Store, string, *atomic.Int32) {
+	t.Helper()
+	if h == nil {
+		h = fakeapi.Handler(fakeapi.Options{})
+	}
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		h.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+	host := strings.TrimPrefix(srv.URL, "http://")
+	s := &Store{Dir: t.TempDir(), HTTP: srv.Client(), Allow: func(_ provider.ID, u *url.URL) bool { return u.Host == host }}
+	return s, srv.URL, &hits
+}
+
+func gif(base, name, title string) provider.Gif {
+	return provider.Gif{Provider: provider.FinerGifs, ID: name, Title: title, DownloadURL: base + "/media/" + name + ".gif"}
+}
+
+func entries(t *testing.T, dir string) []string {
+	t.Helper()
+	var out []string
+	_ = filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+		if p != dir {
+			rel, _ := filepath.Rel(dir, p)
+			out = append(out, rel)
+		}
+		return nil
+	})
+	return out
+}
+
+func noURL(t *testing.T, err error, base string) {
+	t.Helper()
+	if strings.Contains(err.Error(), base) || strings.Contains(err.Error(), "http") {
+		t.Errorf("error text %q contains the URL", err)
+	}
+}
+
+func TestFetchStagesGIF(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	p, err := s.Fetch(context.Background(), gif(base, "office-7", "Office moment 7"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rel, _ := filepath.Rel(s.Dir, p)
+	if ok, _ := regexp.MatchString(`^[0-9a-f]{16}/office-moment-7\.gif$`, filepath.ToSlash(rel)); !ok {
+		t.Errorf("staged at %q, want <16 hex>/office-moment-7.gif under Dir", rel)
+	}
+	b, err := os.ReadFile(p)
+	if err != nil || !strings.HasPrefix(string(b), "GIF8") {
+		t.Errorf("staged bytes start %q (err %v), want GIF8", b[:min(len(b), 6)], err)
+	}
+	for _, e := range entries(t, s.Dir) {
+		if strings.HasSuffix(e, ".part") {
+			t.Errorf("leftover %s", e)
+		}
+	}
+}
+
+func TestFetchNotGIF(t *testing.T) {
+	s, base, _ := newStore(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte("<html>"))
+	}))
+	_, err := s.Fetch(context.Background(), gif(base, "x", "x"))
+	if !errors.Is(err, ErrNotGIF) {
+		t.Fatalf("err = %v, want ErrNotGIF", err)
+	}
+	noURL(t, err, base)
+	if e := entries(t, s.Dir); len(e) != 0 {
+		t.Errorf("Dir not empty after a rejected download: %q", e)
+	}
+}
+
+func TestFetchHTTPError(t *testing.T) {
+	s, base, _ := newStore(t, http.NotFoundHandler())
+	_, err := s.Fetch(context.Background(), gif(base, "x", "x"))
+	if !errors.Is(err, ErrDownload) {
+		t.Fatalf("err = %v, want ErrDownload", err)
+	}
+	noURL(t, err, base)
+}
+
+func TestFetchNetworkError(t *testing.T) {
+	s := &Store{Dir: t.TempDir(), HTTP: http.DefaultClient, Allow: func(provider.ID, *url.URL) bool { return true }}
+	_, err := s.Fetch(context.Background(), gif("http://127.0.0.1:1", "x", "x"))
+	if !errors.Is(err, ErrDownload) {
+		t.Fatalf("err = %v, want ErrDownload", err)
+	}
+	noURL(t, err, "127.0.0.1")
+}
+
+func TestFetchTooLarge(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	s.maxBytes = 64 // fakeapi GIFs are a few hundred bytes
+	_, err := s.Fetch(context.Background(), gif(base, "office-1", "big"))
+	if !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("err = %v, want ErrTooLarge", err)
+	}
+	noURL(t, err, base)
+	if e := entries(t, s.Dir); len(e) != 0 {
+		t.Errorf("Dir not empty after an oversized download: %q", e)
+	}
+}
+
+func TestFetchDisallowedHost(t *testing.T) {
+	s, base, hits := newStore(t, nil)
+	s.Allow = nil // VendorAllow: the fixture host is not a vendor host
+	_, err := s.Fetch(context.Background(), gif(base, "office-1", "x"))
+	if !errors.Is(err, ErrNotAllowed) {
+		t.Fatalf("err = %v, want ErrNotAllowed", err)
+	}
+	noURL(t, err, base)
+	if n := hits.Load(); n != 0 {
+		t.Errorf("%d requests made to a disallowed host", n)
+	}
+}
+
+func TestFetchTraversalSlug(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	for _, title := range []string{"../../etc/passwd", "", "/", "..", "a/../../b"} {
+		p, err := s.Fetch(context.Background(), gif(base, "office-2", title))
+		if err != nil {
+			t.Fatalf("title %q: %v", title, err)
+		}
+		rel, err := filepath.Rel(s.Dir, p)
+		if err != nil || strings.HasPrefix(rel, "..") || filepath.Dir(filepath.Dir(rel)) != "." {
+			t.Errorf("title %q staged at %q, outside <Dir>/<hash>/", title, p)
+		}
+	}
+	if got := slug(""); got != "gif" {
+		t.Errorf("slug(\"\") = %q, want gif", got)
+	}
+	if got := slug("../../etc/passwd"); got != "etc-passwd" {
+		t.Errorf("slug(traversal) = %q, want etc-passwd", got)
+	}
+}
+
+func TestSlugCap(t *testing.T) {
+	long := strings.Repeat("é", 100) // 200 bytes
+	got := slug(long)
+	if len(got) > 80 || !utf8.ValidString(got) || got != strings.Repeat("é", 40) {
+		t.Errorf("slug(200-byte title) = %q (%d bytes), want 40 é (80 bytes)", got, len(got))
+	}
+	if got := slug("Bears. Beets. Battlestar Galactica."); got != "bears-beets-battlestar-galactica" {
+		t.Errorf("slug = %q", got)
+	}
+}
+
+func TestSweep(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	old, err := s.Fetch(context.Background(), gif(base, "office-3", "old"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(s.Dir, "sample.gif"), []byte("GIF89a"), 0o644); err != nil { // Phase 1 leftover
+		t.Fatal(err)
+	}
+	keep, err := s.Fetch(context.Background(), gif(base, "office-4", "keep"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Sweep(keep); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(keep); err != nil {
+		t.Errorf("kept file gone: %v", err)
+	}
+	if _, err := os.Stat(old); !os.IsNotExist(err) {
+		t.Errorf("old staged file still there (err %v)", err)
+	}
+	rel, _ := filepath.Rel(s.Dir, keep)
+	if e := entries(t, s.Dir); len(e) != 2 || e[0] != filepath.Dir(rel) {
+		t.Errorf("Dir entries = %q, want only %s", e, filepath.Dir(rel))
+	}
+}
+
+func TestVendorAllow(t *testing.T) {
+	cases := []struct {
+		p    provider.ID
+		u    string
+		want bool
+	}{
+		{provider.GIPHY, "https://media2.giphy.com/x.gif", true},
+		{provider.Clips, "https://media.giphy.com/x.gif", true},
+		{provider.GIPHY, "https://giphy.com/x.gif", true},
+		{provider.GIPHY, "http://media2.giphy.com/x.gif", false},
+		{provider.GIPHY, "https://giphy.com.evil.test/x.gif", false},
+		{provider.GIPHY, "https://evilgiphy.com/x.gif", false},
+		{provider.GIPHY, "https://media2.giphy.com:8443/x.gif", false},
+		{provider.Klipy, "https://static.klipy.com/x.gif", true},
+		{provider.Klipy, "https://klipy.com/x.gif", true},
+		{provider.Klipy, "https://media2.giphy.com/x.gif", false},
+		{provider.FinerGifs, "https://media.thefinergifs.club/a.gif", true},
+		{provider.FinerGifs, "https://api.thefinergifs.club/a.gif", false},
+		{provider.GIPHY, "https://media.thefinergifs.club/a.gif", false},
+		{"", "https://media2.giphy.com/x.gif", false},
+	}
+	for _, c := range cases {
+		u, err := url.Parse(c.u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := VendorAllow(c.p, u); got != c.want {
+			t.Errorf("VendorAllow(%s, %s) = %v, want %v", c.p, c.u, got, c.want)
+		}
+	}
+}
+
+// A redirect is checked against the allowlist on every hop (WR-03).
+func TestFetchRedirectAllowlist(t *testing.T) {
+	var offHits atomic.Int32
+	off := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { offHits.Add(1) }))
+	t.Cleanup(off.Close)
+	media := fakeapi.Handler(fakeapi.Options{})
+	s, base, _ := newStore(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/media/away.gif":
+			http.Redirect(w, r, off.URL+"/x.gif", http.StatusFound)
+		case "/media/home.gif":
+			http.Redirect(w, r, "/media/office-7.gif", http.StatusFound)
+		case "/media/loop.gif":
+			http.Redirect(w, r, "/media/loop.gif", http.StatusFound)
+		default:
+			media.ServeHTTP(w, r)
+		}
+	}))
+	_, err := s.Fetch(context.Background(), gif(base, "away", "Away"))
+	if !errors.Is(err, ErrNotAllowed) || offHits.Load() != 0 {
+		t.Errorf("redirect off the allowlist: err %v, off-host hits %d; want ErrNotAllowed, 0", err, offHits.Load())
+	}
+	if _, err := s.Fetch(context.Background(), gif(base, "home", "Home")); err != nil {
+		t.Errorf("redirect within the allowlist: %v", err)
+	}
+	if _, err := s.Fetch(context.Background(), gif(base, "loop", "Loop")); !errors.Is(err, ErrNotAllowed) {
+		t.Errorf("redirect loop: %v, want ErrNotAllowed", err)
+	}
+}
