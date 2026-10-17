@@ -6,10 +6,10 @@ current_phase: 2
 current_phase_name: Providers, Search UI & First Run
 status: verifying
 stopped_at: Completed 02-06-PLAN.md
-last_updated: "2026-10-17T21:22:55.439Z"
+last_updated: "2026-10-17T22:35:45.444Z"
 last_activity: 2026-10-17
 last_activity_desc: Phase 2 execution started
-state_head: 3d7aab318a41dc05bcda6eea3cac12c2c67bf75d
+state_head: dbe648e6db7fa1c567b5668ca7202acf405f98ce
 progress:
   total_phases: 4
   completed_phases: 1
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-17)
 Phase: 2 (Providers, Search UI & First Run) — EXECUTING
 Plan: 6 of 6
 Status: Phase complete — ready for verification
-Last activity: 2026-10-17 — Phase 2 execution started
+Last activity: 2026-10-17 - Completed quick task 261017-npc: Wire designed app and menu bar icons into the build
 
 Progress: [███░░░░░░░] 25% (4/4 plans in Phase 1)
 
@@ -122,6 +122,12 @@ None yet.
 - [Phase 2]: Klipy request shapes untested with a live key; GIPHY Clips needs per-key approval; Finer Gifs was down on 2026-10-17
 - [Phase 4]: Klipy written clearance for temp file copies (developers@klipy.com) is a pre-release gate; request early
 - [Phase 4]: Apple Developer agreement 403 (notarytool store-credentials: 'A required agreement is missing or has expired') must be resolved by the user before Phase 4 notarization; notarized dry run + N15 carried over from Phase 1
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 261017-npc | Wire designed app and menu bar icons into the build | 2026-10-17 | dbe648e | [261017-npc-wire-designed-app-and-menu-bar-icons-int](./quick/261017-npc-wire-designed-app-and-menu-bar-icons-int/) |
 
 ## Deferred Items
 
