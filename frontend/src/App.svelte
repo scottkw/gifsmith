@@ -3,10 +3,12 @@
   import { Events } from '@wailsio/runtime';
   import {
     cancel,
+    checkClips,
     copy,
     hide,
     latest,
     lastProvider,
+    openExternal,
     paste,
     providerError,
     providers,
@@ -21,7 +23,7 @@
   } from './lib/api';
   import { errorState, pagingMessage, providerName, revokedMessage } from './lib/errors';
   import { move, nearEnd, routeKey } from './lib/grid';
-  import { SLOTS, slotById, type SlotId } from './lib/providers';
+  import { CLIPS_ACCESS_MAILTO, SLOTS, slotById, type SlotId } from './lib/providers';
   import Footer from './components/Footer.svelte';
   import ProviderTabs from './components/ProviderTabs.svelte';
   import ResultGrid from './components/ResultGrid.svelte';
@@ -71,7 +73,9 @@
   let statuses = $state<Record<string, ProviderStatus> | null>(null);
   const cur = $derived(states[active]);
   const slot = $derived(slotById(active));
-  const clipsEnabled = $derived(statuses?.clips?.clips === 'enabled');
+  // Clips probe state from Go: no_key | checking | enabled | disabled | unknown.
+  const clipsState = $derived(statuses?.clips?.clips ?? 'no_key');
+  const clipsEnabled = $derived(clipsState === 'enabled');
   const giphyKey = $derived(!!statuses?.giphy?.configured);
 
   let input: HTMLInputElement;
@@ -123,6 +127,29 @@
   const byId = (list: ProviderStatus[]) => Object.fromEntries(list.map((p) => [p.id, p]));
   async function refreshProviders() {
     statuses = byId(await providers());
+    // The Clips probe settled while Clips is on screen: its grid, or one re-probe for an unknown result.
+    if (active === 'clips' && clipsEnabled) show('clips');
+    else if (active === 'clips' && clipsState === 'unknown' && states.clips.status !== 'error') recheckClips();
+  }
+
+  // Choosing Clips while its result is unknown re-probes once (S2 skeleton meanwhile);
+  // a repeat failure shows that error for "GIPHY Clips". Enabled loads via refreshProviders.
+  let rechecking = false;
+  async function recheckClips() {
+    if (rechecking) return;
+    rechecking = true;
+    const s = states.clips;
+    s.status = 'idle';
+    s.err = null;
+    try {
+      if ((await checkClips()) === 'enabled') await refreshProviders();
+    } catch (e) {
+      s.status = 'error';
+      s.err = providerError(e) ?? { kind: 'http', provider: 'clips' };
+      now = s.errAt = Date.now();
+    } finally {
+      rechecking = false;
+    }
   }
 
   onMount(async () => {
@@ -202,7 +229,8 @@
       clearTransient();
       selected = states[p].items.length ? 0 : -1;
       setLastProvider(p);
-      show(p);
+      if (p === 'clips' && clipsState === 'unknown') recheckClips();
+      else show(p);
     }
     tick().then(() => card || input.focus()); // a setup card focuses its own key field
   }
@@ -260,7 +288,8 @@
   }
 
   function retry() {
-    runFirst(active, cur.q);
+    if (active === 'clips' && !clipsEnabled) recheckClips();
+    else runFirst(active, cur.q);
   }
 
   // One page request at a time; a failed page keeps loaded results until Try Again.
@@ -418,7 +447,17 @@
         primary
         onbutton={() => switchTo('giphy')}
       />
-    {:else if active === 'clips' && !clipsEnabled}
+    {:else if active === 'clips' && clipsState === 'disabled'}
+      <StateMessage
+        heading="Clips aren't enabled for your key"
+        body="Your GIPHY key works for GIFs, but GIPHY has to approve it for Clips. Email clips@giphy.com to request access, then reopen Gifsmith."
+        link="Email clips@giphy.com ↗"
+        href={CLIPS_ACCESS_MAILTO}
+        onlink={() => openExternal(CLIPS_ACCESS_MAILTO)}
+        button="Back to GIPHY"
+        onbutton={() => switchTo('giphy')}
+      />
+    {:else if active === 'clips' && !clipsEnabled && cur.status !== 'error'}
       <div class="skeleton" aria-hidden="true">
         {#each Array(8), i (i)}
           <div></div>

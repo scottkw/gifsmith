@@ -1,5 +1,6 @@
 <script lang="ts">
-  // Centered content-area message (UI-SPEC S7–S12): optional alert icon, heading, body, one button (secondary, or primary for C1).
+  // Centered content-area message (UI-SPEC S7–S12, C1, C2): optional alert icon, heading, body, an optional
+  // primary link (C2's external link, an <a> styled as a button) and one button (secondary, or primary for C1).
   let {
     heading,
     body,
@@ -7,8 +8,20 @@
     button = '',
     primary = false,
     onbutton,
-  }: { heading: string; body: string; icon?: boolean; button?: string; primary?: boolean; onbutton?: () => void } =
-    $props();
+    link = '',
+    href = '',
+    onlink,
+  }: {
+    heading: string;
+    body: string;
+    icon?: boolean;
+    button?: string;
+    primary?: boolean;
+    onbutton?: () => void;
+    link?: string;
+    href?: string;
+    onlink?: () => void;
+  } = $props();
 </script>
 
 <div class="message" role="status">
@@ -21,8 +34,22 @@
   {/if}
   <h2>{heading}</h2>
   <p>{body}</p>
-  {#if button}
-    <button class:primary onclick={onbutton}>{button}</button>
+  {#if link || button}
+    <div class="actions">
+      {#if link}
+        <a
+          class="primary"
+          {href}
+          onclick={(e) => {
+            e.preventDefault();
+            onlink?.();
+          }}>{link}</a
+        >
+      {/if}
+      {#if button}
+        <button class:primary onclick={onbutton}>{button}</button>
+      {/if}
+    </div>
   {/if}
 </div>
 
@@ -59,8 +86,17 @@
     font: var(--body);
     color: var(--text-secondary);
   }
-  button {
+  .actions {
     margin-top: 16px;
+    display: flex;
+    gap: 8px;
+  }
+  button,
+  a {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
     height: 32px;
     padding: 0 16px;
     border: 0;
@@ -70,7 +106,7 @@
     font: 600 14px/1 var(--font);
     cursor: pointer;
   }
-  button.primary {
+  .primary {
     background: var(--accent-fill);
     color: #ffffff;
   }

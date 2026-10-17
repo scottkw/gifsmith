@@ -14,6 +14,8 @@ export type Slot = {
 
 export const GIPHY_KEY_URL = 'https://developers.giphy.com/dashboard/';
 export const KLIPY_KEY_URL = 'https://partner.klipy.com';
+// C2: GIPHY grants Clips access by email (D-21); pre-addressed with a subject.
+export const CLIPS_ACCESS_MAILTO = 'mailto:clips@giphy.com?subject=GIPHY%20Clips%20API%20access%20request';
 
 export const SLOTS: readonly Slot[] = [
   { id: 'giphy', label: 'GIPHY', shortcut: '⌘1', placeholder: 'Search GIPHY', attribution: 'giphy', keyProvider: 'giphy', keyLabel: 'GIPHY', getKeyUrl: GIPHY_KEY_URL },
