@@ -9,6 +9,9 @@ import (
 
 var ErrUnsupported = errors.New("not supported in this build")
 
+// Rect is in Wails window coordinates: points, Y down from the top of the primary screen.
+type Rect struct{ X, Y, Width, Height int }
+
 type Platform interface {
 	// CopyFile puts a file URL for path on the general pasteboard.
 	CopyFile(path string) error
