@@ -9,7 +9,6 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
-	"github.com/wailsapp/wails/v3/pkg/icons"
 )
 
 const (
@@ -29,7 +28,8 @@ type Shell struct {
 }
 
 // New creates the panel once (hidden; never closed) and registers the hotkey after start.
-func New(app *application.App, plat platform.Platform) *Shell {
+// trayIcon is the menu bar template PNG, supplied by the caller (embedded in main).
+func New(app *application.App, plat platform.Platform, trayIcon []byte) *Shell {
 	s := &Shell{app: app, plat: plat}
 	s.panel = app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:            "panel",
@@ -66,7 +66,7 @@ func New(app *application.App, plat platform.Platform) *Shell {
 	// Tray is built here, not in the hotkey handler, so Open works even if the hotkey fails.
 	// No window is attached: with only a menu, a click opens the menu.
 	tray := app.SystemTray.New()
-	tray.SetTemplateIcon(icons.SystrayMacTemplate)
+	tray.SetTemplateIcon(trayIcon)
 	menu := app.NewMenu()
 	menu.Add("Open Gifsmith").OnClick(func(*application.Context) { s.Show() })
 	menu.Add("Settings…").OnClick(func(*application.Context) {

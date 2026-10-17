@@ -24,6 +24,9 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+//go:embed icons/menubar/GifsmithTemplate-tray-2x.png
+var trayIcon []byte
+
 // deps is what differs between the desktop build (wire_desktop.go) and the
 // -tags server UAT build (wire_server.go). Services are still registered here,
 // untagged: the binding generator finds them by static analysis without tags.
@@ -91,7 +94,7 @@ func main() {
 		log.Printf("clips: %s", clips.State()) // state only: records the native probe outcome
 		app.Event.Emit("providers:changed")
 	}
-	sh := shell.New(app, plat)
+	sh := shell.New(app, plat, trayIcon)
 	actions.Hide = sh.Hide
 	actions.Previous = sh.Previous
 	panel.HideFunc = sh.Hide
