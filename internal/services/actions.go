@@ -10,10 +10,15 @@ import (
 	"time"
 
 	"gifsmith/internal/platform"
+	"gifsmith/internal/provider"
+	"gifsmith/internal/staging"
 )
 
 // ErrBusy is returned when another action is still running (each bound call has its own goroutine).
 var ErrBusy = errors.New("another action is still running")
+
+// ErrClipsCopy: Clips are MP4, and file copy for them ships in Phase 3.
+var ErrClipsCopy = errors.New("copying Clips arrives in a later update")
 
 // PasteDelay is the wait between hiding the panel (or reactivating the previous app) and ⌘V.
 const PasteDelay = 80 * time.Millisecond
@@ -28,6 +33,7 @@ type Result struct {
 type ActionService struct {
 	Platform   platform.Platform
 	SamplePath string
+	Staging    *staging.Store
 	Hide       func()
 	Previous   func() platform.App
 	Sleep      func(time.Duration) // nil means time.Sleep
@@ -36,7 +42,7 @@ type ActionService struct {
 
 // Copy puts the staged sample GIF on the clipboard as a file and hides the panel.
 // On failure the panel stays open so the frontend can show the error.
-func (a *ActionService) Copy(ctx context.Context) (Result, error) {
+func (a *ActionService) Copy(ctx context.Context, g provider.Gif) (Result, error) {
 	if !a.busy.TryLock() {
 		return Result{}, ErrBusy
 	}
@@ -51,7 +57,7 @@ func (a *ActionService) Copy(ctx context.Context) (Result, error) {
 
 // Paste copies the GIF, hides the panel and posts one ⌘V to the previous app.
 // Without Accessibility it only copies and keeps the panel open with instructions.
-func (a *ActionService) Paste(ctx context.Context) (Result, error) {
+func (a *ActionService) Paste(ctx context.Context, g provider.Gif) (Result, error) {
 	if !a.busy.TryLock() {
 		return Result{}, ErrBusy
 	}
