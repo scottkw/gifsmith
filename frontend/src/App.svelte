@@ -6,11 +6,14 @@
   let input: HTMLInputElement;
   let status = $state('');
   let needsAccessibility = $state(false);
+  // Paste hides the panel before ⌘V; a copied-only fallback message must survive to the next show.
+  let keepStatus = false;
 
   onMount(() => {
     input.focus();
     Events.On('panel:show', () => {
-      status = '';
+      if (!keepStatus) status = '';
+      keepStatus = false;
       needsAccessibility = false;
       input.focus();
       input.select();
@@ -28,6 +31,7 @@
         const r = await ActionService.Paste();
         status = r.message;
         needsAccessibility = r.needsAccessibility;
+        keepStatus = r.copied && !r.pasted && !r.needsAccessibility;
       } else {
         status = (await ActionService.Copy()).message;
       }

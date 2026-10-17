@@ -153,11 +153,11 @@ func TestPasteCopyError(t *testing.T) {
 func TestPastePostError(t *testing.T) {
 	f := &platform.Fake{Trusted: true, Frontmost: prevApp, PasteErr: errors.New("could not post")}
 	r, err := newPasteService(f).Paste(context.Background())
-	if !errors.Is(err, f.PasteErr) {
-		t.Errorf("err = %v, want %v", err, f.PasteErr)
+	if err != nil {
+		t.Errorf("err = %v, want nil (Wails drops the result on error and the panel is hidden)", err)
 	}
-	if !r.Copied || r.Pasted {
-		t.Errorf("result = %+v, want Copied, not Pasted", r)
+	if !r.Copied || r.Pasted || r.Message == "" {
+		t.Errorf("result = %+v, want Copied, not Pasted, with a message", r)
 	}
 }
 

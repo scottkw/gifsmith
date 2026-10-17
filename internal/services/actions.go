@@ -70,7 +70,9 @@ func (a *ActionService) Paste(ctx context.Context) (Result, error) {
 		}
 	}
 	if err := a.Platform.PasteShortcut(); err != nil {
-		return Result{Copied: true}, err
+		// The panel is already hidden, so an error here would never be seen; report it as a result.
+		log.Printf("paste: post ⌘V: %v", err)
+		return Result{Copied: true, Message: "Copied — automatic paste failed, press ⌘V"}, nil
 	}
 	log.Printf("paste: posted ⌘V (previous app %q)", prev.Name)
 	return Result{Copied: true, Pasted: true, Message: "Pasted GIF"}, nil
