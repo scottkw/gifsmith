@@ -94,12 +94,70 @@ type Snapshot struct {
 	Theme string `json:"theme"`
 }
 
-func (s *SettingsService) Snapshot(ctx context.Context) Snapshot { return Snapshot{} } // RED skeleton
+func (s *SettingsService) Snapshot(ctx context.Context) Snapshot { return snapshotOf(s.Store.Get()) }
 
+func snapshotOf(p settings.Prefs) Snapshot { return Snapshot{Theme: p.Theme} }
+
+var errUnchanged = errors.New("unchanged")
+
+// SetPref sets one allow-listed pref from the webview, validated here; an equal value is a no-op.
+// Each write emits settings:changed with the full Snapshot so the panel and Settings converge.
 func (s *SettingsService) SetPref(ctx context.Context, name, value string) (Snapshot, error) {
-	return Snapshot{}, nil // RED skeleton
+	var set func(*settings.Prefs)
+	switch name {
+	case "theme":
+		set = func(p *settings.Prefs) { p.Theme = value }
+	default:
+		return s.Snapshot(ctx), errInvalidValue
+	}
+	p, err := s.Store.Update(func(p *settings.Prefs) error {
+		before := *p
+		set(p)
+		if len(p.Normalize()) > 0 {
+			return errInvalidValue
+		}
+		if *p == before {
+			return errUnchanged
+		}
+		return nil
+	})
+	switch {
+	case errors.Is(err, errUnchanged):
+		return snapshotOf(p), nil
+	case errors.Is(err, errInvalidValue):
+		return snapshotOf(p), err
+	case err != nil:
+		log.Printf("settings write failed: %s", name)
+		return snapshotOf(p), errPrefsWriteFailed
+	}
+	if name == "theme" && s.ApplyTheme != nil {
+		s.ApplyTheme(p.Theme)
+	}
+	snap := snapshotOf(p)
+	if s.Emit != nil {
+		s.Emit("settings:changed", snap)
+	}
+	return snap, nil
 }
 
-func (s *SettingsService) LastProvider(ctx context.Context) string { return "" } // RED skeleton
+// LastProvider is the persisted provider id, or "" on first run or an unreadable file.
+func (s *SettingsService) LastProvider(ctx context.Context) string {
+	lp := s.Store.Get().LastProvider
+	if _, ok := provider.ParseID(lp); !ok {
+		return ""
+	}
+	return lp
+}
 
-func (s *SettingsService) SetLastProvider(ctx context.Context, p string) error { return nil } // RED skeleton
+// SetLastProvider persists the provider tab to reopen on next launch (no event: a tab switch).
+func (s *SettingsService) SetLastProvider(ctx context.Context, p string) error {
+	id, err := parse(p)
+	if err != nil {
+		return err
+	}
+	if _, err := s.Store.Update(func(p *settings.Prefs) error { p.LastProvider = string(id); return nil }); err != nil {
+		log.Printf("settings write failed: lastProvider")
+		return errPrefsWriteFailed
+	}
+	return nil
+}

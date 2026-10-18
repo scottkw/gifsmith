@@ -43,14 +43,19 @@ func actionErr(kind string) error { return &ActionError{Kind: kind} }
 var ErrBusy = actionErr("busy")
 
 // MarshalError makes an *ActionError err.cause in JS; nil leaves every other error to Wails.
-// main.go tries provider.MarshalError first.
+// The same for *SettingsError (kind, optional slot). main.go tries provider.MarshalError first.
 func MarshalError(err error) []byte {
 	var ae *ActionError
-	if !errors.As(err, &ae) {
-		return nil
+	if errors.As(err, &ae) {
+		b, _ := json.Marshal(ae) // cannot fail for this struct
+		return b
 	}
-	b, _ := json.Marshal(ae) // cannot fail for this struct
-	return b
+	var se *SettingsError
+	if errors.As(err, &se) {
+		b, _ := json.Marshal(se)
+		return b
+	}
+	return nil
 }
 
 // SettingsError is the error SettingsService returns to the webview: fixed text per kind.
@@ -59,4 +64,23 @@ type SettingsError struct {
 	Slot string `json:"slot,omitempty"`
 }
 
-func (e *SettingsError) Error() string { return "settings failed" } // RED skeleton
+var settingsText = map[string]string{
+	"invalid_value":       "this setting value is not allowed",
+	"prefs_write_failed":  "the settings file could not be written",
+	"autostart_failed":    "could not change Open at login",
+	"not_in_applications": "Gifsmith is not in the Applications folder",
+}
+
+func (e *SettingsError) Error() string {
+	if t, ok := settingsText[e.Kind]; ok {
+		return t
+	}
+	return "settings change failed"
+}
+
+var (
+	errInvalidValue      = &SettingsError{Kind: "invalid_value"}
+	errPrefsWriteFailed  = &SettingsError{Kind: "prefs_write_failed"}
+	errAutostartFailed   = &SettingsError{Kind: "autostart_failed"}
+	errNotInApplications = &SettingsError{Kind: "not_in_applications"}
+)

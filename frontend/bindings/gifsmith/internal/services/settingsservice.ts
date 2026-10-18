@@ -11,6 +11,10 @@
 // @ts-ignore: Unused imports
 import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
 /**
  * LastProvider is the persisted provider id, or "" on first run or an unreadable file.
  */
@@ -27,8 +31,20 @@ export function SaveKey(p: string, key: string): $CancellablePromise<void> {
 }
 
 /**
- * SetLastProvider persists the provider tab to reopen on next launch.
+ * SetLastProvider persists the provider tab to reopen on next launch (no event: a tab switch).
  */
 export function SetLastProvider(p: string): $CancellablePromise<void> {
     return $Call.ByID(2165858912, p);
+}
+
+/**
+ * SetPref sets one allow-listed pref from the webview, validated here; an equal value is a no-op.
+ * Each write emits settings:changed with the full Snapshot so the panel and Settings converge.
+ */
+export function SetPref(name: string, value: string): $CancellablePromise<$models.Snapshot> {
+    return $Call.ByID(3385564000, name, value);
+}
+
+export function Snapshot(): $CancellablePromise<$models.Snapshot> {
+    return $Call.ByID(1374333671);
 }

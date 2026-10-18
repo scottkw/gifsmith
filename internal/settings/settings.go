@@ -126,38 +126,67 @@ type Prefs struct {
 }
 
 // Normalize resets invalid values to their declared defaults and returns the reset field names.
-func (p *Prefs) Normalize() []string { return nil } // RED skeleton
+func (p *Prefs) Normalize() []string {
+	var reset []string
+	switch p.Theme {
+	case "", "light", "dark":
+	default:
+		p.Theme = ""
+		reset = append(reset, "theme")
+	}
+	return reset
+}
 
-// Store is the single owner of settings.json.
+const prefsFile = "settings.json"
+
+// Store is the single owner of settings.json: every write is a load-modify-save under one mutex,
+// so concurrent writers (panel and Settings) never erase each other's fields.
 type Store struct {
 	dir string
 	mu  sync.Mutex
 	p   Prefs
 }
 
-func OpenStore(dir string) *Store { return &Store{dir: dir} } // RED skeleton
-
-func (s *Store) Get() Prefs { return Prefs{} } // RED skeleton
-
-func (s *Store) Update(f func(*Prefs) error) (Prefs, error) { return Prefs{}, nil } // RED skeleton
-
-const prefsFile = "settings.json"
-
-// LoadPrefs reads dir/settings.json; a missing file is the first run (zero Prefs, nil).
-func LoadPrefs(dir string) (Prefs, error) {
-	var p Prefs
+// OpenStore reads dir/settings.json once. A missing file is the first run; an unreadable one is
+// treated as the first run too, logged. Unknown values reset to their defaults, logged by name.
+func OpenStore(dir string) *Store {
+	s := &Store{dir: dir}
 	b, err := os.ReadFile(filepath.Join(dir, prefsFile))
-	if errors.Is(err, os.ErrNotExist) {
-		return p, nil
+	if err == nil {
+		err = json.Unmarshal(b, &s.p)
 	}
-	if err != nil {
-		return p, err
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		log.Printf("settings unreadable, treating as first run: %v", err)
+		s.p = Prefs{}
 	}
-	return p, json.Unmarshal(b, &p)
+	for _, f := range s.p.Normalize() {
+		log.Printf("settings: reset %s to default", f)
+	}
+	return s
 }
 
-// SavePrefs writes settings.json with WriteJSONAtomic.
-func SavePrefs(dir string, p Prefs) error { return WriteJSONAtomic(dir, prefsFile, p) }
+func (s *Store) Get() Prefs {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.p
+}
+
+// Update runs f on a copy, normalizes and writes it atomically, and keeps it only when the write
+// succeeded; on any error the in-memory prefs are unchanged and the current prefs are returned.
+func (s *Store) Update(f func(*Prefs) error) (Prefs, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	next := s.p
+	if err := f(&next); err != nil {
+		return s.p, err
+	}
+	next.Normalize()
+	if err := WriteJSONAtomic(s.dir, prefsFile, next); err != nil {
+		return s.p, err
+	}
+	s.p = next
+	return next, nil
+}
 
 // WriteJSONAtomic writes v as JSON to dir/name: temp file in the same dir, Sync, then rename,
 // mode 0600 in a 0700 dir. On any error the previous file is untouched and the temp file removed.

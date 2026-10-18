@@ -24,3 +24,10 @@ export interface Result {
     "needsAccessibility": boolean;
     "message": string;
 }
+
+/**
+ * Snapshot is the settings the webviews render. Never a key.
+ */
+export interface Snapshot {
+    "theme": string;
+}

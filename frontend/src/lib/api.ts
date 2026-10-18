@@ -8,13 +8,14 @@ import {
   type DownloadResult,
   type ProviderStatus,
   type Result,
+  type Snapshot as SettingsSnapshot,
 } from '../../bindings/gifsmith/internal/services';
 import type { Gif, Page } from '../../bindings/gifsmith/internal/provider';
 import type { Entry, Snapshot } from '../../bindings/gifsmith/internal/library';
 import { Browser, CancelError, type CancellablePromise } from '@wailsio/runtime';
 import { CLIPS_ACCESS_MAILTO, GIPHY_KEY_URL, KLIPY_KEY_URL } from './providers';
 
-export type { DownloadResult, Entry, Gif, Page, ProviderStatus, Result };
+export type { DownloadResult, Entry, Gif, Page, ProviderStatus, Result, SettingsSnapshot };
 
 export const search = (p: string, q: string, cursor: string) => GifService.Search(p, q, cursor);
 export const trending = (p: string, cursor: string) => GifService.Trending(p, cursor);
@@ -22,6 +23,11 @@ export const trending = (p: string, cursor: string) => GifService.Trending(p, cu
 export const providers = async () => (await GifService.Providers()) ?? [];
 export const lastProvider = () => SettingsService.LastProvider();
 export const setLastProvider = (p: string) => SettingsService.SetLastProvider(p);
+// Settings: every change applies at once; Go validates and answers with the full snapshot.
+export const snapshot = () => SettingsService.Snapshot();
+export const setPref = (name: string, value: string) => SettingsService.SetPref(name, value);
+// Go's services.SettingsError arrives as err.cause: { kind, slot? }.
+export const settingsError = (e: unknown): { kind: string; slot?: string } | null => providerError(e);
 // Verifies with a real trending call, then stores in the Keychain; rejects with a provider cause.
 export const saveKey = (p: string, key: string) => SettingsService.SaveKey(p, key);
 // Re-probes Clips once when its result is unknown; resolves to the state, rejects with the probe's cause.

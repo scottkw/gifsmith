@@ -17,5 +17,6 @@ export {
 export type {
     DownloadResult,
     ProviderStatus,
-    Result
+    Result,
+    Snapshot
 } from "./models.js";

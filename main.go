@@ -71,8 +71,9 @@ func main() {
 		HasKey:  func() bool { _, ok := keys.Get(provider.GIPHY); return ok },
 		Blocked: func() error { return svc.BlockedErr(provider.Clips) },
 	}
+	store := settings.OpenStore(d.ConfigDir) // the only settings.json owner
 	gifs := &services.GifService{Svc: svc, Keys: keys, Clips: clips}
-	settingsSvc := &services.SettingsService{Keys: keys, Store: settings.OpenStore(d.ConfigDir), Platform: plat, Svc: svc, Clips: clips, NewClient: func(p provider.ID, key string) provider.Provider {
+	settingsSvc := &services.SettingsService{Keys: keys, Store: store, Platform: plat, Svc: svc, Clips: clips, NewClient: func(p provider.ID, key string) provider.Provider {
 		candidate := func() (string, bool) { return key, true }
 		if p == provider.Klipy {
 			return &klipy.Client{BaseURL: d.KlipyBase, Key: candidate, HTTP: d.HTTP}
