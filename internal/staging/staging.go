@@ -1,4 +1,4 @@
-// Package staging downloads the selected GIF to the one file the pasteboard points at.
+// Package staging downloads the selected GIF (or a Clip's MP4) to the one file the pasteboard points at.
 // There is no media cache: Sweep removes every older staged file after a successful copy.
 package staging
 
@@ -43,7 +43,8 @@ type Store struct {
 	maxBytes int64                                // 0 = 50 MB (tests lower it)
 }
 
-// Fetch downloads g.DownloadURL to <Dir>/<sha1(provider:id)[:16]>/<slug>.gif and returns that path.
+// Fetch downloads g.DownloadURL to <Dir>/<sha1(provider:id)[:16]>/<slug>.gif (.mp4 for a Clip) and
+// returns that path. The first bytes must be the GIF magic, or for a Clip an MP4 ftyp box.
 // Transport errors are never wrapped: their text holds the URL.
 func (s *Store) Fetch(ctx context.Context, g provider.Gif) (string, error) {
 	allow := s.Allows
@@ -80,14 +81,17 @@ func (s *Store) Fetch(ctx context.Context, g provider.Gif) (string, error) {
 	if resp.StatusCode != http.StatusOK {
 		return "", ErrDownload
 	}
-	head := make([]byte, 6)
-	if _, err := io.ReadFull(resp.Body, head); err != nil || (string(head) != "GIF87a" && string(head) != "GIF89a") {
-		return "", ErrNotGIF
+	head, ext, notMedia := make([]byte, 6), ".gif", ErrNotGIF
+	if g.IsClip {
+		head, ext, notMedia = make([]byte, 8), ".mp4", ErrNotMP4
+	}
+	if _, err := io.ReadFull(resp.Body, head); err != nil || !magic(g.IsClip, head) {
+		return "", notMedia
 	}
 
 	sum := sha1.Sum([]byte(string(g.Provider) + ":" + g.ID))
 	dir := filepath.Join(s.Dir, hex.EncodeToString(sum[:])[:16])
-	final := filepath.Join(dir, slug(g.Title)+".gif")
+	final := filepath.Join(dir, slug(g.Title)+ext)
 	if rel, err := filepath.Rel(s.Dir, final); err != nil || strings.HasPrefix(rel, "..") {
 		return "", ErrNotAllowed
 	}
@@ -117,6 +121,14 @@ func (s *Store) Fetch(ctx context.Context, g provider.Gif) (string, error) {
 	_ = os.Remove(part)
 	_ = os.Remove(dir) // only succeeds when empty: an earlier copy of the same GIF stays
 	return "", err
+}
+
+// magic reports whether head starts a GIF or, for a Clip, an MP4 (an ftyp box at offset 4).
+func magic(clip bool, head []byte) bool {
+	if clip {
+		return string(head[4:8]) == "ftyp"
+	}
+	return string(head) == "GIF87a" || string(head) == "GIF89a"
 }
 
 // Allows applies the store's allowlist (nil Allow = VendorAllow).

@@ -1,8 +1,8 @@
 // dev-browser UAT (QuickJS sandbox, Playwright Page API). Run via:
 //   bash scripts/smoke-browser-loop.sh --uat scripts/uat/06-clips.js
 // Headless only, fixture keys only. Fresh state: saving the GIPHY key runs the Clips probe
-// (fixture answers 200), the Clips pill turns on, ⌘2 shows clip tiles under the GIPHY mark,
-// and Enter on a clip shows E8 without copying.
+// (fixture answers 200), the Clips pill turns on, ⌘2 shows clip tiles under the GIPHY mark
+// with the MP4 badge, ⌘K lists MP4 rows, and Enter on a clip copies its MP4 (platform.Fake).
 const page = await browser.newPage();
 const fail = (msg) => {
   throw new Error("UAT FAIL: " + msg);
@@ -36,12 +36,28 @@ if (!(await page.locator("#tile-0 img").getAttribute("src")).includes("/media/cl
 if (!(await footer.locator('img[alt="Powered by GIPHY"]').count())) fail("Clips grid without the GIPHY mark");
 await saveScreenshot(await page.screenshot(), "gifsmith-06-clips.png");
 
-// E8: Enter and ⌘Enter on a clip tile keep the panel and make no copy.
-for (const key of ["Enter", "Meta+Enter"]) {
-  await input.press(key);
-  await footer.filter({ hasText: "Copying Clips (MP4) arrives in the next update." }).waitFor({ timeout: 3000 });
-  if (!(await page.locator("#tile-0 img").count())) fail(`${key} left the Clips grid`);
-}
+// MP4 badge (aria-hidden, on --scrim) and the tile's accessible name.
+const badge = page.locator("#tile-0 .badge");
+if ((await badge.innerText()).trim() !== "MP4" || !(await badge.isVisible())) fail("first Clips tile has no visible MP4 badge");
+if ((await badge.getAttribute("aria-hidden")) !== "true") fail("MP4 badge is not aria-hidden");
+if (!(await page.locator("#tile-0").getAttribute("aria-label")).endsWith(", MP4")) fail("Clips tile aria-label lacks ', MP4'");
+const bg = await badge.evaluate((el) => getComputedStyle(el).backgroundColor);
+if (bg !== "rgba(0, 0, 0, 0.6)") fail("MP4 badge background " + bg);
+
+// ⌘K: MP4 rows, no square rows.
+const dialog = page.locator("[role=dialog][aria-label=Actions]");
+await input.press("Meta+k");
+await dialog.waitFor({ timeout: 2000 });
+const labels = (await dialog.locator("[role=option]").allInnerTexts()).map((t) => t.split("\n")[0].trim());
+if (!labels.includes("Copy MP4") || !labels.includes("Paste MP4")) fail("menu rows " + JSON.stringify(labels));
+if (labels.some((l) => l.includes("Square") || l.includes("GIF"))) fail("Clips menu offers a GIF row: " + JSON.stringify(labels));
+await page.keyboard.press("Escape");
+await dialog.waitFor({ state: "detached", timeout: 2000 });
+
+// Enter copies the clip's MP4 (T1m); the E8 placeholder is gone.
+await input.press("Enter");
+await page.locator("footer .center.success", { hasText: "Copied MP4 — press ⌘V to paste" }).waitFor({ timeout: 8000 });
+if ((await footer.innerText()).includes("next update")) fail("E8 placeholder still shown");
 
 // Clips search goes to the Clips endpoint too.
 await input.fill("cats");

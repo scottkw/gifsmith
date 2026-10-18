@@ -30,7 +30,7 @@
   role="option"
   tabindex="-1"
   aria-selected={selected}
-  aria-label={gif.title || `GIF ${index + 1}`}
+  aria-label={(gif.title || `GIF ${index + 1}`) + (gif.isClip ? ', MP4' : '')}
   onclick={() => onselect(index)}
   ondblclick={() => oncopy(index)}
 >
@@ -47,6 +47,9 @@
       draggable="false"
       onerror={() => (brokenSrc = gif.previewUrl)}
     />
+  {/if}
+  {#if gif.isClip}
+    <span class="badge" aria-hidden="true">MP4</span>
   {/if}
   {#if copying && selected}
     <div class="overlay"><span class="spinner" role="status" aria-label="Loading"></span></div>
@@ -82,6 +85,18 @@
     stroke: var(--text-tertiary);
     stroke-width: 1.5;
     stroke-linecap: round;
+  }
+  .badge {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 4px;
+    background: var(--scrim);
+    color: #fff;
+    font-size: 12px;
+    line-height: 16px;
   }
   .overlay {
     position: absolute;

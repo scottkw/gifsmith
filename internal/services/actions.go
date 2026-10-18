@@ -16,9 +16,6 @@ import (
 	"gifsmith/internal/staging"
 )
 
-// ErrClipsCopy: Clips are MP4, and file copy for them ships in Phase 3.
-var ErrClipsCopy = errors.New("copying Clips arrives in a later update")
-
 // PasteDelay is the wait between hiding the panel (or reactivating the previous app) and ⌘V.
 const PasteDelay = 80 * time.Millisecond
 
@@ -41,9 +38,6 @@ type ActionService struct {
 // stage downloads g and puts its file URL on the pasteboard. Older staged files
 // are swept only after that succeeds: until then the clipboard may point at one.
 func (a *ActionService) stage(ctx context.Context, g provider.Gif) error {
-	if g.IsClip {
-		return ErrClipsCopy
-	}
 	path, err := a.Staging.Fetch(ctx, g)
 	if err != nil {
 		log.Printf("stage %s: %v", g.Provider, err)
@@ -64,7 +58,7 @@ func stageErr(err error) error {
 	switch {
 	case errors.Is(err, staging.ErrNotAllowed):
 		return actionErr("not_allowed")
-	case errors.Is(err, staging.ErrNotGIF):
+	case errors.Is(err, staging.ErrNotGIF), errors.Is(err, staging.ErrNotMP4):
 		return actionErr("not_media")
 	case errors.Is(err, staging.ErrTooLarge):
 		return actionErr("too_large")
@@ -72,7 +66,7 @@ func stageErr(err error) error {
 	return actionErr("download_failed")
 }
 
-// Copy puts the selected GIF on the clipboard as a file. The panel stays open:
+// Copy puts the selected GIF (a Clip's MP4) on the clipboard as a file. The panel stays open:
 // the frontend shows the confirmation, then hides it.
 func (a *ActionService) Copy(ctx context.Context, g provider.Gif) (Result, error) {
 	if !a.busy.TryLock() {
@@ -83,6 +77,9 @@ func (a *ActionService) Copy(ctx context.Context, g provider.Gif) (Result, error
 		return Result{}, err
 	}
 	log.Printf("copy: staged and copied")
+	if g.IsClip {
+		return Result{Copied: true, Message: "Copied MP4 — press ⌘V to paste"}, nil
+	}
 	return Result{Copied: true, Message: "Copied — press ⌘V to paste"}, nil
 }
 
@@ -93,7 +90,11 @@ func (a *ActionService) Paste(ctx context.Context, g provider.Gif) (Result, erro
 		return Result{}, ErrBusy
 	}
 	defer a.busy.Unlock()
-	return a.paste(func() error { return a.stage(ctx, g) }, "Pasted GIF")
+	msg := "Pasted GIF"
+	if g.IsClip {
+		msg = "Pasted MP4"
+	}
+	return a.paste(func() error { return a.stage(ctx, g) }, msg)
 }
 
 // paste runs put (which fills the clipboard), then hides the panel and posts one ⌘V to the

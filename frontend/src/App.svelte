@@ -42,7 +42,6 @@
   const DEBOUNCE_MS = 450;
   const HIDE_AFTER_COPY_MS = 400;
   const KEY_SAVED_MS = 2000;
-  const CLIPS_COPY = 'Copying Clips (MP4) arrives in the next update.';
   const AX_FAILED = "Couldn't ask macOS for Accessibility access. Try again.";
 
   type Status = 'idle' | 'loading' | 'refreshing' | 'ready' | 'empty' | 'error';
@@ -459,11 +458,6 @@
   }
 
   function run(action: 'copy' | 'paste') {
-    const g = cur.items[selected];
-    if (g?.isClip && !copying) {
-      setStatus(CLIPS_COPY);
-      return;
-    }
     act(action === 'copy' ? copy : paste, action === 'paste');
   }
 

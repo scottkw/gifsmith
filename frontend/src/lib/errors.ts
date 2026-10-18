@@ -98,8 +98,11 @@ export function revokedMessage(providerLabel: string): string {
 }
 
 // Copy/paste/open failures (UI-SPEC F1/F3/F8), keyed by Go's ActionError kind; '' = no typed cause.
+// A Clip's file is its MP4, so F1/F3 name the MP4 for Clips.
 export function actionErrorText(kind: string, g: Gif): string {
-  if (kind === 'not_media') return `${providerName(g.provider)} sent something that isn't a GIF. Nothing was saved. Try another GIF.`;
+  const what = g.isClip ? 'an MP4' : 'a GIF';
+  if (kind === 'not_media') return `${providerName(g.provider)} sent something that isn't ${what}. Nothing was saved. Try another GIF.`;
   if (kind === 'no_page' || kind === 'open_failed') return "Couldn't open the page in your browser.";
+  if (g.isClip) return "Couldn't copy this MP4. The download failed. Try again or pick another clip.";
   return "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";
 }

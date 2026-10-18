@@ -5,7 +5,7 @@ import (
 	"errors"
 )
 
-// ActionError is the error ActionService returns to the webview (besides ErrClipsCopy).
+// ActionError is the error ActionService returns to the webview.
 // Its text is fixed per kind, never a URL, path or transport error; JS reads err.cause.kind.
 type ActionError struct {
 	Kind string `json:"kind"`
