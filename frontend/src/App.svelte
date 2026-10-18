@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { Events } from '@wailsio/runtime';
   import {
     actionError,
@@ -85,6 +85,7 @@
     errAt: number;
     pageErr: ProviderErr | null; // page 2+ error (S9a/S12a)
     pageErrAt: number;
+    stale: boolean; // fetched with old provider parameters: refetch the first page when next shown
   };
   const fresh = (): PState => ({
     status: 'idle',
@@ -98,8 +99,19 @@
     errAt: 0,
     pageErr: null,
     pageErrAt: 0,
+    stale: false,
   });
   const states = $state<Record<SlotId, PState>>({ giphy: fresh(), clips: fresh(), klipy: fresh(), finergifs: fresh() });
+  let { initial }: { initial: SettingsSnapshot } = $props();
+  // Provider parameters of the last snapshot; a change marks every provider tab stale.
+  const paramsOf = (s: SettingsSnapshot) => [s.giphyRating, s.pageSize, s.giphyLang, s.klipyCountry].join('|');
+  let params = untrack(() => paramsOf(initial));
+  function onSettings(s: SettingsSnapshot) {
+    applyTheme(s.theme);
+    if (paramsOf(s) === params) return;
+    params = paramsOf(s);
+    for (const st of Object.values(states)) st.stale = st.status !== 'idle'; // results on screen stay until then
+  }
   let active = $state<SlotId>('giphy');
   // Key state comes only from GifService.Providers() (booleans); null until the first answer.
   let statuses = $state<Record<string, ProviderStatus> | null>(null);
@@ -251,6 +263,7 @@
       keepStatus = false;
       needsAccessibility = false;
       refreshLibrary(); // a copy or paste while hidden may have changed Recents
+      if (!libTab && states[active].stale) show(active);
       if (card) setup?.focus();
       else {
         input.focus();
@@ -259,7 +272,7 @@
     });
     Events.On('panel:status', (e) => setStatus(String(e.data)));
     Events.On('providers:changed', refreshProviders);
-    Events.On('settings:changed', (e) => applyTheme((e.data as SettingsSnapshot).theme));
+    Events.On('settings:changed', (e) => onSettings(e.data as SettingsSnapshot));
     const [list, last] = await Promise.all([providers(), lastProvider()]);
     const st = byId(list);
     // Persisted slot; first run (or Clips without a GIPHY key) opens on GIPHY. Set with statuses in one step.
@@ -416,11 +429,13 @@
     else runFirst(p, q);
   }
 
-  // Shows p's own state, fetching only when what it holds belongs to another query.
+  // Shows p's own state, fetching only when what it holds belongs to another query or is stale.
   function show(p: SlotId) {
     const s = states[p];
     if (s.err?.kind === 'key_rejected') return; // S13: the card stays until a new key is saved
-    if (s.status !== 'idle' && s.q === wanted()) return;
+    const stale = s.stale;
+    s.stale = false;
+    if (!stale && s.status !== 'idle' && s.q === wanted()) return;
     load(p);
   }
 

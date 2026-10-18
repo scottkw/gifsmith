@@ -74,14 +74,18 @@ await markIs("giphy-powered-light.png");
 if (!(await mark.count())) fail("GIPHY mark missing");
 await saveScreenshot(await B.screenshot(), "gifsmith-15-settings-light.png");
 
-// Sidebar keyboard: the General tab is the only tab stop; ↑/↓ clamp; Tab goes on into the pane.
+// Sidebar keyboard: the selected tab is the only tab stop; ↑/↓ move and clamp at the ends; Tab goes on into the pane.
 const tab = B.getByRole("tab", { name: "General" });
 if ((await tab.getAttribute("aria-selected")) !== "true") fail("General tab not selected");
 await tab.focus();
-for (const k of ["ArrowDown", "ArrowUp"]) {
+const last = await B.getByRole("tab").count();
+for (const [k, want] of [["ArrowUp", 0], ["ArrowDown", 1], ...Array(last).fill(["ArrowDown", last - 1]), ["ArrowUp", last - 2]]) {
   await B.keyboard.press(k);
-  if (!(await tab.evaluate((el) => document.activeElement === el))) fail(`${k} moved focus off the only tab`);
+  const at = await B.evaluate(() => [...document.querySelectorAll("[role=tab]")].indexOf(document.activeElement));
+  if (at !== Math.max(want, 0)) fail(`${k}: focus on tab ${at}, want ${want}`);
 }
+for (let i = 0; i < last; i++) await B.keyboard.press("ArrowUp");
+if (!(await tab.evaluate((el) => document.activeElement === el && el.getAttribute("aria-selected") === "true"))) fail("ArrowUp did not return to General");
 await B.keyboard.press("Tab");
 const tabbed = await B.evaluate(() => document.activeElement && document.activeElement.getAttribute("type") + ":" + document.activeElement.name);
 if (tabbed !== "radio:theme") fail("Tab from the sidebar reached " + tabbed);

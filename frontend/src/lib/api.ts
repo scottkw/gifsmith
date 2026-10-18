@@ -26,6 +26,8 @@ export const setLastProvider = (p: string) => SettingsService.SetLastProvider(p)
 // Settings: every change applies at once; Go validates and answers with the full snapshot.
 export const snapshot = () => SettingsService.Snapshot();
 export const setPref = (name: string, value: string) => SettingsService.SetPref(name, value);
+// The Search-pane choices Go allows, and what Match System resolves to now.
+export const choices = () => SettingsService.Choices();
 // Registers or removes the login item now; rejects with cause.kind autostart_failed | not_in_applications.
 export const setLaunchAtLogin = (on: boolean) => SettingsService.SetLaunchAtLogin(on);
 // The Automatic paste grant, read without prompting.
