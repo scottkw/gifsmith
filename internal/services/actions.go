@@ -439,7 +439,8 @@ func (a *ActionService) ShowDownload(ctx context.Context) error {
 const (
 	SquareMaxBytes  = 15 << 20
 	SquareMaxSide   = 4096
-	SquareMaxPixels = 256 << 20 // summed w*h over all frames, about 256 MB of *image.Paletted
+	SquareMaxPixels = 256 << 20  // summed w*h + frameOverhead over all frames, about 256 MB of *image.Paletted
+	frameOverhead   = 4096 + 256 // Go's fixed per-frame cost (palette clone, image header), so empty frames count
 )
 
 // CopySquare puts a center-cropped square copy of the GIF on the clipboard as a file (D-16).
@@ -590,7 +591,7 @@ func framePixels(r io.Reader) (int64, error) {
 			if _, err := io.ReadFull(br, d[:]); err != nil {
 				return 0, err
 			}
-			px += int64(binary.LittleEndian.Uint16(d[4:])) * int64(binary.LittleEndian.Uint16(d[6:]))
+			px += int64(binary.LittleEndian.Uint16(d[4:]))*int64(binary.LittleEndian.Uint16(d[6:])) + frameOverhead
 			skip := 1
 			if d[8]&0x80 != 0 {
 				skip += 3 << ((d[8] & 7) + 1)

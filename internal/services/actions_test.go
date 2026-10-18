@@ -1094,7 +1094,7 @@ func TestCopySquareDecodeBudget(t *testing.T) {
 	if len(body) > SquareMaxBytes {
 		t.Fatalf("bomb is %d bytes, want under the %d byte cap", len(body), SquareMaxBytes)
 	}
-	if px, err := framePixels(bytes.NewReader(body)); err != nil || px != int64(n)*SquareMaxSide*SquareMaxSide {
+	if px, err := framePixels(bytes.NewReader(body)); err != nil || px != int64(n)*(SquareMaxSide*SquareMaxSide+frameOverhead) {
 		t.Fatalf("framePixels = %d, %v; want %d frames of 4096x4096", px, err, n)
 	}
 	f := &platform.Fake{}
@@ -1125,7 +1125,7 @@ func TestCopySquareDecodeBudgetExtensions(t *testing.T) {
 			if err == nil {
 				t.Errorf("%s: framePixels = %d, want an error", name, px)
 			}
-		} else if err != nil || px != int64(n)*SquareMaxSide*SquareMaxSide {
+		} else if err != nil || px != int64(n)*(SquareMaxSide*SquareMaxSide+frameOverhead) {
 			t.Errorf("%s: framePixels = %d, %v; want %d frames of 4096x4096", name, px, err, n)
 		}
 		f := &platform.Fake{}
