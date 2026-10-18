@@ -37,6 +37,7 @@ type deps struct {
 	Secrets               settings.SecretStore
 	ConfigDir             string // settings.json lives here
 	StagingDir            string
+	DownloadsDir          string                           // Download saves here; never created by the app
 	Allow                 func(provider.ID, *url.URL) bool // download allowlist for staging
 	Platform              platform.Platform                // native in the app; platform.Fake in the UAT build
 }
@@ -47,7 +48,7 @@ func main() {
 	// Downloads get their own client: Fetch's 45 s deadline bounds them, and the
 	// API client's 15 s timeout would cut off a multi-MB original on a slow link.
 	stage := &staging.Store{Dir: d.StagingDir, HTTP: &http.Client{}, Allow: d.Allow}
-	actions := &services.ActionService{Platform: plat, Staging: stage}
+	actions := &services.ActionService{Platform: plat, Staging: stage, DownloadsDir: func() string { return d.DownloadsDir }}
 	panel := &services.PanelService{}
 	keys := settings.NewKeys(d.Secrets)
 	keys.Load()

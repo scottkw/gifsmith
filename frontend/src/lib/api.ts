@@ -1,10 +1,18 @@
 // Thin facade over the generated bindings. Provider HTTP happens in Go; this only calls it.
-import { ActionService, GifService, PanelService, SettingsService, type ProviderStatus, type Result } from '../../bindings/gifsmith/internal/services';
+import {
+  ActionService,
+  GifService,
+  PanelService,
+  SettingsService,
+  type DownloadResult,
+  type ProviderStatus,
+  type Result,
+} from '../../bindings/gifsmith/internal/services';
 import type { Gif, Page } from '../../bindings/gifsmith/internal/provider';
 import { Browser, CancelError, type CancellablePromise } from '@wailsio/runtime';
 import { CLIPS_ACCESS_MAILTO, GIPHY_KEY_URL, KLIPY_KEY_URL } from './providers';
 
-export type { Gif, Page, ProviderStatus, Result };
+export type { DownloadResult, Gif, Page, ProviderStatus, Result };
 
 export const search = (p: string, q: string, cursor: string) => GifService.Search(p, q, cursor);
 export const trending = (p: string, cursor: string) => GifService.Trending(p, cursor);
@@ -71,5 +79,7 @@ export const pasteText = (g: Gif, kind: 'link' | 'markdown') => ActionService.Pa
 export const openPage = (g: Gif) => ActionService.OpenPage(g);
 export const openSource = (g: Gif) => ActionService.OpenSource(g);
 export const paste = (g: Gif) => ActionService.Paste(g);
+// Saves into the download folder Go chooses; the result is the file and folder names, never a path.
+export const download = (g: Gif) => ActionService.Download(g);
 export const requestAccessibility = () => ActionService.RequestAccessibility();
 export const hide = () => PanelService.Hide();

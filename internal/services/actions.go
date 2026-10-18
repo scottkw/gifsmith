@@ -42,6 +42,7 @@ type ActionService struct {
 	DownloadsDir func() string
 	busy         sync.Mutex    // one action at a time: no racing pasteboard writes, no double ⌘V
 	gen          atomic.Uint64 // bumped on every clipboard write; a Klipy timer deletes only if unchanged
+	lastDownload string        // the file Show in Finder reveals; guarded by busy
 }
 
 // stage downloads g, puts its file URL on the pasteboard and returns the staged path. Older
@@ -72,6 +73,8 @@ func stageErr(err error) error {
 		return actionErr("not_media")
 	case errors.Is(err, staging.ErrTooLarge):
 		return actionErr("too_large")
+	case errors.Is(err, staging.ErrFolder):
+		return actionErr("folder_unwritable")
 	}
 	return actionErr("download_failed")
 }
@@ -352,7 +355,27 @@ type DownloadResult struct {
 	Folder string `json:"folder"`
 }
 
-// Download is a RED skeleton.
+// Download saves the selected GIF (a Clip's MP4) into the download folder; the panel stays open.
+// It never goes through staging, the pasteboard or Recents (D-17, D-07).
 func (a *ActionService) Download(ctx context.Context, g provider.Gif) (DownloadResult, error) {
-	return DownloadResult{}, actionErr("download_failed")
+	if !a.busy.TryLock() {
+		return DownloadResult{}, ErrBusy
+	}
+	defer a.busy.Unlock()
+	dir := ""
+	if a.DownloadsDir != nil {
+		dir = a.DownloadsDir()
+	}
+	if dir == "" {
+		return DownloadResult{}, actionErr("folder_unwritable")
+	}
+	// hide is the Phase 4 Settings toggle (SETT-04); FileStem already implements both names.
+	path, err := a.Staging.Save(ctx, g, dir, false)
+	if err != nil {
+		log.Printf("download %s: %v", g.Provider, err)
+		return DownloadResult{}, stageErr(err)
+	}
+	a.lastDownload = path
+	log.Printf("download %s: saved", g.Provider)
+	return DownloadResult{Name: filepath.Base(path), Folder: filepath.Base(dir)}, nil
 }

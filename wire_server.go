@@ -32,14 +32,15 @@ func wire() deps {
 	host := ln.Addr().String()
 	log.Printf("fixture server: http://%s", host)
 	return deps{
-		HTTP:       &http.Client{Timeout: 3 * time.Second},
-		FinerBase:  "http://" + host + "/finer",
-		FinerMedia: "http://" + host + "/media",
-		GiphyBase:  "http://" + host + "/giphy",
-		KlipyBase:  "http://" + host + "/klipy",
-		Secrets:    settings.NewMemoryStore(), // never the user's Keychain
-		ConfigDir:  "bin/uat-config",
-		StagingDir: "bin/uat-cache/staging",
+		HTTP:         &http.Client{Timeout: 3 * time.Second},
+		FinerBase:    "http://" + host + "/finer",
+		FinerMedia:   "http://" + host + "/media",
+		GiphyBase:    "http://" + host + "/giphy",
+		KlipyBase:    "http://" + host + "/klipy",
+		Secrets:      settings.NewMemoryStore(), // never the user's Keychain
+		ConfigDir:    "bin/uat-config",
+		StagingDir:   "bin/uat-cache/staging",
+		DownloadsDir: "bin/uat-downloads", // the smoke script creates it; never the user's ~/Downloads
 		// Vendor hosts, plus plain http to the fixture listener only.
 		Allow: func(p provider.ID, u *url.URL) bool {
 			return staging.VendorAllow(p, u) || (u.Scheme == "http" && u.Host == host)

@@ -13,6 +13,7 @@ export {
 };
 
 export type {
+    DownloadResult,
     ProviderStatus,
     Result
 } from "./models.js";

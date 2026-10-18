@@ -14,7 +14,7 @@ import * as provider$0 from "../provider/models.js";
 import * as $models from "./models.js";
 
 /**
- * Copy puts the selected GIF on the clipboard as a file. The panel stays open:
+ * Copy puts the selected GIF (a Clip's MP4) on the clipboard as a file. The panel stays open:
  * the frontend shows the confirmation, then hides it.
  */
 export function Copy(g: provider$0.Gif): $CancellablePromise<$models.Result> {
@@ -27,6 +27,14 @@ export function Copy(g: provider$0.Gif): $CancellablePromise<$models.Result> {
  */
 export function CopyText(g: provider$0.Gif, kind: string): $CancellablePromise<$models.Result> {
     return $Call.ByID(1904424890, g, kind);
+}
+
+/**
+ * Download saves the selected GIF (a Clip's MP4) into the download folder; the panel stays open.
+ * It never goes through staging, the pasteboard or Recents (D-17, D-07).
+ */
+export function Download(g: provider$0.Gif): $CancellablePromise<$models.DownloadResult> {
+    return $Call.ByID(2459290364, g);
 }
 
 /**

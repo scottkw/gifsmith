@@ -33,14 +33,14 @@ const highlighted = async () => {
 };
 const isFocused = (loc) => loc.evaluate((el) => document.activeElement === el);
 
-// Open: filter focused, first row highlighted. Finer Gifs has no page URL: 6 rows.
+// Open: filter focused, first row highlighted. Finer Gifs has no page URL: 7 rows.
 await input.press("Meta+k");
 await dialog.waitFor({ timeout: 2000 });
 if (!(await isFocused(filter))) fail("filter input not focused");
 if ((await filter.getAttribute("placeholder")) !== "Search actions") fail("filter placeholder");
 if ((await highlighted()) !== "Copy GIF") fail("first row not highlighted");
 const labels = (await options.allInnerTexts()).map((t) => t.split("\n")[0].trim());
-const want = ["Copy GIF", "Paste GIF", "Copy Link", "Paste Link", "Copy Markdown", "Paste Markdown"];
+const want = ["Copy GIF", "Paste GIF", "Copy Link", "Paste Link", "Copy Markdown", "Paste Markdown", "Download GIF"];
 if (JSON.stringify(labels) !== JSON.stringify(want)) fail("rows " + JSON.stringify(labels));
 if ((await options.nth(2).getAttribute("aria-keyshortcuts")) !== "Meta+Shift+C") fail("Copy Link aria-keyshortcuts");
 
@@ -78,7 +78,7 @@ const noToast = async (what) => {
 
 // Filter: "mark" leaves the 2 Markdown rows, separators hidden, first match highlighted.
 await openMenu();
-if ((await dialog.locator(".sep").count()) !== 1) fail("Finer rows should have 1 separator (groups 1 and 2)");
+if ((await dialog.locator(".sep").count()) !== 2) fail("Finer rows should have 2 separators (groups 1, 2 and 3)");
 await filter.type("mark");
 if ((await options.count()) !== 2) fail(`"mark" left ${await options.count()} rows`);
 if (await dialog.locator(".sep").count()) fail("separators shown while filtering");
@@ -150,7 +150,7 @@ await placed("tile-8", "gifsmith-08-menu-col1.png");
 for (let i = 0; i < 3; i++) await input.press("ArrowRight");
 await placed("tile-11", "gifsmith-08-menu-col4.png");
 
-// Overflow (GIPHY: 8 rows + 2 separators > 224px): the list scrolls and keeps the highlight in view.
+// Overflow (GIPHY: 9 rows + 2 separators > 224px): the list scrolls and keeps the highlight in view.
 await page.keyboard.press("Meta+1");
 const field = page.locator(".card input");
 await field.waitFor({ timeout: 5000 });
@@ -158,11 +158,11 @@ await field.fill("uat-key-123");
 await field.press("Enter");
 await page.locator("#tile-0[aria-selected=true] img").waitFor({ timeout: 10000 });
 await openMenu();
-if ((await options.count()) !== 8) fail(`GIPHY rows ${await options.count()}`);
+if ((await options.count()) !== 9) fail(`GIPHY rows ${await options.count()}`);
 const list = dialog.locator("[role=listbox]");
 if (!(await list.evaluate((el) => el.scrollHeight > el.clientHeight && el.clientHeight <= 240))) fail("list does not scroll");
-for (let i = 0; i < 9; i++) await filter.press("ArrowDown"); // clamped at the last row
-if ((await highlighted()) !== "Open in Browser") fail("ArrowDown did not clamp at Open in Browser");
+for (let i = 0; i < 10; i++) await filter.press("ArrowDown"); // clamped at the last row
+if ((await highlighted()) !== "Download GIF") fail("ArrowDown did not clamp at Download GIF");
 const inView = await dialog.locator("[role=option][aria-selected=true]").evaluate((el) => {
   const r = el.getBoundingClientRect();
   const l = el.parentElement.getBoundingClientRect();

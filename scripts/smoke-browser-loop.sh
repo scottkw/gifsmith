@@ -42,7 +42,9 @@ echo "building bin/gifsmith-server (CGO_ENABLED=0, -tags server)"
 mkdir -p bin
 CGO_ENABLED=0 go build -tags server -o bin/gifsmith-server .
 # Fresh first-run state every run (UAT-only dirs; the real app uses the user's cache/config dirs).
-rm -rf bin/uat-config bin/uat-cache
+# The server build downloads into bin/uat-downloads, never ~/Downloads; Download never creates it.
+rm -rf bin/uat-config bin/uat-cache bin/uat-downloads
+mkdir -p bin/uat-downloads
 
 PIDS=()
 BODY=$(mktemp)
@@ -125,6 +127,24 @@ fi
 STAGED=$(find bin/uat-cache/staging -name '*.gif' -type f 2>/dev/null | head -1)
 [ -n "$STAGED" ] || fail "ActionService.Copy(gif) staged no .gif under bin/uat-cache/staging"
 echo "ActionService.Copy(gif): staged $STAGED, HTTP 200 $(cat "$BODY")"
+
+DOWNLOAD_ID=$(method_id "$SVC/actionservice.ts" Download)
+[ -n "$DOWNLOAD_ID" ] || fail "could not find the ActionService.Download method ID"
+for name in "office-moment-1-office-1.gif" "office-moment-1-office-1 (2).gif"; do
+  CODE=$(call "$DOWNLOAD_ID" "[$ITEM]")
+  if [ "$CODE" != "200" ] || ! grep -qF "\"name\":\"$name\"" "$BODY" || grep -q 'uat-downloads/' "$BODY"; then
+    fail "ActionService.Download(gif) via proxy: HTTP $CODE, body: $(cat "$BODY")"
+  fi
+  [ "$(head -c 4 "bin/uat-downloads/$name")" = "GIF8" ] || fail "bin/uat-downloads/$name missing or not a GIF"
+  echo "ActionService.Download(gif): HTTP 200 $(cat "$BODY"), bin/uat-downloads/$name starts GIF8"
+done
+HTML_ITEM=$(node -e 'const g = JSON.parse(process.argv[1]); g.downloadUrl = g.downloadUrl.replace(/office-1\.gif$/, "html-1.gif"); process.stdout.write(JSON.stringify(g))' "$ITEM")
+CODE=$(call "$DOWNLOAD_ID" "[$HTML_ITEM]")
+COUNT=$(find bin/uat-downloads -type f | wc -l | tr -d ' ')
+if [ "$CODE" = "200" ] || [ "$COUNT" != "2" ]; then
+  fail "ActionService.Download(html media): HTTP $CODE, $COUNT files in bin/uat-downloads, body: $(cat "$BODY")"
+fi
+echo "ActionService.Download(html media): HTTP $CODE $(cat "$BODY"), no new file"
 
 COPYTEXT_ID=$(method_id "$SVC/actionservice.ts" CopyText)
 [ -n "$COPYTEXT_ID" ] || fail "could not find the ActionService.CopyText method ID"

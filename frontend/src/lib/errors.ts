@@ -97,11 +97,16 @@ export function revokedMessage(providerLabel: string): string {
   return `${providerLabel} rejected your saved key. It may have been revoked. Paste a new key to continue.`;
 }
 
-// Copy/paste/open failures (UI-SPEC F1/F3/F8), keyed by Go's ActionError kind; '' = no typed cause.
-// A Clip's file is its MP4, so F1/F3 name the MP4 for Clips.
-export function actionErrorText(kind: string, g: Gif): string {
+// Copy/paste/open/download failures (UI-SPEC F1–F4, F8), keyed by Go's ActionError kind; '' = no
+// typed cause. A Clip's file is its MP4, so F1–F3 name the MP4 for Clips. `folder` is the download
+// folder's display name, never a path.
+export function actionErrorText(kind: string, g: Gif, action: 'copy' | 'download' = 'copy', folder = 'Downloads'): string {
   const what = g.isClip ? 'an MP4' : 'a GIF';
   if (kind === 'not_media') return `${providerName(g.provider)} sent something that isn't ${what}. Nothing was saved. Try another GIF.`;
+  if (action === 'download') {
+    if (kind === 'folder_unwritable') return `Couldn't save to ${folder}. Check that the folder exists and that Gifsmith can write to it.`;
+    return `Couldn't download this ${g.isClip ? 'MP4' : 'GIF'}. Check your connection, then try again.`;
+  }
   if (kind === 'no_page' || kind === 'open_failed') return "Couldn't open the page in your browser.";
   if (g.isClip) return "Couldn't copy this MP4. The download failed. Try again or pick another clip.";
   return "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";

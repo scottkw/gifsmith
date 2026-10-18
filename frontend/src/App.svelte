@@ -7,6 +7,7 @@
     checkClips,
     copy,
     copyText,
+    download,
     openPage,
     hide,
     latest,
@@ -42,6 +43,7 @@
   const DEBOUNCE_MS = 450;
   const HIDE_AFTER_COPY_MS = 400;
   const KEY_SAVED_MS = 2000;
+  const DOWNLOAD_TOAST_MS = 5000;
   const AX_FAILED = "Couldn't ask macOS for Accessibility access. Try again.";
 
   type Status = 'idle' | 'loading' | 'refreshing' | 'ready' | 'empty' | 'error';
@@ -91,6 +93,7 @@
   let tone = $state<'' | 'success' | 'error'>('');
   let copying = $state(false); // one Copy/Paste in flight; a second Enter would paste twice
   let needsAccessibility = $state(false);
+  let downloadFolder: string | undefined; // display name from the last download, for F4
   // Paste hides the panel before ⌘V; a copied-only fallback message must survive to the next show.
   let keepStatus = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -383,6 +386,7 @@
       case 'copyLink':
       case 'copyMarkdown':
       case 'open':
+      case 'download':
         runAction(a);
         return;
       case 'actions':
@@ -394,7 +398,7 @@
           onInput();
         } else hide(); // no-op in the server build; nothing here depends on it
         return;
-      // 'tab': bound, no effect; slot1–slot4: onMainKeydown.
+      // 'tab': bound, no effect; 'reveal' (⌘R): captured so it never reloads; slot1–slot4: onMainKeydown.
     }
   }
 
@@ -454,6 +458,9 @@
         // Only GIPHY and Clips items carry a page URL; for the rest ⌘O does nothing.
         if (g?.pageUrl) openItem(g);
         return;
+      case 'download':
+        downloadItem();
+        return;
     }
   }
 
@@ -498,10 +505,30 @@
   }
 
   // Fixed copy keyed by Go's error kind, never the error's text. A busy refusal is silently ignored.
-  function actionFailed(err: unknown, g: Gif) {
+  function actionFailed(err: unknown, g: Gif, action: 'copy' | 'download' = 'copy') {
     const kind = actionError(err)?.kind ?? '';
     if (kind === 'busy') setStatus('');
-    else setStatus(actionErrorText(kind, g), 'error');
+    else setStatus(actionErrorText(kind, g, action, downloadFolder), 'error');
+  }
+
+  // Saves the selected item into the download folder; the panel stays open (D-04). Shares the
+  // copy lock and busy overlay: one file action at a time.
+  async function downloadItem() {
+    const g = cur.items[selected];
+    if (copying || !g) return;
+    copying = true;
+    setStatus('Downloading…');
+    try {
+      const r = await download(g);
+      downloadFolder = r.folder;
+      const text = `Downloaded to ${r.folder}`;
+      setStatus(text, 'success');
+      setTimeout(() => status === text && setStatus(''), DOWNLOAD_TOAST_MS);
+    } catch (err) {
+      actionFailed(err, g, 'download');
+    } finally {
+      copying = false;
+    }
   }
 
   // Success shows no toast: the browser takes focus and HideOnFocusLost hides the panel.

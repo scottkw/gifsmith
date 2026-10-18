@@ -41,6 +41,7 @@ const ROWS: Row[] = [
   { id: 'pasteMarkdown', label: 'Paste Markdown', hint: '', keys: '', group: 2, applies: linkable },
   { id: 'copyPage', label: 'Copy Page Link', hint: '', keys: '', group: 2, applies: hasPage },
   { id: 'open', label: 'Open in Browser', hint: '⌘O', keys: 'Meta+O', group: 3, applies: hasPage },
+  { id: 'download', label: media('Download'), hint: '⌘S', keys: 'Meta+S', group: 3 },
 ];
 
 // Rows that do not apply are omitted, never greyed (D-03).

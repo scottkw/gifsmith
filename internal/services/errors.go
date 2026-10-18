@@ -12,15 +12,17 @@ type ActionError struct {
 }
 
 var actionText = map[string]string{
-	"busy":            "another action is still running", // App.svelte compares this text
-	"download_failed": "the GIF download failed",
-	"not_media":       "the download is not a GIF",
-	"too_large":       "the GIF is too large to copy",
-	"not_allowed":     "this GIF's address is not allowed",
-	"no_link":         "this item has no link to copy",
-	"no_page":         "this item has no page to open",
-	"open_failed":     "could not open the page",
-	"copy_failed":     "could not write to the clipboard",
+	"busy":              "another action is still running", // App.svelte compares this text
+	"download_failed":   "the GIF download failed",
+	"not_media":         "the download is not a GIF",
+	"too_large":         "the GIF is too large to copy",
+	"not_allowed":       "this GIF's address is not allowed",
+	"no_link":           "this item has no link to copy",
+	"no_page":           "this item has no page to open",
+	"open_failed":       "could not open the page",
+	"copy_failed":       "could not write to the clipboard",
+	"folder_unwritable": "the download folder is not writable",
+	"nothing_to_show":   "there is no download to show",
 }
 
 func (e *ActionError) Error() string {
