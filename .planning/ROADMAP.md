@@ -104,7 +104,7 @@ Plans:
   4. The user can add or remove a favorite, and every successful copy or paste appears in Recents (most recent first, capped). Favorites and Recents are browsable grouped by provider (never blended), items can be removed from Recents, and both render from saved metadata with no API calls.
   5. The user can open a details view for a GIF (title, size, dimensions, tags, source links), and an empty search box shows recent searches that can be rerun.
 
-**Plans:** 7/8 plans executed
+**Plans:** 8/8 plans executed
 
 Plans:
 **Wave 1**
@@ -129,7 +129,7 @@ Plans:
 - [x] 03-07-PLAN.md — Details pane (⌘I), recent-search chips, Phase 2 polish (P1–P11, IN-04) and UI backstops
 
 **Wave 8** *(blocked on Wave 7 completion)*
-- [ ] 03-08-PLAN.md — Full-suite regression, signed dev install, native UAT checkpoint
+- [x] 03-08-PLAN.md — Full-suite regression, signed dev install, native UAT checkpoint
 
 **UI hint**: yes
 
@@ -164,5 +164,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Native Spike & Signed Dev Loop | 4/4 | Complete    | 2026-10-17 |
 | 2. Providers, Search UI & First Run | 6/6 | Complete    | 2026-10-17 |
-| 3. Action Pipeline & Library | 7/8 | In Progress | - |
+| 3. Action Pipeline & Library | 8/8 | In Progress | - |
 | 4. Settings, Shell Polish & Release | 0/TBD | Not started | - |

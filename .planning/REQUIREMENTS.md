@@ -44,8 +44,8 @@
 - [x] **ACTN-06**: User can copy or paste a center-cropped square version of a GIF (not offered for Clips)
 - [x] **ACTN-07**: User can open an action menu (⌘K) listing all actions for the selected GIF
 - [ ] **ACTN-08**: User can choose the default Enter action and a second ⌘Enter action in settings
-- [ ] **ACTN-09**: Clips are handled as MP4 (labelled accordingly, 720p default)
-- [ ] **ACTN-10**: Temp files used for copy/paste/download are deleted promptly; Klipy temp files are deleted eagerly
+- [x] **ACTN-09**: Clips are handled as MP4 (labelled accordingly, 720p default)
+- [x] **ACTN-10**: Temp files used for copy/paste/download are deleted promptly; Klipy temp files are deleted eagerly
 - [x] **ACTN-11**: Downloaded files are validated (real GIF/MP4, not an error page) and never overwrite or collide; optional hide-original-filename setting
 
 ### Library
@@ -131,8 +131,8 @@
 | ACTN-06 | Phase 3 | Complete |
 | ACTN-07 | Phase 3 | Complete |
 | ACTN-08 | Phase 4 | Pending |
-| ACTN-09 | Phase 3 | Pending |
-| ACTN-10 | Phase 3 | Pending |
+| ACTN-09 | Phase 3 | Complete |
+| ACTN-10 | Phase 3 | Complete |
 | ACTN-11 | Phase 3 | Complete |
 | LIBR-01 | Phase 3 | Complete |
 | LIBR-02 | Phase 3 | Complete |
