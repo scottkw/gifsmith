@@ -159,6 +159,12 @@ func (s *Store) Sweep(keep string) error {
 	return errors.Join(errs...)
 }
 
+// Clear removes every entry in Dir. Skeleton (03-03 RED).
+func (s *Store) Clear() error { return nil }
+
+// Remove deletes one staged directory. Skeleton (03-03 RED).
+func (s *Store) Remove(dir string) error { return nil }
+
 // VendorAllow admits only https URLs on the provider's own media hosts (default port).
 func VendorAllow(p provider.ID, u *url.URL) bool {
 	if u.Scheme != "https" || u.Port() != "" {

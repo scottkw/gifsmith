@@ -19,6 +19,9 @@ import (
 // PasteDelay is the wait between hiding the panel (or reactivating the previous app) and ⌘V.
 const PasteDelay = 80 * time.Millisecond
 
+// KlipyPasteGrace is how long a pasted Klipy file stays for the target app to read it (D-19).
+const KlipyPasteGrace = 30 * time.Second
+
 type Result struct {
 	Copied             bool   `json:"copied"`
 	Pasted             bool   `json:"pasted"`
@@ -31,8 +34,9 @@ type ActionService struct {
 	Staging  *staging.Store
 	Hide     func()
 	Previous func() platform.App
-	Sleep    func(time.Duration) // nil means time.Sleep
-	busy     sync.Mutex          // one action at a time: no racing pasteboard writes, no double ⌘V
+	Sleep    func(time.Duration)         // nil means time.Sleep
+	After    func(time.Duration, func()) // nil means time.AfterFunc
+	busy     sync.Mutex                  // one action at a time: no racing pasteboard writes, no double ⌘V
 }
 
 // stage downloads g and puts its file URL on the pasteboard. Older staged files
@@ -295,3 +299,6 @@ func (a *ActionService) RequestAccessibility(ctx context.Context) (bool, error) 
 	log.Printf("request accessibility: prompted, opening the Accessibility pane")
 	return false, a.Platform.OpenAccessibilitySettings()
 }
+
+// ServiceShutdown is a skeleton (03-03 RED).
+func (a *ActionService) ServiceShutdown() error { return nil }

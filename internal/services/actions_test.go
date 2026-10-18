@@ -618,3 +618,155 @@ func TestTextActionsRefuseWhileBusy(t *testing.T) {
 		t.Errorf("calls = %q", f.Calls)
 	}
 }
+
+// timers records After calls instead of starting real timers (no 30 s sleeps in tests).
+type timers struct {
+	d  []time.Duration
+	fn []func()
+}
+
+func (tm *timers) after(d time.Duration, fn func()) { tm.d, tm.fn = append(tm.d, d), append(tm.fn, fn) }
+
+// klipyService is a trusted paste service with a recording After and a Klipy fixture item.
+func klipyService(t *testing.T, f *platform.Fake) (*ActionService, fixture, *timers, provider.Gif) {
+	t.Helper()
+	s, fx := newPasteService(t, f)
+	tm := &timers{}
+	s.After = tm.after
+	base, _, _ := strings.Cut(fx.gif.DownloadURL, "/media/")
+	k := provider.Gif{Provider: provider.Klipy, ID: "8041071659142945", Title: "Klipy moment 1", DownloadURL: base + "/media/klipy-1-hd.gif"}
+	return s, fx, tm, k
+}
+
+func stagedPath(t *testing.T, f *platform.Fake) string {
+	t.Helper()
+	for i := len(f.Calls) - 1; i >= 0; i-- {
+		if p, ok := strings.CutPrefix(f.Calls[i], "CopyFile:"); ok {
+			return p
+		}
+	}
+	t.Fatalf("no CopyFile in %q", f.Calls)
+	return ""
+}
+
+func exists(p string) bool { _, err := os.Stat(p); return err == nil }
+
+// D-17: a text copy leaves the clipboard pointing at no file, so every staged file goes.
+func TestCopyTextClearsStaging(t *testing.T) {
+	f := &platform.Fake{}
+	s, fx := newService(t, f)
+	if _, err := s.Copy(context.Background(), fx.gif); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CopyText(context.Background(), fx.gif, "link"); err != nil {
+		t.Fatal(err)
+	}
+	if ents, _ := os.ReadDir(fx.dir); len(ents) != 0 {
+		t.Errorf("staging holds %d entries after a text copy, want none", len(ents))
+	}
+}
+
+func TestCopyTextFailureKeepsStaging(t *testing.T) {
+	f := &platform.Fake{}
+	s, fx := newService(t, f)
+	if _, err := s.Copy(context.Background(), fx.gif); err != nil {
+		t.Fatal(err)
+	}
+	path := stagedPath(t, f)
+	f.CopyErr = errors.New("pasteboard write failed")
+	if _, err := s.CopyText(context.Background(), fx.gif, "link"); actionKind(err) != "copy_failed" {
+		t.Fatalf("err = %v, want copy_failed", err)
+	}
+	if !exists(path) {
+		t.Error("staged file removed although the text copy failed (the clipboard still points at it)")
+	}
+}
+
+func TestServiceShutdownClears(t *testing.T) {
+	f := &platform.Fake{}
+	s, fx := newService(t, f)
+	if _, err := s.Copy(context.Background(), fx.gif); err != nil {
+		t.Fatal(err)
+	}
+	s.busy.Lock() // an action still running must not block quitting
+	defer s.busy.Unlock()
+	if err := s.ServiceShutdown(); err != nil {
+		t.Fatal(err)
+	}
+	if ents, _ := os.ReadDir(fx.dir); len(ents) != 0 {
+		t.Errorf("staging holds %d entries after shutdown, want none", len(ents))
+	}
+}
+
+// D-19: a pasted Klipy file is deleted KlipyPasteGrace after ⌘V.
+func TestKlipyGraceDeletesAfterPaste(t *testing.T) {
+	f := &platform.Fake{Trusted: true, Frontmost: prevApp}
+	s, _, tm, k := klipyService(t, f)
+	r, err := s.Paste(context.Background(), k)
+	if err != nil || !r.Pasted {
+		t.Fatalf("Paste = %+v, %v", r, err)
+	}
+	path := stagedPath(t, f)
+	if len(tm.d) != 1 || tm.d[0] != KlipyPasteGrace || KlipyPasteGrace != 30*time.Second {
+		t.Fatalf("After calls = %v, want one of 30s", tm.d)
+	}
+	if !exists(path) {
+		t.Fatal("Klipy file deleted before the grace period")
+	}
+	tm.fn[0]()
+	if exists(filepath.Dir(path)) {
+		t.Error("Klipy staged dir still there after the grace timer ran")
+	}
+}
+
+// A later copy of the same Klipy GIF re-stages the same hash dir; the older timer must not delete it.
+func TestKlipyGraceGenerationGuard(t *testing.T) {
+	f := &platform.Fake{Trusted: true, Frontmost: prevApp}
+	s, _, tm, k := klipyService(t, f)
+	if _, err := s.Paste(context.Background(), k); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Copy(context.Background(), k); err != nil {
+		t.Fatal(err)
+	}
+	path := stagedPath(t, f)
+	if len(tm.fn) != 1 {
+		t.Fatalf("After calls = %v, want one (Copy schedules none)", tm.d)
+	}
+	tm.fn[0]()
+	if !exists(path) {
+		t.Error("an older Klipy timer deleted a newer staged copy")
+	}
+}
+
+func TestKlipyGraceOnlyAfterKlipyPaste(t *testing.T) {
+	for name, tc := range map[string]struct {
+		trusted bool
+		paste   bool
+		klipy   bool
+	}{
+		"klipy copy":            {true, false, true},
+		"klipy paste untrusted": {false, true, true},
+		"giphy-like paste":      {true, true, false},
+	} {
+		f := &platform.Fake{Trusted: tc.trusted, Frontmost: prevApp}
+		s, fx, tm, k := klipyService(t, f)
+		g := k
+		if !tc.klipy {
+			g = fx.gif
+		}
+		call := s.Copy
+		if tc.paste {
+			call = s.Paste
+		}
+		if _, err := call(context.Background(), g); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if len(tm.d) != 0 {
+			t.Errorf("%s: After called %v, want never", name, tm.d)
+		}
+		if !exists(stagedPath(t, f)) {
+			t.Errorf("%s: staged file gone, want it kept until the next clipboard write", name)
+		}
+	}
+}

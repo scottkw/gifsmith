@@ -332,3 +332,62 @@ func TestPageAllow(t *testing.T) {
 		}
 	}
 }
+
+func TestClear(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	for _, n := range []string{"office-1", "office-2"} {
+		if _, err := s.Fetch(context.Background(), gif(base, n, n)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.Clear(); err != nil {
+		t.Fatal(err)
+	}
+	if e := entries(t, s.Dir); len(e) != 0 {
+		t.Errorf("Dir holds %q after Clear, want nothing", e)
+	}
+	if _, err := os.Stat(s.Dir); err != nil {
+		t.Errorf("Clear removed Dir itself: %v", err)
+	}
+	missing := &Store{Dir: filepath.Join(t.TempDir(), "never-created")}
+	if err := missing.Clear(); err != nil {
+		t.Errorf("Clear on a missing Dir = %v, want nil", err)
+	}
+}
+
+func TestRemove(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	a, err := s.Fetch(context.Background(), gif(base, "office-1", "a"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := s.Fetch(context.Background(), gif(base, "office-2", "b"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Remove(filepath.Dir(a)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Dir(a)); !os.IsNotExist(err) {
+		t.Errorf("removed dir still there (err %v)", err)
+	}
+	if _, err := os.Stat(b); err != nil {
+		t.Errorf("other staged file gone: %v", err)
+	}
+	outside := t.TempDir()
+	victim := filepath.Join(outside, "keep.txt")
+	if err := os.WriteFile(victim, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range []string{filepath.Join(s.Dir, "..", filepath.Base(outside)), outside, s.Dir, filepath.Join(s.Dir, "../x")} {
+		if err := s.Remove(d); !errors.Is(err, ErrNotAllowed) {
+			t.Errorf("Remove(%q) = %v, want ErrNotAllowed", d, err)
+		}
+	}
+	if _, err := os.Stat(victim); err != nil {
+		t.Errorf("file outside Dir removed: %v", err)
+	}
+	if _, err := os.Stat(b); err != nil {
+		t.Errorf("Remove(Dir) emptied the store: %v", err)
+	}
+}
