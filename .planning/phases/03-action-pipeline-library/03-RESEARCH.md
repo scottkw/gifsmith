@@ -596,7 +596,9 @@ Every clipboard write bumps `gen`, so a later copy of the same Klipy GIF (same h
 | A9 | Clips media hosts are under `giphy.com` (existing `VendorAllow` covers them) | Pattern 4 | MP4 fetch refused with `ErrNotAllowed`; extend the allowlist after seeing a real URL |
 | A10 | Klipy `tags` elements are strings when present | Pitfall 7 | Mitigated by tolerant decoding either way |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All five resolved by the user on 2026-10-17 — see 03-CONTEXT.md "Post-research decisions" (plans index them as D-18 Clips link = GIF rendition, Klipy 30 s grace, chip only with ≥1 result, Finer Source omitted, server build uses platform.Fake).
 
 1. **Clips Link/Markdown payload: MP4 URL (UI-SPEC) or the GIF rendition (extension, FEATURES.md)?**
    - What we know: UI-SPEC "Payload formats" says the MP4 URL for Clips. The extension uses `images.original.url` (a GIF) for link and Markdown, and `clips_grid_picker` includes `original`. `![t](x.mp4)` does not render as an image in most Markdown renderers.

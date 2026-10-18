@@ -104,7 +104,33 @@ Plans:
   4. The user can add or remove a favorite, and every successful copy or paste appears in Recents (most recent first, capped). Favorites and Recents are browsable grouped by provider (never blended), items can be removed from Recents, and both render from saved metadata with no API calls.
   5. The user can open a details view for a GIF (title, size, dimensions, tags, source links), and an empty search box shows recent searches that can be rerun.
 
-**Plans**: TBD
+**Plans:** 8 plans
+
+Plans:
+**Wave 1**
+- [ ] 03-01-PLAN.md — Tracer: ⌘⇧C copies the link through Go + Platform.CopyText (server build on platform.Fake); Gif metadata fields; Markdown, page link, paste variants, Open in Browser
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 03-02-PLAN.md — ⌘K action menu: pure action table + placement, popover with filter/keyboard/mouse, one runAction dispatcher
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 03-03-PLAN.md — Clips copy/paste as the 720p MP4 (badge, labels, E8 retired); staging lifecycle (launch/quit wipe, clear after text copy, Klipy 30 s grace delete)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 03-04-PLAN.md — Download (validated, atomic no-overwrite, injected folder) with Show in Finder (⌘R) and the Downloads usage description
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 03-05-PLAN.md — Square GIF: lossless image/gif crop with golden tests, 15 MB/canvas limits, Copy/Paste Square, 300 ms busy rule
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 03-06-PLAN.md — Favorites & Recents: library store + LibraryService, Recents recording, sectioned tabs ⌘5/⌘6, remove/Clear/Undo
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [ ] 03-07-PLAN.md — Details pane (⌘I), recent-search chips, Phase 2 polish (P1–P11, IN-04) and UI backstops
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [ ] 03-08-PLAN.md — Full-suite regression, signed dev install, native UAT checkpoint
+
 **UI hint**: yes
 
 **Notes**: Default Enter action is Copy GIF and ⌘Enter is a built-in sibling until Phase 4 exposes both in Settings (ACTN-08). Favorites persist metadata snapshots only, with no media cache (vendor terms). Paste variants reuse the Phase 1 Accessibility-gated paste path.

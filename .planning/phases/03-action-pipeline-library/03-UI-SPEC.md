@@ -286,7 +286,7 @@ Library-tab grid movement: the selection index runs through all items in section
 | 6 | `Remove from Recents` | same | ⌘⌫ | Not on the Recents tab |
 | 6 | `Clear Recents` | same | — | Not on the Recents tab |
 
-Payload formats: Link = the item's GIF URL (the MP4 URL for Clips). Markdown = `![{title}]({link})`, with `GIF` as the alt text when the title is empty. Page link = the provider's page URL.
+Payload formats: Link = the item's GIF URL (for Clips, the Clip's GIF rendition URL — user decision 2026-10-17, D-18; not the MP4 URL). Markdown = `![{title}]({link})`, with `GIF` as the alt text when the title is empty. Page link = the provider's page URL.
 
 ### Action feedback (Amends 02 Copy flow, Footer center precedence)
 
