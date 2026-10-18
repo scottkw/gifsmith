@@ -8,6 +8,7 @@ import {
   type DownloadResult,
   type ProviderStatus,
   type Result,
+  type KeyStatus,
   type Snapshot as SettingsSnapshot,
 } from '../../bindings/gifsmith/internal/services';
 import type { Gif, Page } from '../../bindings/gifsmith/internal/provider';
@@ -15,7 +16,7 @@ import type { Entry, Snapshot } from '../../bindings/gifsmith/internal/library';
 import { Browser, CancelError, type CancellablePromise } from '@wailsio/runtime';
 import { CLIPS_ACCESS_MAILTO, GIPHY_KEY_URL, KLIPY_KEY_URL } from './providers';
 
-export type { DownloadResult, Entry, Gif, Page, ProviderStatus, Result, SettingsSnapshot };
+export type { DownloadResult, Entry, Gif, KeyStatus, Page, ProviderStatus, Result, SettingsSnapshot };
 
 export const search = (p: string, q: string, cursor: string) => GifService.Search(p, q, cursor);
 export const trending = (p: string, cursor: string) => GifService.Trending(p, cursor);
@@ -36,6 +37,11 @@ export const accessibilityStatus = () => SettingsService.AccessibilityStatus();
 export const settingsError = (e: unknown): { kind: string; slot?: string } | null => providerError(e);
 // Verifies with a real trending call, then stores in the Keychain; rejects with a provider cause.
 export const saveKey = (p: string, key: string) => SettingsService.SaveKey(p, key);
+// Keys pane: status carries the last 4 characters at most; Test is one uncached trending call;
+// Remove deletes the Keychain item (rejects with cause.kind keychain_delete_failed).
+export const keyStatus = async () => (await SettingsService.KeyStatus()) ?? [];
+export const testKey = (p: string) => SettingsService.TestKey(p);
+export const removeKey = (p: string) => SettingsService.RemoveKey(p);
 // Re-probes Clips once when its result is unknown; resolves to the state, rejects with the probe's cause.
 export const checkClips = () => GifService.CheckClips();
 

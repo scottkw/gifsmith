@@ -83,13 +83,15 @@ export function pagingMessage(e: ProviderErr, now: number, receivedAt = now): st
 export function keyMessage(e: ProviderErr | null, providerLabel: string, now: number): string {
   if (!e) return "Couldn't save the key to the macOS Keychain. Try again.";
   if (e.kind === 'key_rejected') return `${providerLabel} rejected that key. Check that you copied the whole key, then try again.`;
-  if (e.kind === 'rate_limited') {
-    const left = remaining(e, now, now);
-    const n = Math.ceil((left ?? 0) / 60);
-    const when = left === null ? 'later this hour' : left < 60 ? 'in less than a minute' : `in ${n} ${n === 1 ? 'minute' : 'minutes'}`;
-    return `${providerLabel}'s request limit was hit while checking the key. Try again ${when}.`;
-  }
+  if (e.kind === 'rate_limited') return `${providerLabel}'s request limit was hit while checking the key. Try again ${retryWhen(e, now)}.`;
   return `Couldn't reach ${providerLabel} to check the key. Check your connection, then try again.`;
+}
+
+// K3's {when}: the error arrived at `now`.
+function retryWhen(e: ProviderErr, now: number): string {
+  const left = remaining(e, now, now);
+  const n = Math.ceil((left ?? 0) / 60);
+  return left === null ? 'later this hour' : left < 60 ? 'in less than a minute' : `in ${n} ${n === 1 ? 'minute' : 'minutes'}`;
 }
 
 // K6: a stored key rejected during search or trending (S13).
@@ -121,10 +123,13 @@ export function libraryErrorText(list: 'favorites' | 'recents'): string {
 
 // Keys pane (UI-SPEC K-T1..K-T4): the result of Test; null = the test passed.
 export function testKeyMessage(e: ProviderErr | null, providerLabel: string, now: number): string {
-  return '';
+  if (!e) return `${providerLabel} accepted the key.`;
+  if (e.kind === 'key_rejected') return `${providerLabel} rejected the saved key. It may have been revoked. Change it to continue.`;
+  if (e.kind === 'rate_limited') return `${providerLabel}'s request limit was hit while testing the key. Try again ${retryWhen(e, now)}.`;
+  return `Couldn't reach ${providerLabel} to test the key. Check your connection, then try again.`;
 }
 
 // Keys pane K-A, K-D, K-F.
-export const keySavedText = (providerLabel: string) => '';
-export const keyRemovedText = (providerLabel: string) => '';
-export const keyRemoveFailedText = () => '';
+export const keySavedText = (providerLabel: string) => `Saved. ${providerLabel} is ready.`;
+export const keyRemovedText = (providerLabel: string) => `Removed. Add a key to use ${providerLabel} again.`;
+export const keyRemoveFailedText = () => "Couldn't remove the key from the macOS Keychain. Try again.";

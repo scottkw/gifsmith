@@ -5,6 +5,7 @@
   import { onMount, tick, untrack } from 'svelte';
   import type { SettingsSnapshot } from '../lib/api';
   import GeneralPane from './GeneralPane.svelte';
+  import KeysPane from './KeysPane.svelte';
   import SearchPane from './SearchPane.svelte';
 
   let { initial }: { initial: SettingsSnapshot } = $props();
@@ -12,6 +13,7 @@
   // UI-SPEC order (General, Keys, Hotkeys, Search, Downloads, About); only built panes are listed.
   const PANES = [
     { id: 'general', name: 'General', component: GeneralPane },
+    { id: 'keys', name: 'Keys', component: KeysPane },
     { id: 'search', name: 'Search', component: SearchPane },
   ];
 
