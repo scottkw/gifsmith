@@ -463,14 +463,16 @@ Production serves `/settings.html` from the embedded `frontend/dist` (`AssetFile
 | A11 | Canvas first-frame of cross-origin GIFs displays in WKWebView | Pitfall 15 | Reduce Motion stills blank; fallback is to pause by removing `src` |
 | A12 | Accepting the agreement resolves the 403 | Pitfall 10 | Forum reports show lapsed memberships needing Apple support; still a user action |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **DMG layout amendment.** The Wails tool cannot place icons at UI-SPEC's (135,170)/(405,170) at 128 px.
+All five resolved by the orchestrator on 2026-10-18 with the recommended option (user standing preference: accept recommendations). Recorded as D-22 (DMG), D-23 (Klipy const) and the plan set in 04-01..04-06.
+
+1. **DMG layout amendment.** RESOLVED: Wails fixed positions (151,164)/(388,164) at 96 px; no `leaanthony/dmg`. The Wails tool cannot place icons at UI-SPEC's (135,170)/(405,170) at 128 px.
    - Recommendation: amend the spec to Wails' (151,164)/(388,164) at 96 px and draw the background to match. Only if the user insists, add the custom `leaanthony/dmg` program behind a legitimacy checkpoint. LICENSE then ships in `Contents/Resources` (satisfies MIT) rather than as a loose DMG icon.
-2. **Klipy clearance mechanism.** UI-SPEC says it is not user-visible. Recommendation: `const KlipyFileActions = false` in `internal/services`, exposed read-only to the frontend in the settings snapshot. Flipping it needs a rebuild and release, which matches "developer flips it once the written answer arrives."
-3. **Phase size.** About 14 requirements plus about 14 polish items plus release. Recommendation: ≤6 plans as listed in the Summary. If the planner needs more, move RELS-01..04 (plans 5-6) to Phase 5 as the roadmap allows.
-4. **Notarization timing.** Is the 403 resolved yet? Unknown (no profile observed). Recommendation: the first plan carries an early non-blocking reminder, and the release plan's step 4 is a blocking `checkpoint:human-action`.
-5. **Klipy email.** Draft text is a deliverable (CONTEXT). Sending it is the user's action, and the gate stays closed regardless of timing.
+2. **Klipy clearance mechanism.** RESOLVED: compile-time const, default false. UI-SPEC says it is not user-visible. Recommendation: `const KlipyFileActions = false` in `internal/services`, exposed read-only to the frontend in the settings snapshot. Flipping it needs a rebuild and release, which matches "developer flips it once the written answer arrives."
+3. **Phase size.** RESOLVED: 6 plans, no phase split. About 14 requirements plus about 14 polish items plus release. Recommendation: ≤6 plans as listed in the Summary. If the planner needs more, move RELS-01..04 (plans 5-6) to Phase 5 as the roadmap allows.
+4. **Notarization timing.** RESOLVED: early reminder in 04-01; blocking checkpoint:human-action in 04-05. Is the 403 resolved yet? Unknown (no profile observed). Recommendation: the first plan carries an early non-blocking reminder, and the release plan's step 4 is a blocking `checkpoint:human-action`.
+5. **Klipy email.** RESOLVED: draft only; user sends it; gate stays closed. Draft text is a deliverable (CONTEXT). Sending it is the user's action, and the gate stays closed regardless of timing.
 
 ## Environment Availability
 
