@@ -149,7 +149,7 @@
     background: var(--surface);
   }
   h2 {
-    margin: 0 0 16px;
+    margin: 0 0 8px;
     font: var(--heading);
     color: var(--text);
   }
@@ -162,7 +162,7 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    margin: 8px 0 16px;
+    margin: 16px 0;
   }
   .row {
     display: flex;
@@ -182,7 +182,6 @@
     font: 400 14px/1 var(--font-mono);
     caret-color: var(--accent);
     -webkit-text-security: disc;
-    outline: 0;
   }
   input.invalid {
     border-color: var(--destructive);
@@ -203,19 +202,15 @@
     background: var(--accent-fill);
     color: #ffffff;
   }
-  .primary:disabled {
-    opacity: 0.5;
+  /* P6: disabled buttons read as inactive without an opacity change. */
+  button:disabled {
+    background: var(--surface-active);
+    color: var(--text-tertiary);
     cursor: default;
   }
   .secondary {
     background: var(--surface-active);
     color: var(--text);
-  }
-  input:focus-visible,
-  button:focus-visible,
-  a:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
   }
   .message {
     height: 16px;

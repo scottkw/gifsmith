@@ -1,6 +1,6 @@
 // Provider error -> UI-SPEC copy rows (E1–E5f, E2, E6). No Svelte or DOM imports so node --test can
 // load it. Copy is built only from the provider name and the HTTP status: never a URL, body or key.
-import type { ProviderErr } from './api';
+import type { Gif, ProviderErr } from './api';
 
 export type ErrorState = { id: 'E1' | 'E3' | 'E4' | 'E5' | 'E5f'; heading: string; body: string; tryAgain: boolean; retryAt?: number };
 
@@ -95,4 +95,26 @@ export function keyMessage(e: ProviderErr | null, providerLabel: string, now: nu
 // K6: a stored key rejected during search or trending (S13).
 export function revokedMessage(providerLabel: string): string {
   return `${providerLabel} rejected your saved key. It may have been revoked. Paste a new key to continue.`;
+}
+
+// Copy/paste/open/download/crop failures (UI-SPEC F1–F4, F6–F8), keyed by Go's ActionError kind; '' = no
+// typed cause. A Clip's file is its MP4, so F1–F3 name the MP4 for Clips. `folder` is the download
+// folder's display name, never a path.
+export function actionErrorText(kind: string, g: Gif, action: 'copy' | 'download' = 'copy', folder = 'Downloads'): string {
+  const what = g.isClip ? 'an MP4' : 'a GIF';
+  if (kind === 'not_media') return `${providerName(g.provider)} sent something that isn't ${what}. Nothing was saved. Try another GIF.`;
+  if (action === 'download') {
+    if (kind === 'folder_unwritable') return `Couldn't save to ${folder}. Check that the folder exists and that Gifsmith can write to it.`;
+    return `Couldn't download this ${g.isClip ? 'MP4' : 'GIF'}. Check your connection, then try again.`;
+  }
+  if (kind === 'no_page' || kind === 'open_failed') return "Couldn't open the page in your browser.";
+  if (kind === 'crop_failed') return "Couldn't crop this GIF. Press ↵ to copy it as is, or pick another GIF.";
+  if (kind === 'crop_too_large') return 'This GIF is too large to crop (over 15 MB). Press ↵ to copy it as is.';
+  if (g.isClip) return "Couldn't copy this MP4. The download failed. Try again or pick another clip.";
+  return "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";
+}
+
+// F5: a library write failed (favorite, remove, Clear Recents, Undo); the list keeps its pre-change state.
+export function libraryErrorText(list: 'favorites' | 'recents'): string {
+  return `Couldn't save your ${list === 'favorites' ? 'Favorites' : 'Recents'}. Try again.`;
 }

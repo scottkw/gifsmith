@@ -95,6 +95,51 @@ func TestFetchNotGIF(t *testing.T) {
 	}
 }
 
+func clip(base, name, title string) provider.Gif {
+	return provider.Gif{Provider: provider.Clips, ID: name, Title: title, IsClip: true, DownloadURL: base + "/media/" + name + ".mp4"}
+}
+
+// D-15: a Clip is staged as <slug>.mp4 after the ftyp check.
+func TestFetchStagesMP4(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	p, err := s.Fetch(context.Background(), clip(base, "clip-1-720p", "GIPHY clip 1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rel, _ := filepath.Rel(s.Dir, p)
+	if ok, _ := regexp.MatchString(`^[0-9a-f]{16}/giphy-clip-1\.mp4$`, filepath.ToSlash(rel)); !ok {
+		t.Errorf("staged at %q, want <16 hex>/giphy-clip-1.mp4 under Dir", rel)
+	}
+	if b, err := os.ReadFile(p); err != nil || len(b) < 8 || string(b[4:8]) != "ftyp" {
+		t.Errorf("staged bytes %q (err %v), want an ftyp box", b, err)
+	}
+}
+
+func TestFetchNotMP4(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	for _, g := range []provider.Gif{
+		clip(base, "html-clip", "x"), // HTML page with 200
+		{Provider: provider.Clips, ID: "g", Title: "x", IsClip: true, DownloadURL: base + "/media/office-1.gif"}, // a real GIF
+	} {
+		_, err := s.Fetch(context.Background(), g)
+		if !errors.Is(err, ErrNotMP4) {
+			t.Errorf("%s: err = %v, want ErrNotMP4", g.DownloadURL, err)
+		}
+		if e := entries(t, s.Dir); len(e) != 0 {
+			t.Errorf("Dir not empty after a rejected download: %q", e)
+		}
+	}
+	// A GIF item served an MP4 is still not a GIF.
+	if _, err := s.Fetch(context.Background(), gif(base, "office-1", "x")); err != nil {
+		t.Fatalf("GIF fetch: %v", err)
+	}
+	g := gif(base, "clip-1", "x")
+	g.DownloadURL = base + "/media/clip-1.mp4"
+	if _, err := s.Fetch(context.Background(), g); !errors.Is(err, ErrNotGIF) {
+		t.Errorf("GIF item with MP4 bytes: err = %v, want ErrNotGIF", err)
+	}
+}
+
 func TestFetchHTTPError(t *testing.T) {
 	s, base, _ := newStore(t, http.NotFoundHandler())
 	_, err := s.Fetch(context.Background(), gif(base, "x", "x"))
@@ -257,5 +302,303 @@ func TestFetchRedirectAllowlist(t *testing.T) {
 	}
 	if _, err := s.Fetch(context.Background(), gif(base, "loop", "Loop")); !errors.Is(err, ErrNotAllowed) {
 		t.Errorf("redirect loop: %v, want ErrNotAllowed", err)
+	}
+}
+
+func TestPageAllow(t *testing.T) {
+	for _, tc := range []struct {
+		p    provider.ID
+		u    string
+		want bool
+	}{
+		{provider.GIPHY, "https://giphy.com/gifs/x", true},
+		{provider.Clips, "https://giphy.com/clips/x", true},
+		{provider.GIPHY, "https://media.giphy.com/x", true},
+		{provider.Klipy, "https://klipy.com/x", false},
+		{provider.Klipy, "https://giphy.com/gifs/x", false},
+		{provider.FinerGifs, "https://giphy.com/gifs/x", false},
+		{provider.GIPHY, "http://giphy.com/x", false},
+		{provider.GIPHY, "https://giphy.com:8443/x", false},
+		{provider.GIPHY, "https://evilgiphy.com/x", false},
+		{provider.GIPHY, "https://giphy.com.evil.example/x", false},
+		{provider.GIPHY, "file:///etc/passwd", false},
+	} {
+		u, err := url.Parse(tc.u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := PageAllow(tc.p, u); got != tc.want {
+			t.Errorf("PageAllow(%s, %s) = %v, want %v", tc.p, tc.u, got, tc.want)
+		}
+	}
+}
+
+func TestClear(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	for _, n := range []string{"office-1", "office-2"} {
+		if _, err := s.Fetch(context.Background(), gif(base, n, n)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.Clear(); err != nil {
+		t.Fatal(err)
+	}
+	if e := entries(t, s.Dir); len(e) != 0 {
+		t.Errorf("Dir holds %q after Clear, want nothing", e)
+	}
+	if _, err := os.Stat(s.Dir); err != nil {
+		t.Errorf("Clear removed Dir itself: %v", err)
+	}
+	missing := &Store{Dir: filepath.Join(t.TempDir(), "never-created")}
+	if err := missing.Clear(); err != nil {
+		t.Errorf("Clear on a missing Dir = %v, want nil", err)
+	}
+}
+
+func TestRemove(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	a, err := s.Fetch(context.Background(), gif(base, "office-1", "a"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := s.Fetch(context.Background(), gif(base, "office-2", "b"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Remove(filepath.Dir(a)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Dir(a)); !os.IsNotExist(err) {
+		t.Errorf("removed dir still there (err %v)", err)
+	}
+	if _, err := os.Stat(b); err != nil {
+		t.Errorf("other staged file gone: %v", err)
+	}
+	outside := t.TempDir()
+	victim := filepath.Join(outside, "keep.txt")
+	if err := os.WriteFile(victim, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range []string{filepath.Join(s.Dir, "..", filepath.Base(outside)), outside, s.Dir, filepath.Join(s.Dir, "../x")} {
+		if err := s.Remove(d); !errors.Is(err, ErrNotAllowed) {
+			t.Errorf("Remove(%q) = %v, want ErrNotAllowed", d, err)
+		}
+	}
+	if _, err := os.Stat(victim); err != nil {
+		t.Errorf("file outside Dir removed: %v", err)
+	}
+	if _, err := os.Stat(b); err != nil {
+		t.Errorf("Remove(Dir) emptied the store: %v", err)
+	}
+}
+
+func TestFileStem(t *testing.T) {
+	g := provider.Gif{Title: "Office moment 1", ID: "office-1"}
+	for _, c := range []struct {
+		title, id string
+		hide      bool
+		want      string
+	}{
+		{"Office moment 1", "office-1", false, "office-moment-1-office-1"},
+		{"Office moment 1", "../../etc", false, "office-moment-1-etc"},
+		{"Office moment 1", "a/b c?d", false, "office-moment-1-abcd"},
+		{"Office moment 1", "..", false, "office-moment-1"},
+		{"", "office-1", false, "gif-office-1"},
+		{"Office moment 1", "office-1", true, "gifsmith-office-1"},
+		{"Office moment 1", "/..", true, "gifsmith"},
+	} {
+		g.Title, g.ID = c.title, c.id
+		if got := FileStem(g, c.hide); got != c.want {
+			t.Errorf("FileStem(%q, %q, %v) = %q, want %q", c.title, c.id, c.hide, got, c.want)
+		}
+	}
+	g.ID = strings.Repeat("a", 100)
+	if got := FileStem(g, false); got != "office-moment-1-"+strings.Repeat("a", 64) {
+		t.Errorf("long id: FileStem = %q, want the id capped at 64 bytes", got)
+	}
+}
+
+// saveDir is an empty destination folder outside the staging Dir.
+func saveDir(t *testing.T) string { t.Helper(); return t.TempDir() }
+
+func TestSaveGIF(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	dir := saveDir(t)
+	p, err := s.Save(context.Background(), gif(base, "office-1", "Office moment 1"), dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(dir, "office-moment-1-office-1.gif"); p != want {
+		t.Errorf("saved at %q, want %q", p, want)
+	}
+	b, err := os.ReadFile(p)
+	if err != nil || !strings.HasPrefix(string(b), "GIF8") {
+		t.Errorf("saved bytes start %q (err %v), want GIF8", b[:min(len(b), 6)], err)
+	}
+	if fi, err := os.Stat(p); err != nil || fi.Mode().Perm() != 0o644 {
+		t.Errorf("mode = %v (err %v), want 0644", fi.Mode().Perm(), err)
+	}
+	if e := entries(t, dir); len(e) != 1 {
+		t.Errorf("dir holds %q, want only the saved file (no .part)", e)
+	}
+	if e := entries(t, s.Dir); len(e) != 0 {
+		t.Errorf("a download went through staging: %q", e)
+	}
+}
+
+func TestSaveCollisionNeverOverwrites(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	dir := saveDir(t)
+	g := gif(base, "office-1", "Office moment 1")
+	first, err := s.Save(context.Background(), g, dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, _ := os.Stat(first)
+	for _, want := range []string{"office-moment-1-office-1 (2).gif", "office-moment-1-office-1 (3).gif"} {
+		p, err := s.Save(context.Background(), g, dir, false)
+		if err != nil || p != filepath.Join(dir, want) {
+			t.Errorf("Save = %q, %v; want %s", p, err, want)
+		}
+	}
+	after, _ := os.Stat(first)
+	if !after.ModTime().Equal(before.ModTime()) || after.Size() != before.Size() {
+		t.Error("the first download changed after later saves")
+	}
+}
+
+func TestSavePreexistingFileUntouched(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	dir := saveDir(t)
+	mine := filepath.Join(dir, "office-moment-1-office-1.gif")
+	if err := os.WriteFile(mine, []byte("the user's own file"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p, err := s.Save(context.Background(), gif(base, "office-1", "Office moment 1"), dir, false)
+	if err != nil || p != filepath.Join(dir, "office-moment-1-office-1 (2).gif") {
+		t.Errorf("Save = %q, %v; want the (2) name", p, err)
+	}
+	if b, _ := os.ReadFile(mine); string(b) != "the user's own file" {
+		t.Errorf("pre-existing file now holds %q", b)
+	}
+}
+
+func TestSaveClipMP4(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	dir := saveDir(t)
+	p, err := s.Save(context.Background(), clip(base, "clip-1-720p", "GIPHY clip 1"), dir, false)
+	if err != nil || p != filepath.Join(dir, "giphy-clip-1-clip-1-720p.mp4") {
+		t.Fatalf("Save(clip) = %q, %v; want giphy-clip-1-clip-1-720p.mp4", p, err)
+	}
+	if b, _ := os.ReadFile(p); len(b) < 8 || string(b[4:8]) != "ftyp" {
+		t.Errorf("saved bytes %q, want an ftyp box", b)
+	}
+}
+
+func TestSaveNotMediaLeavesNothing(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	for name, want := range map[string]error{"html-1": ErrNotGIF, "broken-1": ErrDownload} {
+		dir := saveDir(t)
+		_, err := s.Save(context.Background(), gif(base, name, "Office moment 1"), dir, false)
+		if !errors.Is(err, want) {
+			t.Errorf("%s: err = %v, want %v", name, err, want)
+		}
+		if e := entries(t, dir); len(e) != 0 {
+			t.Errorf("%s: dir holds %q, want nothing (not even a temp file)", name, e)
+		}
+	}
+}
+
+func TestSaveFolderErrors(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	ro := saveDir(t)
+	if err := os.Chmod(ro, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(ro, 0o700) })
+	for _, dir := range []string{filepath.Join(saveDir(t), "missing"), ro} {
+		_, err := s.Save(context.Background(), gif(base, "office-1", "Office moment 1"), dir, false)
+		if !errors.Is(err, ErrFolder) {
+			t.Errorf("%s: err = %v, want ErrFolder", dir, err)
+			continue
+		}
+		if strings.Contains(err.Error(), dir) || strings.Contains(err.Error(), "/") {
+			t.Errorf("error text %q holds a path", err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(ro), "missing")); err == nil {
+		t.Error("Save created the missing folder")
+	}
+}
+
+// Traversal ids (Klipy slugs, Finer "..") never leave the destination folder.
+func TestSaveTraversalID(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	dir := saveDir(t)
+	for _, id := range []string{"../../escape", "..", "a/../../b"} {
+		g := gif(base, "office-1", "Office moment 1")
+		g.ID = id
+		p, err := s.Save(context.Background(), g, dir, false)
+		if err != nil {
+			t.Fatalf("%q: %v", id, err)
+		}
+		if filepath.Dir(p) != dir {
+			t.Errorf("%q: saved at %q, outside %q", id, p, dir)
+		}
+	}
+}
+
+// Invariant: the destination is a parameter; any folder gets the same naming and hide rule.
+func TestSaveAnyFolderHideName(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	dir := filepath.Join(saveDir(t), "Chosen Folder")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	p, err := s.Save(context.Background(), gif(base, "office-1", "Office moment 1"), dir, true)
+	if err != nil || p != filepath.Join(dir, "gifsmith-office-1.gif") {
+		t.Errorf("Save(hide) = %q, %v; want gifsmith-office-1.gif in the chosen folder", p, err)
+	}
+}
+
+func TestFetchMaxCap(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	if _, err := s.FetchMax(context.Background(), gif(base, "office-1", "big"), 64); !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("FetchMax(64) err = %v, want ErrTooLarge", err)
+	}
+	if e := entries(t, s.Dir); len(e) != 0 {
+		t.Errorf("Dir not empty after an oversized download: %q", e)
+	}
+	p, err := s.FetchMax(context.Background(), gif(base, "office-1", "Office moment 1"), 1<<20)
+	if err != nil || !strings.HasSuffix(p, "office-moment-1.gif") {
+		t.Fatalf("FetchMax(1 MB) = %q, %v", p, err)
+	}
+}
+
+func TestWriteDerived(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	g := gif(base, "office-1", "Office moment 1")
+	orig, err := s.Fetch(context.Background(), g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := s.WriteDerived(g, "square", []byte("GIF89a-derived"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rel, _ := filepath.Rel(s.Dir, p)
+	if ok, _ := regexp.MatchString(`^[0-9a-f]{16}/office-moment-1-square\.gif$`, filepath.ToSlash(rel)); !ok {
+		t.Errorf("derived at %q, want <16 hex>/office-moment-1-square.gif under Dir", rel)
+	}
+	if filepath.Dir(p) == filepath.Dir(orig) {
+		t.Error("derived file shares the original's directory: Sweep(derived) would keep the original")
+	}
+	if b, err := os.ReadFile(p); err != nil || string(b) != "GIF89a-derived" {
+		t.Errorf("derived bytes = %q, %v", b, err)
+	}
+	for _, e := range entries(t, s.Dir) {
+		if strings.HasSuffix(e, ".part") {
+			t.Errorf("leftover %s", e)
+		}
 	}
 }

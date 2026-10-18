@@ -34,8 +34,8 @@ test('nearEnd is true within the last 8 tiles', () => {
   assert.equal(nearEnd(0, 3), true);
 });
 
-const key = (k: string, o: Partial<{ metaKey: boolean; isComposing: boolean; keyCode: number; repeat: boolean }> = {}) =>
-  routeKey({ key: k, metaKey: false, isComposing: false, keyCode: 0, repeat: false, ...o });
+const key = (k: string, o: Partial<{ metaKey: boolean; shiftKey: boolean; isComposing: boolean; keyCode: number; repeat: boolean }> = {}) =>
+  routeKey({ key: k, metaKey: false, shiftKey: false, isComposing: false, keyCode: 0, repeat: false, ...o });
 
 test('routeKey maps Enter, Escape, Cmd+K, Tab and arrows', () => {
   assert.equal(key('Enter'), 'copy');
@@ -58,11 +58,58 @@ test('routeKey leaves IME composition keys and repeated Enter alone', () => {
   assert.equal(key('Escape', { keyCode: 229 }), 'none');
 });
 
-test('routeKey maps Cmd+1..Cmd+4 to provider slots', () => {
+test('routeKey maps Cmd+1..Cmd+6 to provider and library slots', () => {
   assert.equal(key('1', { metaKey: true }), 'slot1');
   assert.equal(key('2', { metaKey: true }), 'slot2');
   assert.equal(key('3', { metaKey: true }), 'slot3');
   assert.equal(key('4', { metaKey: true }), 'slot4');
-  assert.equal(key('5', { metaKey: true }), 'none');
+  assert.equal(key('5', { metaKey: true }), 'slot5');
+  assert.equal(key('6', { metaKey: true }), 'slot6');
+  assert.equal(key('7', { metaKey: true }), 'none');
+  assert.equal(key('6'), 'none');
   assert.equal(key('1'), 'none');
+});
+
+test('routeKey maps Cmd+Shift+C to copyLink and leaves Cmd+C to the input', () => {
+  assert.equal(key('c', { metaKey: true, shiftKey: true }), 'copyLink');
+  assert.equal(key('C', { metaKey: true, shiftKey: true }), 'copyLink');
+  assert.equal(key('c', { metaKey: true }), 'none');
+  assert.equal(key('C', { shiftKey: true }), 'none');
+});
+
+test('routeKey maps Cmd+Shift+M to copyMarkdown and Cmd+O (no Shift) to open', () => {
+  assert.equal(key('m', { metaKey: true, shiftKey: true }), 'copyMarkdown');
+  assert.equal(key('M', { metaKey: true, shiftKey: true }), 'copyMarkdown');
+  assert.equal(key('m', { metaKey: true }), 'none');
+  assert.equal(key('o', { metaKey: true }), 'open');
+  assert.equal(key('O', { metaKey: true, shiftKey: true }), 'none');
+  assert.equal(key('o'), 'none');
+});
+
+test('routeKey maps Cmd+S to download and Cmd+R to reveal (no Shift)', () => {
+  assert.equal(key('s', { metaKey: true }), 'download');
+  assert.equal(key('S', { metaKey: true, shiftKey: true }), 'none');
+  assert.equal(key('s'), 'none');
+  assert.equal(key('r', { metaKey: true }), 'reveal');
+  assert.equal(key('R', { metaKey: true, shiftKey: true }), 'none');
+});
+
+test('routeKey maps Cmd+Backspace to remove, Cmd+Z (no Shift) to undo, Cmd+Shift+F to favorite', () => {
+  assert.equal(key('Backspace', { metaKey: true }), 'remove');
+  assert.equal(key('Backspace'), 'none');
+  assert.equal(key('z', { metaKey: true }), 'undo');
+  assert.equal(key('Z', { metaKey: true }), 'undo');
+  assert.equal(key('z', { metaKey: true, shiftKey: true }), 'none');
+  assert.equal(key('Z', { metaKey: true, shiftKey: true }), 'none');
+  assert.equal(key('f', { metaKey: true, shiftKey: true }), 'favorite');
+  assert.equal(key('F', { metaKey: true, shiftKey: true }), 'favorite');
+  assert.equal(key('f', { metaKey: true }), 'none');
+  assert.equal(key('5', { metaKey: true }), 'slot5');
+});
+
+test('routeKey maps Cmd+I (no Shift) to details', () => {
+  assert.equal(key('i', { metaKey: true }), 'details');
+  assert.equal(key('I', { metaKey: true }), 'details');
+  assert.equal(key('i'), 'none');
+  assert.equal(key('i', { metaKey: true, shiftKey: true }), 'none');
 });

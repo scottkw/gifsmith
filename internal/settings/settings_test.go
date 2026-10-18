@@ -149,3 +149,50 @@ func TestPrefsInvalidJSON(t *testing.T) {
 		t.Error("invalid JSON loaded without error")
 	}
 }
+
+func TestWriteJSONAtomicModes(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "cfg")
+	if err := WriteJSONAtomic(dir, "list.json", map[string]int{"version": 1}); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "list.json"))
+	if err != nil || string(b) != `{"version":1}` {
+		t.Fatalf("list.json = %q, %v", b, err)
+	}
+	if fi, _ := os.Stat(filepath.Join(dir, "list.json")); fi.Mode().Perm() != 0o600 {
+		t.Errorf("file mode %v, want 0600", fi.Mode().Perm())
+	}
+	if fi, _ := os.Stat(dir); fi.Mode().Perm() != 0o700 {
+		t.Errorf("dir mode %v, want 0700", fi.Mode().Perm())
+	}
+}
+
+// A failed write keeps the previous file byte for byte and leaves no temp file behind.
+func TestWriteJSONAtomicFailureKeepsPrevious(t *testing.T) {
+	dir := t.TempDir()
+	if err := WriteJSONAtomic(dir, "list.json", []int{1}); err != nil {
+		t.Fatal(err)
+	}
+	// Rename onto a non-empty directory fails after the temp file was written.
+	if err := os.MkdirAll(filepath.Join(dir, "busy.json", "x"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteJSONAtomic(dir, "busy.json", []int{2}); err == nil {
+		t.Error("write over a directory succeeded")
+	}
+	// An unwritable dir fails before anything is created.
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	if err := WriteJSONAtomic(dir, "list.json", []int{3}); err == nil {
+		t.Error("write into a read-only dir succeeded")
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "list.json")); string(b) != "[1]" {
+		t.Errorf("list.json = %q, want the previous [1]", b)
+	}
+	ents, _ := os.ReadDir(dir)
+	if len(ents) != 2 {
+		t.Errorf("dir holds %d entries, want list.json and busy.json only (no temp files)", len(ents))
+	}
+}

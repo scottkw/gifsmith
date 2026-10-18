@@ -1,7 +1,8 @@
 // dev-browser UAT (QuickJS sandbox, Playwright Page API). Run via:
 //   bash scripts/smoke-browser-loop.sh --uat scripts/uat/01-tracer.js
-// Search renders an animated 4-column grid of fixture GIFs; Enter stages the GIF and,
-// in the CGO-free server build, the pasteboard stub rejects it, so the footer shows E7.
+// Search renders an animated 4-column grid of fixture GIFs; Enter stages the GIF and the
+// server build's platform.Fake records the copy (no real pasteboard), so the footer confirms it.
+// A fixture whose media answers 500 ("brokenmedia") shows E7.
 const E7 = "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";
 const page = await browser.newPage();
 const fail = (msg) => {
@@ -38,6 +39,11 @@ if (!(await footer.innerText()).includes("GIFs from The Finer Gifs Club")) fail(
 if (!(await footer.innerText()).includes("Office moment 1")) fail("footer title");
 await saveScreenshot(await page.screenshot(), "gifsmith-01-grid.png");
 
+await input.press("Enter");
+await page.locator("footer .center.success", { hasText: "Copied — press ⌘V to paste" }).waitFor({ timeout: 10000 });
+
+await input.fill("brokenmedia");
+await page.locator("#tile-0[aria-selected=true] svg.broken").waitFor({ timeout: 10000 });
 await input.press("Enter");
 await page.locator("footer .center.error", { hasText: E7 }).waitFor({ timeout: 10000 });
 await saveScreenshot(await page.screenshot(), "gifsmith-01-copy-error.png");

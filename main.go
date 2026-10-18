@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"gifsmith/internal/library"
 	"gifsmith/internal/platform"
 	"gifsmith/internal/provider"
 	"gifsmith/internal/provider/finergifs"
@@ -35,18 +36,23 @@ type deps struct {
 	FinerBase, FinerMedia string
 	GiphyBase, KlipyBase  string
 	Secrets               settings.SecretStore
-	ConfigDir             string // settings.json lives here
+	ConfigDir             string // settings.json and the library files live here
 	StagingDir            string
+	DownloadsDir          string                           // Download saves here; never created by the app
 	Allow                 func(provider.ID, *url.URL) bool // download allowlist for staging
+	Platform              platform.Platform                // native in the app; platform.Fake in the UAT build
 }
 
 func main() {
 	d := wire()
-	plat := platform.New()
+	plat := d.Platform
 	// Downloads get their own client: Fetch's 45 s deadline bounds them, and the
 	// API client's 15 s timeout would cut off a multi-MB original on a slow link.
 	stage := &staging.Store{Dir: d.StagingDir, HTTP: &http.Client{}, Allow: d.Allow}
-	actions := &services.ActionService{Platform: plat, Staging: stage}
+	actions := &services.ActionService{Platform: plat, Staging: stage, DownloadsDir: func() string { return d.DownloadsDir }}
+	// Favorites, Recents and recent searches live next to settings.json; metadata only (D-09).
+	lib := &library.Store{Dir: d.ConfigDir, Allow: d.Allow}
+	actions.Recents = lib
 	panel := &services.PanelService{}
 	keys := settings.NewKeys(d.Secrets)
 	keys.Load()
@@ -74,18 +80,32 @@ func main() {
 		return &giphy.Client{BaseURL: d.GiphyBase, Key: candidate, HTTP: d.HTTP}
 	}}
 
+	var sh *shell.Shell // set below, before app.Run; a second launch arrives only after Run starts
 	// No ApplicationShouldTerminateAfterLastWindowClosed: the hidden panel counts as closed.
 	app := application.New(application.Options{
 		Name: "Gifsmith",
+		// One process owns the library, staging and the hotkey (WR-01): a second launch, including
+		// a wails3 dev build while the installed app runs, exits and shows this panel instead.
+		// No-op in -tags server builds.
+		SingleInstance: &application.SingleInstanceOptions{
+			UniqueID:               "com.kenscott.gifsmith",
+			OnSecondInstanceLaunch: func(application.SecondInstanceData) { sh.Show() },
+		},
 		Services: []application.Service{
 			application.NewService(actions),
 			application.NewService(gifs),
 			application.NewService(panel),
 			application.NewService(settingsSvc),
+			application.NewService(&services.LibraryService{Store: lib}),
 		},
-		MarshalError: provider.MarshalError,
-		Assets:       application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
-		Mac:          application.MacOptions{ActivationPolicy: application.ActivationPolicyAccessory},
+		MarshalError: func(err error) []byte {
+			if b := provider.MarshalError(err); b != nil {
+				return b
+			}
+			return services.MarshalError(err)
+		},
+		Assets: application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
+		Mac:    application.MacOptions{ActivationPolicy: application.ActivationPolicyAccessory},
 		// Used only by -tags server builds (browser UAT); WAILS_SERVER_PORT overrides.
 		Server: application.ServerOptions{Host: "localhost", Port: 8089},
 	})
@@ -94,11 +114,16 @@ func main() {
 		log.Printf("clips: %s", clips.State()) // state only: records the native probe outcome
 		app.Event.Emit("providers:changed")
 	}
-	sh := shell.New(app, plat, trayIcon)
+	sh = shell.New(app, plat, trayIcon)
 	actions.Hide = sh.Hide
 	actions.Previous = sh.Previous
 	panel.HideFunc = sh.Hide
 
+	// Staging holds only the clipboard's file; nothing from an earlier run is kept (D-17).
+	// ActionService.ServiceShutdown clears it again at quit.
+	if err := stage.Clear(); err != nil {
+		log.Printf("staging clear: %v", err)
+	}
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}

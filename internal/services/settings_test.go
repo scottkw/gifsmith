@@ -516,8 +516,8 @@ func TestClipsRefusedUnlessEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(p.Items) == 0 || !p.Items[0].IsClip || p.Items[0].Provider != provider.Clips || p.Items[0].DownloadURL != "" {
-		t.Errorf("clips search = %+v, want clip items with no download URL", p.Items)
+	if len(p.Items) == 0 || !p.Items[0].IsClip || p.Items[0].Provider != provider.Clips || !strings.HasSuffix(p.Items[0].DownloadURL, "-720p.mp4") {
+		t.Errorf("clips search = %+v, want clip items downloading the 720p MP4", p.Items)
 	}
 }
 

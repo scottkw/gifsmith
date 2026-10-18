@@ -38,6 +38,29 @@ int gsCopyFile(const char *pbName, const char *path) {
     return ok ? 1 : 0;
 }
 
+// Plain string (public.utf8-plain-text); the Go side rejects invalid UTF-8 and NUL first.
+int gsCopyText(const char *pbName, const char *text) {
+    BOOL ok = NO;
+    @autoreleasepool {
+        NSString *str = [NSString stringWithUTF8String:text];
+        if (str == nil) return 0;
+        NSPasteboard *pb = pasteboard(pbName);
+        [pb clearContents];
+        ok = [pb setString:str forType:NSPasteboardTypeString];
+    }
+    return ok ? 1 : 0;
+}
+
+// Caller frees; NULL when the pasteboard holds no string.
+char *gsPasteboardString(const char *pbName) {
+    char *out = NULL;
+    @autoreleasepool {
+        NSString *s = [pasteboard(pbName) stringForType:NSPasteboardTypeString];
+        if (s != nil) out = strdup(s.UTF8String);
+    }
+    return out;
+}
+
 // First line "types:<space-separated pasteboard types>", then one file path per line.
 // Caller frees.
 char *gsPasteboardFileURLs(const char *pbName) {
@@ -185,4 +208,26 @@ int gsOpenAXSettings(void) {
         ok = [[NSWorkspace sharedWorkspace] openURL:u] ? 1 : 0;
     }});
     return ok;
+}
+
+// Never called from tests: it opens a real browser.
+int gsOpenURL(const char *url) {
+    __block int ok = 0;
+    NSString *s = [NSString stringWithUTF8String:url]; // copied before the block; Go frees url after return
+    if (s == nil) return 0;
+    onMain(^{ @autoreleasepool {
+        NSURL *u = [NSURL URLWithString:s];
+        ok = (u != nil && [[NSWorkspace sharedWorkspace] openURL:u]) ? 1 : 0;
+    }});
+    return ok;
+}
+
+// Never called from tests: it opens a Finder window.
+int gsReveal(const char *path) {
+    NSString *p = [NSString stringWithUTF8String:path]; // copied before the block; Go frees path after return
+    if (p == nil) return 0;
+    onMain(^{ @autoreleasepool {
+        [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs:@[[NSURL fileURLWithPath:p]]];
+    }});
+    return 1;
 }

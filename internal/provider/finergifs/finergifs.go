@@ -76,7 +76,7 @@ func (c *Client) Search(ctx context.Context, q, cursor string) (provider.Page, e
 			title = f.Name
 		}
 		u := c.MediaBase + "/" + f.Fileid + ".gif" // the only rendition: grid and copy share it
-		items = append(items, provider.Gif{Provider: provider.FinerGifs, ID: f.Fileid, Title: title, PreviewURL: u, DownloadURL: u})
+		items = append(items, provider.Gif{Provider: provider.FinerGifs, ID: provider.ClampID(f.Fileid), Title: provider.ClampTitle(title), PreviewURL: u, DownloadURL: u})
 	}
 	next := start + len(items)
 	more := len(items) == provider.PageSize

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { errorState, pagingMessage, providerName, keyMessage, revokedMessage } from './errors.ts';
+import { actionErrorText, libraryErrorText, errorState, pagingMessage, providerName, keyMessage, revokedMessage } from './errors.ts';
 
 const NOW = Date.UTC(2026, 9, 17, 19, 0, 0);
 const SWITCH = 'Other providers still work: ⌘1–⌘4.';
@@ -151,4 +151,52 @@ test('keyMessage: Keychain failure', () => {
 
 test('revokedMessage (K6)', () => {
   assert.equal(revokedMessage('Klipy'), 'Klipy rejected your saved key. It may have been revoked. Paste a new key to continue.');
+});
+
+test('action error rows F1 and F3 come from the kind, never the error text', () => {
+  const F1 = "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";
+  const g = { provider: 'finergifs' } as Parameters<typeof actionErrorText>[1];
+  for (const k of ['download_failed', 'not_allowed', 'too_large', 'copy_failed', '', 'something_new']) {
+    assert.equal(actionErrorText(k, g), F1, k);
+  }
+  assert.equal(actionErrorText('not_media', g), "The Finer Gifs Club sent something that isn't a GIF. Nothing was saved. Try another GIF.");
+  assert.equal(actionErrorText('not_media', { ...g, provider: 'klipy' }), "Klipy sent something that isn't a GIF. Nothing was saved. Try another GIF.");
+});
+
+test('page errors show F8 and a missing link shows F1', () => {
+  const g = { provider: 'giphy' } as Parameters<typeof actionErrorText>[1];
+  assert.equal(actionErrorText('no_page', g), "Couldn't open the page in your browser.");
+  assert.equal(actionErrorText('open_failed', g), "Couldn't open the page in your browser.");
+  assert.equal(actionErrorText('no_link', g), "Couldn't copy this GIF. The download failed. Try again or pick another GIF.");
+});
+
+test('Clips copy errors name the MP4 (F1 and F3 Clips variants)', () => {
+  const clip = { provider: 'clips', isClip: true } as Parameters<typeof actionErrorText>[1];
+  assert.equal(actionErrorText('download_failed', clip), "Couldn't copy this MP4. The download failed. Try again or pick another clip.");
+  assert.equal(actionErrorText('not_media', clip), "GIPHY Clips sent something that isn't an MP4. Nothing was saved. Try another GIF.");
+});
+
+test('download errors show F2, F3 and F4', () => {
+  const g = { provider: 'finergifs' } as Parameters<typeof actionErrorText>[1];
+  const clip = { provider: 'clips', isClip: true } as Parameters<typeof actionErrorText>[1];
+  assert.equal(actionErrorText('download_failed', g, 'download'), "Couldn't download this GIF. Check your connection, then try again.");
+  assert.equal(actionErrorText('', g, 'download'), "Couldn't download this GIF. Check your connection, then try again.");
+  assert.equal(actionErrorText('download_failed', clip, 'download'), "Couldn't download this MP4. Check your connection, then try again.");
+  const F4 = "Couldn't save to Downloads. Check that the folder exists and that Gifsmith can write to it.";
+  assert.equal(actionErrorText('folder_unwritable', g, 'download'), F4);
+  assert.equal(actionErrorText('folder_unwritable', g, 'download', 'uat-downloads'), F4.replace('Downloads', 'uat-downloads'));
+  const F3 = "The Finer Gifs Club sent something that isn't a GIF. Nothing was saved. Try another GIF.";
+  assert.equal(actionErrorText('not_media', g, 'download'), F3);
+  assert.equal(actionErrorText('not_media', g, 'copy'), F3);
+});
+
+test('square crop errors show F6 and F7', () => {
+  const g = { provider: 'giphy' } as Parameters<typeof actionErrorText>[1];
+  assert.equal(actionErrorText('crop_failed', g), "Couldn't crop this GIF. Press ↵ to copy it as is, or pick another GIF.");
+  assert.equal(actionErrorText('crop_too_large', g), 'This GIF is too large to crop (over 15 MB). Press ↵ to copy it as is.');
+});
+
+test('library write failures show F5 for the list that changed', () => {
+  assert.equal(libraryErrorText('favorites'), "Couldn't save your Favorites. Try again.");
+  assert.equal(libraryErrorText('recents'), "Couldn't save your Recents. Try again.");
 });

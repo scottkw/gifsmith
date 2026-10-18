@@ -23,7 +23,7 @@
 - [x] **SRCH-05**: User can navigate the grid entirely by keyboard (arrows, Enter, ⌘K, Esc)
 - [x] **SRCH-06**: Searches are debounced so free keys (100 calls/hour) last; a rate-limit hit shows a clear message with when to retry
 - [x] **SRCH-07**: Network, timeout, and provider errors show a per-provider message; one provider failing never blocks the others
-- [ ] **SRCH-08**: User sees recent searches when the box is empty and can rerun one
+- [x] **SRCH-08**: User sees recent searches when the box is empty and can rerun one
 - [ ] **SRCH-09**: User can set GIPHY content rating (default PG-13)
 
 ### Onboarding & Compliance
@@ -38,23 +38,23 @@
 
 - [x] **ACTN-01**: User can copy the GIF as a file to the clipboard (default Enter action), without needing Accessibility permission
 - [x] **ACTN-02**: User can paste the GIF directly into the app they were using; if Accessibility isn't granted, the GIF is copied and the user is told to press ⌘V and how to grant permission
-- [ ] **ACTN-03**: User can copy or paste the GIF link, and copy or paste GIF Markdown
-- [ ] **ACTN-04**: User can copy the page link and open the GIF page in the browser
-- [ ] **ACTN-05**: User can download the GIF to a chosen folder (default Downloads)
-- [ ] **ACTN-06**: User can copy or paste a center-cropped square version of a GIF (not offered for Clips)
-- [ ] **ACTN-07**: User can open an action menu (⌘K) listing all actions for the selected GIF
+- [x] **ACTN-03**: User can copy or paste the GIF link, and copy or paste GIF Markdown
+- [x] **ACTN-04**: User can copy the page link and open the GIF page in the browser
+- [x] **ACTN-05**: User can download the GIF to a chosen folder (default Downloads)
+- [x] **ACTN-06**: User can copy or paste a center-cropped square version of a GIF (not offered for Clips)
+- [x] **ACTN-07**: User can open an action menu (⌘K) listing all actions for the selected GIF
 - [ ] **ACTN-08**: User can choose the default Enter action and a second ⌘Enter action in settings
-- [ ] **ACTN-09**: Clips are handled as MP4 (labelled accordingly, 720p default)
-- [ ] **ACTN-10**: Temp files used for copy/paste/download are deleted promptly; Klipy temp files are deleted eagerly
-- [ ] **ACTN-11**: Downloaded files are validated (real GIF/MP4, not an error page) and never overwrite or collide; optional hide-original-filename setting
+- [x] **ACTN-09**: Clips are handled as MP4 (labelled accordingly, 720p default)
+- [x] **ACTN-10**: Temp files used for copy/paste/download are deleted promptly; Klipy temp files are deleted eagerly
+- [x] **ACTN-11**: Downloaded files are validated (real GIF/MP4, not an error page) and never overwrite or collide; optional hide-original-filename setting
 
 ### Library
 
-- [ ] **LIBR-01**: User can add/remove a GIF to Favorites
-- [ ] **LIBR-02**: Every successful copy/paste records the GIF in Recents (most recent first, capped)
-- [ ] **LIBR-03**: User can browse Favorites and Recents, grouped by provider (never blended), and remove items from Recents
-- [ ] **LIBR-04**: Favorites and Recents render from saved metadata without API calls (work offline/rate-limited)
-- [ ] **LIBR-05**: User can open a details view for a GIF (title, size, dimensions, tags, source links)
+- [x] **LIBR-01**: User can add/remove a GIF to Favorites
+- [x] **LIBR-02**: Every successful copy/paste records the GIF in Recents (most recent first, capped)
+- [x] **LIBR-03**: User can browse Favorites and Recents, grouped by provider (never blended), and remove items from Recents
+- [x] **LIBR-04**: Favorites and Recents render from saved metadata without API calls (work offline/rate-limited)
+- [x] **LIBR-05**: User can open a details view for a GIF (title, size, dimensions, tags, source links)
 
 ### Settings
 
@@ -116,7 +116,7 @@
 | SRCH-05 | Phase 2 | Complete |
 | SRCH-06 | Phase 2 | Complete |
 | SRCH-07 | Phase 2 | Complete |
-| SRCH-08 | Phase 3 | Pending |
+| SRCH-08 | Phase 3 | Complete |
 | SRCH-09 | Phase 4 | Pending |
 | ONBD-01 | Phase 2 | Complete |
 | ONBD-02 | Phase 2 | Complete |
@@ -125,20 +125,20 @@
 | ONBD-05 | Phase 2 | Complete |
 | ACTN-01 | Phase 1 | Complete |
 | ACTN-02 | Phase 1 | Complete |
-| ACTN-03 | Phase 3 | Pending |
-| ACTN-04 | Phase 3 | Pending |
-| ACTN-05 | Phase 3 | Pending |
-| ACTN-06 | Phase 3 | Pending |
-| ACTN-07 | Phase 3 | Pending |
+| ACTN-03 | Phase 3 | Complete |
+| ACTN-04 | Phase 3 | Complete |
+| ACTN-05 | Phase 3 | Complete |
+| ACTN-06 | Phase 3 | Complete |
+| ACTN-07 | Phase 3 | Complete |
 | ACTN-08 | Phase 4 | Pending |
-| ACTN-09 | Phase 3 | Pending |
-| ACTN-10 | Phase 3 | Pending |
-| ACTN-11 | Phase 3 | Pending |
-| LIBR-01 | Phase 3 | Pending |
-| LIBR-02 | Phase 3 | Pending |
-| LIBR-03 | Phase 3 | Pending |
-| LIBR-04 | Phase 3 | Pending |
-| LIBR-05 | Phase 3 | Pending |
+| ACTN-09 | Phase 3 | Complete |
+| ACTN-10 | Phase 3 | Complete |
+| ACTN-11 | Phase 3 | Complete |
+| LIBR-01 | Phase 3 | Complete |
+| LIBR-02 | Phase 3 | Complete |
+| LIBR-03 | Phase 3 | Complete |
+| LIBR-04 | Phase 3 | Complete |
+| LIBR-05 | Phase 3 | Complete |
 | SETT-01 | Phase 4 | Pending |
 | SETT-02 | Phase 4 | Pending |
 | SETT-03 | Phase 4 | Pending |

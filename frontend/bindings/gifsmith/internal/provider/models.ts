@@ -20,6 +20,39 @@ export interface Gif {
      */
     "downloadUrl": string;
     "isClip": boolean;
+
+    /**
+     * Optional metadata, filled only from fields the vendor response carries (absent = unknown).
+     * Width/Height/Size describe the file Copy puts on the clipboard.
+     */
+    "width"?: number;
+    "height"?: number;
+
+    /**
+     * bytes
+     */
+    "size"?: number;
+    "tags"?: string[] | null;
+
+    /**
+     * PageURL is the vendor's https page for the item; "" = no page actions (Klipy, Finer Gifs).
+     */
+    "pageUrl"?: string;
+
+    /**
+     * https only; can point anywhere
+     */
+    "sourceUrl"?: string;
+
+    /**
+     * Details preview; "" = use PreviewURL
+     */
+    "mediumUrl"?: string;
+
+    /**
+     * GifURL is the GIF rendition used for link and Markdown when DownloadURL is not a GIF (Clips).
+     */
+    "gifUrl"?: string;
 }
 
 export enum ID {

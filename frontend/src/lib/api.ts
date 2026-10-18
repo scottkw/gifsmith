@@ -1,10 +1,20 @@
 // Thin facade over the generated bindings. Provider HTTP happens in Go; this only calls it.
-import { ActionService, GifService, PanelService, SettingsService, type ProviderStatus } from '../../bindings/gifsmith/internal/services';
+import {
+  ActionService,
+  GifService,
+  LibraryService,
+  PanelService,
+  SettingsService,
+  type DownloadResult,
+  type ProviderStatus,
+  type Result,
+} from '../../bindings/gifsmith/internal/services';
 import type { Gif, Page } from '../../bindings/gifsmith/internal/provider';
+import type { Entry, Snapshot } from '../../bindings/gifsmith/internal/library';
 import { Browser, CancelError, type CancellablePromise } from '@wailsio/runtime';
 import { CLIPS_ACCESS_MAILTO, GIPHY_KEY_URL, KLIPY_KEY_URL } from './providers';
 
-export type { Gif, Page, ProviderStatus };
+export type { DownloadResult, Entry, Gif, Page, ProviderStatus, Result };
 
 export const search = (p: string, q: string, cursor: string) => GifService.Search(p, q, cursor);
 export const trending = (p: string, cursor: string) => GifService.Trending(p, cursor);
@@ -59,7 +69,44 @@ export function providerError(e: unknown): ProviderErr | null {
   return c && typeof c.kind === 'string' ? c : null;
 }
 
+// Go's services.ActionError arrives as err.cause too: { kind } only.
+export const actionError = (e: unknown): { kind: string } | null => providerError(e);
+
 export const copy = (g: Gif) => ActionService.Copy(g);
+// Go builds the text (and validates every URL) from g; the webview only names the kind.
+export type TextKind = 'link' | 'markdown' | 'page';
+export const copyText = (g: Gif, kind: TextKind) => ActionService.CopyText(g, kind);
+export const pasteText = (g: Gif, kind: 'link' | 'markdown') => ActionService.PasteText(g, kind);
+// Per-item URLs open only through Go (platform.Fake in the UAT build), never Browser.OpenURL.
+export const openPage = (g: Gif) => ActionService.OpenPage(g);
+export const openSource = (g: Gif) => ActionService.OpenSource(g);
 export const paste = (g: Gif) => ActionService.Paste(g);
+// Go downloads, crops and stages the square GIF; Clips are refused.
+export const copySquare = (g: Gif) => ActionService.CopySquare(g);
+export const pasteSquare = (g: Gif) => ActionService.PasteSquare(g);
+// Saves into the download folder Go chooses; the result is the file and folder names, never a path.
+export const download = (g: Gif) => ActionService.Download(g);
+// Reveals the file Go saved last; no path crosses from the webview.
+export const showDownload = () => ActionService.ShowDownload();
 export const requestAccessibility = () => ActionService.RequestAccessibility();
 export const hide = () => PanelService.Hide();
+
+// Favorites, Recents and recent searches: local files only, never a provider request (D-09).
+// Go never sends null lists; the generated types allow it, so normalize once here.
+export type Library = { favorites: Entry[]; recents: Entry[]; searches: Record<string, string[]>; unreadable: string[]; canUndo: boolean };
+const library = (s: Snapshot): Library => ({
+  favorites: s.favorites ?? [],
+  recents: s.recents ?? [],
+  searches: (s.searches ?? {}) as Record<string, string[]>,
+  unreadable: s.unreadable ?? [],
+  canUndo: s.canUndo,
+});
+export const loadLibrary = async () => library(await LibraryService.Load());
+// Each mutation resolves to the fresh lists; failures reject with cause.kind library_read |
+// library_write | invalid_item, and the previous lists stay as they were.
+export const setFavorite = async (g: Gif, on: boolean) => library(await LibraryService.SetFavorite(g, on));
+export const removeRecent = async (g: Gif) => library(await LibraryService.RemoveRecent(g.provider, g.id));
+export const clearRecents = async () => library(await LibraryService.ClearRecents());
+export const undoLibrary = async () => library(await LibraryService.Undo());
+export const saveSearch = (p: string, q: string) => LibraryService.SaveSearch(p, q);
+export const removeSearch = async (p: string, q: string) => library(await LibraryService.RemoveSearch(p, q));

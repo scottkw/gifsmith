@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -107,9 +108,12 @@ func TestMapping(t *testing.T) {
 		Title:       "Hello",
 		PreviewURL:  "https://static.klipy.com/ii/935d7ab9d8c6202580a668421940ec81/14/af/y6iepZM7.gif",
 		DownloadURL: "https://static.klipy.com/ii/935d7ab9d8c6202580a668421940ec81/14/af/um0L4dFH.gif",
+		Width:       498,
+		Height:      498,
+		Size:        4001918,
 	}
 	ad := provider.Gif{Provider: provider.Klipy, ID: "sponsored-1", Title: "Sponsored", PreviewURL: "https://ads.example.test/sm.gif", DownloadURL: "https://ads.example.test/hd.gif"}
-	if len(p.Items) != 2 || p.Items[0] != want || p.Items[1] != ad {
+	if len(p.Items) != 2 || !reflect.DeepEqual(p.Items[0], want) || !reflect.DeepEqual(p.Items[1], ad) {
 		t.Fatalf("items = %+v, want [%+v %+v] (an ad with GIF renditions stays in place; one without is skipped)", p.Items, want, ad)
 	}
 	if p.Next != "2" {
@@ -131,6 +135,19 @@ func TestTitleFallsBackToSlug(t *testing.T) {
 	}
 	if len(p.Items) != 1 || p.Items[0].Title != "cat-1" {
 		t.Errorf("items = %+v, want title cat-1", p.Items)
+	}
+}
+
+// WR-02: a long slug (the id, and the title when there is none) is clamped to the library limits.
+func TestLongSlugClamped(t *testing.T) {
+	slug := strings.Repeat("é", provider.MaxTitleRunes+50)
+	c, _, _ := stubClient(t, 200, body(1, false, item(slug, "https://s/sm.gif", "", "https://s/hd.gif")))
+	p, err := c.Search(context.Background(), "cat", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Items) != 1 || p.Items[0].ID != slug[:provider.MaxIDBytes] || p.Items[0].Title != string([]rune(slug)[:provider.MaxTitleRunes]) {
+		t.Errorf("items = %+v, want id and title clamped", p.Items)
 	}
 }
 
@@ -350,5 +367,57 @@ func TestRedaction(t *testing.T) {
 		if provider.MarshalError(err) == nil {
 			t.Errorf("%s: %v is not a typed provider error", name, err)
 		}
+	}
+}
+
+// tagged is one Klipy item with the given raw tags value, hd and md sizes.
+func tagged(t *testing.T, tags string) provider.Gif {
+	t.Helper()
+	it := `{"slug":"a","title":"A","type":"gif","tags":` + tags + `,"file":{"sm":{"gif":{"url":"https://s/sm.gif"}},` +
+		`"md":{"gif":{"url":"https://s/md.gif","width":"200","height":150,"size":"bad"}},` +
+		`"hd":{"gif":{"url":"https://s/hd.gif","width":498,"height":"300","size":4001918}}}}`
+	c, _, _ := stubClient(t, 200, body(1, false, it))
+	p, err := c.Search(context.Background(), "cat", "")
+	if err != nil || len(p.Items) != 1 {
+		t.Fatalf("tags %s: %+v, %v", tags, p, err)
+	}
+	return p.Items[0]
+}
+
+func TestTagsTolerant(t *testing.T) {
+	long := strings.Repeat("é", 150)
+	many := make([]string, 60)
+	for i := range many {
+		many[i] = fmt.Sprintf("%q", fmt.Sprint("t", i))
+	}
+	for tags, want := range map[string][]string{
+		`["funny",{"name":"x"},"",5,"cat"]`: {"funny", "cat"},
+		`[]`:                                nil,
+		`"funny"`:                           nil,
+		`{"a":1}`:                           nil,
+		`null`:                              nil,
+		`["` + long + `"]`:                  {strings.Repeat("é", 100)},
+	} {
+		if got := tagged(t, tags).Tags; !reflect.DeepEqual(got, want) {
+			t.Errorf("tags %.40s -> %q, want %q", tags, got, want)
+		}
+	}
+	if got := tagged(t, "["+strings.Join(many, ",")+"]").Tags; len(got) != 50 || got[49] != "t49" {
+		t.Errorf("60 tags -> %d kept, want the first 50", len(got))
+	}
+}
+
+func TestDimensionsFollowDownload(t *testing.T) {
+	g := tagged(t, `[]`)
+	if g.Width != 498 || g.Height != 300 || g.Size != 4001918 || g.MediumURL != "https://s/md.gif" {
+		t.Errorf("hd item = %+v, want hd dims (strings tolerated) and md medium", g)
+	}
+	c, _, _ := stubClient(t, 200, body(1, false, `{"slug":"b","type":"gif","file":{"sm":{"gif":{"url":"https://s/sm.gif"}},"md":{"gif":{"url":"https://s/md.gif","width":200,"height":150,"size":"bad"}}}}`))
+	p, err := c.Search(context.Background(), "cat", "")
+	if err != nil || len(p.Items) != 1 {
+		t.Fatal(p, err)
+	}
+	if g := p.Items[0]; g.DownloadURL != "https://s/md.gif" || g.Width != 200 || g.Height != 150 || g.Size != 0 || g.PageURL != "" {
+		t.Errorf("md item = %+v, want md dims, unknown size, no page URL", g)
 	}
 }

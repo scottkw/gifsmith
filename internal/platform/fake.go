@@ -10,11 +10,13 @@ import (
 type Fake struct {
 	mu        sync.Mutex
 	Calls     []string
-	CopyErr   error
+	CopyErr   error // CopyFile and CopyText
+	OpenErr   error
 	WorkArea  Rect
 	Trusted   bool
 	Frontmost App
 	PasteErr  error
+	RevealErr error
 	// FrontmostErr makes FrontmostApp fail (nil frontmostApplication during app switches or at the lock screen).
 	FrontmostErr error
 	// ActivateSetsFrontmost makes ActivateApp succeed; otherwise it is declined (Frontmost unchanged).
@@ -30,6 +32,16 @@ func (f *Fake) Note(s string) {
 func (f *Fake) CopyFile(path string) error {
 	f.Note("CopyFile:" + path)
 	return f.CopyErr
+}
+
+func (f *Fake) CopyText(text string) error {
+	f.Note("CopyText:" + text)
+	return f.CopyErr
+}
+
+func (f *Fake) OpenURL(u string) error {
+	f.Note("OpenURL:" + u)
+	return f.OpenErr
 }
 
 func (f *Fake) FocusWebView(unsafe.Pointer) { f.Note("FocusWebView") }
@@ -63,6 +75,11 @@ func (f *Fake) AccessibilityTrusted(prompt bool) bool {
 func (f *Fake) OpenAccessibilitySettings() error {
 	f.Note("OpenAccessibilitySettings")
 	return nil
+}
+
+func (f *Fake) RevealFile(path string) error {
+	f.Note("RevealFile:" + path)
+	return f.RevealErr
 }
 
 func (f *Fake) PasteShortcut() error {

@@ -12,6 +12,7 @@ import (
 	"image/color"
 	"image/gif"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -68,16 +69,27 @@ func finerSearch(w http.ResponseWriter, r *http.Request, o Options) {
 		ID     string `json:"id"`
 		Fields fields `json:"fields"`
 	}
+	// Failing-media words: fileids whose /media/ file answers 500 or HTML (copy error rows).
+	prefix := "office-"
+	if hasWord(q.Get("q"), "brokenmedia") {
+		prefix = "broken-"
+	} else if hasWord(q.Get("q"), "htmlmedia") {
+		prefix = "html-"
+	} else if hasWord(q.Get("q"), "widemedia") { // 48x32 media (square crop)
+		prefix = "wide-"
+	} else if hasWord(q.Get("q"), "tallmedia") { // 32x48 media
+		prefix = "tall-"
+	}
 	results := []result{}
 	for n := max(start, 0) + 1; n <= found && len(results) < size; n++ {
-		id := "office-" + strconv.Itoa(n)
+		id := prefix + strconv.Itoa(n)
 		results = append(results, result{ID: strconv.Itoa(n), Fields: fields{Name: id, Text: "Office moment " + strconv.Itoa(n), Fileid: id}})
 	}
 	writeJSON(w, map[string]any{"hits": map[string]int{"found": found, "start": start}, "results": results})
 }
 
 // giphyGifs serves /v1/gifs/{search,trending} and, with clips, /v1/clips/{search,trending}
-// (clips_grid_picker-shaped: fixed_width plus video assets, no original GIF). Scenario
+// (clips_grid_picker-shaped: fixed_width, original GIF and 720p/480p/360p MP4 video assets). Scenario
 // words are read from q and the key, so trending (no q) can be driven by a key such as "ratelimit-key".
 func giphyGifs(w http.ResponseWriter, r *http.Request, o Options, clips bool) {
 	kind := r.PathValue("kind")
@@ -125,23 +137,35 @@ func giphyGifs(w http.ResponseWriter, r *http.Request, o Options, clips bool) {
 		ID     string               `json:"id"`
 		Slug   string               `json:"slug"`
 		Title  string               `json:"title"`
+		URL    string               `json:"url"`
+		Source string               `json:"source,omitempty"`
 		Images map[string]rendition `json:"images"`
 		Video  map[string]any       `json:"video,omitempty"`
 	}
 	media := "http://" + r.Host + "/media/"
+	originalSize := "5678"
+	if hasWord(words, "hugesize") { // over the 15 MB square crop limit
+		originalSize = "16000000"
+	}
 	data := []item{}
 	for n := max(offset, 0) + 1; n <= total && len(data) < limit; n++ {
 		if clips {
 			id := "clip-" + strconv.Itoa(n)
-			data = append(data, item{Type: "video", ID: id, Slug: "clip-" + id, Title: "GIPHY clip " + strconv.Itoa(n), Images: map[string]rendition{
+			data = append(data, item{Type: "video", ID: id, Slug: "clip-" + id, Title: "GIPHY clip " + strconv.Itoa(n), URL: "https://giphy.com/clips/clip-" + id, Images: map[string]rendition{
 				"fixed_width": {URL: media + id + "-200w.gif", Width: "200", Height: "112", Size: "1234"},
-			}, Video: map[string]any{"assets": map[string]rendition{"360p": {URL: media + id + "-360p.mp4", Width: "640", Height: "360"}}}})
+				"original":    {URL: media + id + ".gif", Width: "480", Height: "270", Size: "4321"},
+			}, Video: map[string]any{"assets": clipAssets(media+id, hasWord(words, "no720"))}})
 			continue
 		}
 		id := "giphy-" + strconv.Itoa(n)
-		data = append(data, item{Type: "gif", ID: id, Slug: "moment-" + id, Title: "GIPHY moment " + strconv.Itoa(n), Images: map[string]rendition{
-			"fixed_width": {URL: media + id + "-200w.gif", Width: "200", Height: "200", Size: "1234"},
-			"original":    {URL: media + id + ".gif", Width: "480", Height: "480", Size: "5678"},
+		source := "" // odd items carry a source page, even ones none
+		if n%2 == 1 {
+			source = "https://example.org/source/" + id
+		}
+		data = append(data, item{Type: "gif", ID: id, Slug: "moment-" + id, Title: "GIPHY moment " + strconv.Itoa(n), URL: "https://giphy.com/gifs/moment-" + id, Source: source, Images: map[string]rendition{
+			"fixed_width":  {URL: media + id + "-200w.gif", Width: "200", Height: "200", Size: "1234"},
+			"fixed_height": {URL: media + id + "-200h.gif", Width: "200", Height: "200", Size: "1234"},
+			"original":     {URL: media + id + ".gif", Width: "480", Height: "480", Size: originalSize},
 		}})
 	}
 	writeJSON(w, map[string]any{
@@ -194,6 +218,7 @@ func klipyGifs(w http.ResponseWriter, r *http.Request, o Options) {
 		Slug  string                        `json:"slug"`
 		Title string                        `json:"title"`
 		Type  string                        `json:"type"`
+		Tags  []any                         `json:"tags"`
 		File  map[string]map[string]gifFile `json:"file"`
 	}
 	media := "http://" + r.Host + "/media/"
@@ -205,14 +230,32 @@ func klipyGifs(w http.ResponseWriter, r *http.Request, o Options) {
 		if n <= 2 {
 			slug = "klipy-dup"
 		}
-		data = append(data, item{ID: 8041071659142944 + int64(n), Slug: slug, Title: "Klipy moment " + strconv.Itoa(n), Type: "gif", File: map[string]map[string]gifFile{
+		tags := []any{"funny", "cat"}
+		if n == 3 { // an object element the client must skip without failing the page
+			tags = []any{map[string]string{"name": "obj"}, "funny"}
+		}
+		data = append(data, item{ID: 8041071659142944 + int64(n), Slug: slug, Title: "Klipy moment " + strconv.Itoa(n), Type: "gif", Tags: tags, File: map[string]map[string]gifFile{
 			"sm": {"gif": {URL: media + name + "-sm.gif", Width: 220, Height: 220, Size: 1234}},
+			"md": {"gif": {URL: media + name + "-md.gif", Width: 320, Height: 320, Size: 3456}},
 			"hd": {"gif": {URL: media + name + "-hd.gif", Width: 498, Height: 498, Size: 5678}},
 		}})
 	}
 	writeJSON(w, map[string]any{"result": true, "data": map[string]any{
 		"data": data, "current_page": page, "per_page": per, "has_next": page*per < total,
 	}})
+}
+
+// clipAssets are a clip's MP4 renditions (no size, like the real wire format); no720 drops 720p.
+func clipAssets(base string, no720 bool) map[string]map[string]string {
+	a := map[string]map[string]string{
+		"720p": {"url": base + "-720p.mp4", "width": "1280", "height": "720"},
+		"480p": {"url": base + "-480p.mp4", "width": "854", "height": "480"},
+		"360p": {"url": base + "-360p.mp4", "width": "640", "height": "360"},
+	}
+	if no720 {
+		delete(a, "720p")
+	}
+	return a
 }
 
 func hasWord(q, word string) bool { return strings.Contains(strings.ToLower(q), word) }
@@ -261,11 +304,32 @@ func Scenario(w http.ResponseWriter, r *http.Request, q string, firstPage bool, 
 	return false
 }
 
-// media serves a tiny 2-frame animated GIF whose colour is derived from the file name.
+// mp4 is the smallest file the MP4 magic check accepts: one ftyp box (isom, minor 0x200, isom mp41).
+var mp4 = []byte("\x00\x00\x00\x18ftypisom\x00\x00\x02\x00isommp41")
+
+// media serves a tiny 2-frame animated GIF whose colour is derived from the file name, or for
+// .mp4 names the ftyp fixture. Names starting "broken" answer 500; "html" an HTML page with 200.
+// GIFs are 32x32; names starting "wide" are 48x32 and "tall" 32x48 (square crop fixtures).
 func media(w http.ResponseWriter, r *http.Request) {
-	name, ok := strings.CutSuffix(r.PathValue("file"), ".gif")
-	if !ok || name == "" {
+	file := r.PathValue("file")
+	ext := path.Ext(file)
+	name := strings.TrimSuffix(file, ext)
+	if (ext != ".gif" && ext != ".mp4") || name == "" {
 		http.NotFound(w, r)
+		return
+	}
+	if strings.HasPrefix(name, "broken") {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if strings.HasPrefix(name, "html") {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = fmt.Fprint(w, "<html>error</html>")
+		return
+	}
+	if ext == ".mp4" {
+		w.Header().Set("Content-Type", "video/mp4")
+		_, _ = w.Write(mp4)
 		return
 	}
 	h := fnv.New32a()
@@ -273,11 +337,17 @@ func media(w http.ResponseWriter, r *http.Request) {
 	sum := h.Sum32()
 	c1 := color.RGBA{uint8(sum), uint8(sum >> 8), uint8(sum >> 16), 255}
 	c2 := color.RGBA{255 - c1.R, 255 - c1.G, 255 - c1.B, 255}
+	wd, ht := 32, 32
+	if strings.HasPrefix(name, "wide") {
+		wd = 48
+	} else if strings.HasPrefix(name, "tall") {
+		ht = 48
+	}
 	anim := &gif.GIF{}
 	for _, fg := range []color.RGBA{c1, c2} {
-		img := image.NewPaletted(image.Rect(0, 0, 32, 32), color.Palette{fg, color.White})
+		img := image.NewPaletted(image.Rect(0, 0, wd, ht), color.Palette{fg, color.White})
 		for y := 12; y < 20; y++ { // a white bar so the frames differ visibly even for similar colours
-			for x := 0; x < 32; x++ {
+			for x := 0; x < wd; x++ {
 				img.SetColorIndex(x, y, 1)
 			}
 		}

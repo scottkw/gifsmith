@@ -5,14 +5,18 @@
     gif,
     index,
     selected,
-    copying,
+    overlay,
+    provider = '',
+    favorite = false,
     onselect,
     oncopy,
   }: {
     gif: Gif;
     index: number;
     selected: boolean;
-    copying: boolean;
+    overlay: boolean; // busy overlay on the selected tile
+    provider?: string; // library tiles name their provider (sections are not announced)
+    favorite?: boolean; // star badge
     onselect: (i: number) => void;
     oncopy: (i: number) => void;
   } = $props();
@@ -30,7 +34,10 @@
   role="option"
   tabindex="-1"
   aria-selected={selected}
-  aria-label={gif.title || `GIF ${index + 1}`}
+  aria-label={(gif.title || `GIF ${index + 1}`) +
+    (provider ? `, ${provider}` : '') +
+    (gif.isClip ? ', MP4' : '') +
+    (favorite ? ', favorite' : '')}
   onclick={() => onselect(index)}
   ondblclick={() => oncopy(index)}
 >
@@ -48,7 +55,15 @@
       onerror={() => (brokenSrc = gif.previewUrl)}
     />
   {/if}
-  {#if copying && selected}
+  {#if gif.isClip}
+    <span class="badge" aria-hidden="true">MP4</span>
+  {/if}
+  {#if favorite}
+    <span class="fav" aria-hidden="true">
+      <svg viewBox="0 0 16 16"><path d="M8 1.5l1.9 4.1 4.5.5-3.4 3 1 4.4L8 11.3l-4 2.2 1-4.4-3.4-3 4.5-.5z" /></svg>
+    </span>
+  {/if}
+  {#if overlay && selected}
     <div class="overlay"><span class="spinner" role="status" aria-label="Loading"></span></div>
   {/if}
 </div>
@@ -82,6 +97,35 @@
     stroke: var(--text-tertiary);
     stroke-width: 1.5;
     stroke-linecap: round;
+  }
+  .badge {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 4px;
+    background: var(--scrim);
+    color: #fff;
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .fav {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--scrim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .fav svg {
+    width: 12px;
+    height: 12px;
+    fill: #fff;
   }
   .overlay {
     position: absolute;

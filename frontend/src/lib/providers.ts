@@ -25,3 +25,12 @@ export const SLOTS: readonly Slot[] = [
 ];
 
 export const slotById = (id: string): Slot => SLOTS.find((s) => s.id === id) ?? SLOTS[0];
+
+// Library tabs follow the provider pills (⌘5, ⌘6). They are never persisted as the last tab (D-22).
+export type LibraryId = 'favorites' | 'recents';
+export type LibraryTab = { id: LibraryId; label: string; shortcut: string; placeholder: string; star?: boolean };
+export const LIBRARY_TABS: readonly LibraryTab[] = [
+  { id: 'favorites', label: 'Favorites', shortcut: '⌘5', placeholder: 'Search Favorites', star: true },
+  { id: 'recents', label: 'Recents', shortcut: '⌘6', placeholder: 'Search Recents' },
+];
+export const libraryTab = (id: LibraryId): LibraryTab => LIBRARY_TABS.find((t) => t.id === id)!;

@@ -5,6 +5,7 @@ package klipy
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"net/url"
@@ -22,10 +23,41 @@ type Client struct {
 	HTTP    *http.Client
 }
 
+// Dimensions and size are display-only, so decoded loosely.
 type size struct {
 	GIF struct {
-		URL string `json:"url"`
+		URL    string         `json:"url"`
+		Width  httpx.LooseInt `json:"width"`
+		Height httpx.LooseInt `json:"height"`
+		Size   httpx.LooseInt `json:"size"`
 	} `json:"gif"`
+}
+
+const (
+	maxTags     = 50
+	maxTagRunes = 100
+)
+
+// tags keeps the non-empty string elements of Klipy's undocumented tags value; anything else is ignored.
+func tags(raw json.RawMessage) []string {
+	var elems []json.RawMessage
+	if json.Unmarshal(raw, &elems) != nil {
+		return nil
+	}
+	var out []string
+	for _, e := range elems {
+		var s string
+		if json.Unmarshal(e, &s) != nil || s == "" {
+			continue
+		}
+		if r := []rune(s); len(r) > maxTagRunes {
+			s = string(r[:maxTagRunes])
+		}
+		if out = append(out, s); len(out) == maxTags {
+			break
+		}
+	}
+	return out
 }
 
 // The 16-digit numeric id is deliberately not decoded (float64 precision); slug is the id.
@@ -33,9 +65,10 @@ type response struct {
 	Result bool `json:"result"`
 	Data   *struct {
 		Data []struct {
-			Slug  string `json:"slug"`
-			Title string `json:"title"`
-			Type  string `json:"type"`
+			Slug  string          `json:"slug"`
+			Title string          `json:"title"`
+			Type  string          `json:"type"`
+			Tags  json.RawMessage `json:"tags"`
 			File  struct {
 				HD size `json:"hd"`
 				MD size `json:"md"`
@@ -97,10 +130,11 @@ func (c *Client) get(ctx context.Context, kind string, v url.Values, cursor stri
 	items := make([]provider.Gif, 0, len(r.Data.Data))
 	skipped := 0
 	for _, d := range r.Data.Data {
-		dl := d.File.HD.GIF.URL
-		if dl == "" {
-			dl = d.File.MD.GIF.URL
+		file := d.File.HD.GIF
+		if file.URL == "" {
+			file = d.File.MD.GIF
 		}
+		dl := file.URL
 		// Klipy forbids filtering results, so any item with GIF renditions (ads included) is
 		// kept in place. An item without them (e.g. an HTML ad) has nothing a GIF grid can show.
 		if d.Type != "gif" && (d.File.SM.GIF.URL == "" || dl == "") {
@@ -114,7 +148,9 @@ func (c *Client) get(ctx context.Context, kind string, v url.Values, cursor stri
 		if title == "" {
 			title = d.Slug
 		}
-		items = append(items, provider.Gif{Provider: provider.Klipy, ID: d.Slug, Title: title, PreviewURL: d.File.SM.GIF.URL, DownloadURL: dl})
+		// No PageURL: Klipy returns none, and one is never constructed.
+		items = append(items, provider.Gif{Provider: provider.Klipy, ID: provider.ClampID(d.Slug), Title: provider.ClampTitle(title), PreviewURL: d.File.SM.GIF.URL, DownloadURL: dl,
+			Width: int(file.Width), Height: int(file.Height), Size: int64(file.Size), Tags: tags(d.Tags), MediumURL: d.File.MD.GIF.URL})
 	}
 	if skipped > 0 {
 		log.Printf("klipy: skipped %d non-gif items", skipped)

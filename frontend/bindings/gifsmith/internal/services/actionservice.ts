@@ -14,11 +14,49 @@ import * as provider$0 from "../provider/models.js";
 import * as $models from "./models.js";
 
 /**
- * Copy puts the selected GIF on the clipboard as a file. The panel stays open:
+ * Copy puts the selected GIF (a Clip's MP4) on the clipboard as a file. The panel stays open:
  * the frontend shows the confirmation, then hides it.
  */
 export function Copy(g: provider$0.Gif): $CancellablePromise<$models.Result> {
     return $Call.ByID(1012912345, g);
+}
+
+/**
+ * CopySquare puts a center-cropped square copy of the GIF on the clipboard as a file (D-16).
+ * The panel stays open: the frontend shows the confirmation, then hides it.
+ */
+export function CopySquare(g: provider$0.Gif): $CancellablePromise<$models.Result> {
+    return $Call.ByID(4162051114, g);
+}
+
+/**
+ * CopyText puts text Go builds from g on the clipboard as a plain string. kind: link | markdown | page.
+ * The webview never composes the text: it only names the kind.
+ */
+export function CopyText(g: provider$0.Gif, kind: string): $CancellablePromise<$models.Result> {
+    return $Call.ByID(1904424890, g, kind);
+}
+
+/**
+ * Download saves the selected GIF (a Clip's MP4) into the download folder; the panel stays open.
+ * It never goes through staging, the pasteboard or Recents (D-17, D-07).
+ */
+export function Download(g: provider$0.Gif): $CancellablePromise<$models.DownloadResult> {
+    return $Call.ByID(2459290364, g);
+}
+
+/**
+ * OpenPage opens the item's GIPHY page in the default browser (platform.Fake in the UAT build).
+ */
+export function OpenPage(g: provider$0.Gif): $CancellablePromise<void> {
+    return $Call.ByID(393537743, g);
+}
+
+/**
+ * OpenSource opens the item's third-party source page; https only, it can point anywhere.
+ */
+export function OpenSource(g: provider$0.Gif): $CancellablePromise<void> {
+    return $Call.ByID(3789089137, g);
 }
 
 /**
@@ -30,9 +68,32 @@ export function Paste(g: provider$0.Gif): $CancellablePromise<$models.Result> {
 }
 
 /**
+ * PasteSquare copies the square GIF like CopySquare, then pastes it like Paste. A pasted Klipy
+ * square file gets the same grace delete as a pasted Klipy GIF (D-19).
+ */
+export function PasteSquare(g: provider$0.Gif): $CancellablePromise<$models.Result> {
+    return $Call.ByID(3482571520, g);
+}
+
+/**
+ * PasteText copies text like CopyText, then pastes it like Paste. kind: link | markdown.
+ */
+export function PasteText(g: provider$0.Gif, kind: string): $CancellablePromise<$models.Result> {
+    return $Call.ByID(228149936, g, kind);
+}
+
+/**
  * RequestAccessibility raises the macOS prompt and, if still untrusted, opens the settings pane.
  * Only an explicit button click calls this.
  */
 export function RequestAccessibility(): $CancellablePromise<boolean> {
     return $Call.ByID(2791695815);
+}
+
+/**
+ * ShowDownload reveals the last downloaded file in Finder (platform.Fake in the UAT build).
+ * It takes no path from JS: only a file Download saved itself can be shown.
+ */
+export function ShowDownload(): $CancellablePromise<void> {
+    return $Call.ByID(1579908481);
 }

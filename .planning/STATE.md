@@ -2,44 +2,44 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: Gifsmith MVP
-current_phase: 3
-current_phase_name: Action Pipeline & Library
+current_phase: 4
+current_phase_name: Settings, Shell Polish & Release
 status: planning
-stopped_at: Phase 2 complete, ready to plan Phase 3
-last_updated: "2026-10-17T23:05:08.531Z"
-last_activity: 2026-10-17
-last_activity_desc: Phase 2 complete, transitioned to Phase 3
-state_head: 2958cc84051f54fdc661273a333dad4e9c9d13b1
+stopped_at: Phase 3 complete, ready to plan Phase 4
+last_updated: "2026-10-18T18:47:41.661Z"
+last_activity: 2026-10-18
+last_activity_desc: Phase 3 complete, transitioned to Phase 4
+state_head: a370f208307208c368b1de40f03189beeb2538a2
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 10
-  completed_plans: 10
-  percent: 50
+  completed_phases: 3
+  total_plans: 18
+  completed_plans: 18
+  percent: 75
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-17)
+See: .planning/PROJECT.md (updated 2026-10-18)
 
 **Core value:** Hotkey → type → Enter puts the right GIF on the clipboard (or into the frontmost app) in seconds, without Raycast.
-**Current focus:** Phase 3 — Action Pipeline & Library
+**Current focus:** Phase 4 — Settings, Shell Polish & Release
 
 ## Current Position
 
-Phase: 3 — Action Pipeline & Library
+Phase: 4 — Settings, Shell Polish & Release
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-10-17 — Phase 2 complete, transitioned to Phase 3
+Last activity: 2026-10-18 — Phase 3 complete, transitioned to Phase 4
 
-Progress: [█████░░░░░] 50% (2/4 phases; 10/10 planned plans complete)
+Progress: [████████░░] 75% (3/4 phases; 18/18 planned plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
+- Total plans completed: 18
 - Average duration: - min
 - Total execution time: 0.0 hours
 
@@ -49,6 +49,7 @@ Progress: [█████░░░░░] 50% (2/4 phases; 10/10 planned plans 
 |-------|-------|-------|----------|
 | 1 | 4 | - | - |
 | 2 | 6 | - | - |
+| 3 | 8 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -69,6 +70,14 @@ Progress: [█████░░░░░] 50% (2/4 phases; 10/10 planned plans 
 | Phase 02 P04 | 11min | 3 tasks | 26 files |
 | Phase 02 P05 | 12min | 2 tasks | 22 files |
 | Phase 02 P06 | 23min | 3 tasks | 22 files |
+| Phase 03 P01 | 14min | 3 tasks | 34 files |
+| Phase 3 P02 | 11min | 2 tasks | 10 files |
+| Phase 03 P03 | 10min | 2 tasks | 16 files |
+| Phase 03 P04 | 15min | 2 tasks | 31 files |
+| Phase 03 P05 | 12min | 2 tasks | 20 files |
+| Phase 03 P06 | 20 min | 3 tasks | 35 files |
+| Phase 03 P07 | 33min | 3 tasks | 25 files |
+| Phase 03 P08 | 10min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -116,6 +125,31 @@ Recent decisions affecting current work:
 - [Phase 2 close]: Klipy items with GIF renditions (ads included) stay in place (WR-04); persisted Clips tab restored when a GIPHY key exists (WR-02) — both accepted verification overrides
 - [Phase 2 close]: GIPHY and Clips share one 429 budget; Clips probed at most once per key after a GIPHY GIFs success; a rate-limited re-check does not spend the re-probe; staging downloads check the allowlist on every redirect
 - [Phase 2 close]: MVP mode dropped for Phases 2–4; 11 Info-level review items left open in 02-REVIEW-DISPOSITION.md
+- [Phase 03]: ActionError has no Unwrap: staging/transport errors are logged, then mapped to a fixed-text kind; JS reads err.cause.kind
+- [Phase 03]: staging.PageAllow is the single page-URL rule (GIPHY/Clips, https giphy.com), used by the GIPHY mapper and ActionService
+- [Phase 03]: Display-only vendor numbers decode through httpx.LooseInt (never fail a page)
+- [Phase 03]: The -tags server UAT build wires platform.Fake (Trusted false); desktop wires platform.New()
+- [Phase 3]: 03-02: every action (menu row or shortcut) runs through App runAction; later plans add ROWS entries only
+- [Phase 3]: 03-02: any mousedown outside the action menu closes it; rows highlight on mousemove so a menu opening under the pointer keeps row 1
+- [Phase 03]: 03-03: Klipy grace delete holds busy around the gen check (no re-stage race); ServiceShutdown takes no lock
+- [Phase 03]: 03-03: text copies and pastes clear staging in putText; Clips assets reuse rendition (LooseInt)
+- [Phase 03]: Download claims names with os.Link from a hidden temp file; never overwrites, never creates the folder
+- [Phase 03]: ActionService.DownloadsDir is an injected func (Phase 4 picker replaces it); results carry only file and folder names
+- [Phase 03]: Toast model: setStatus(text, tone, action, ms); a toast with an action survives panel:show inside its expiry
+- [Phase 03]: Square crop: a 1x1 placeholder for a frame outside the window gets disposal None (Background cleared the visible pixel (0,0)); golden test proves 0 mismatches
+- [Phase 03]: Derived clipboard files (square) are staged under sha1(provider:id:variant) so Sweep(derived) removes the downloaded original
+- [Phase 03]: Square actions: claimed Size > 15 MB refused before any request; DecodeConfig refuses canvases over 4096 before DecodeAll
+- [Phase 03]: internal/library does not import staging (httpx); page URLs validated as GIPHY/Clips through the injected media Allow
+- [Phase 03]: Library Load never fails: unreadable files are listed in Snapshot.Unreadable; library_read comes only from mutations
+- [Phase 03]: All library mutation errors show F5 for the list that changed
+- [Phase 03]: Details overlays the content area; the grid stays mounted so left/right move its selection
+- [Phase 03]: While a chip is selected no tile is selected; Enter and Cmd+Backspace act on the chip
+- [Phase 03]: IN-04: stale Clips error cleared only when Clips become enabled (clearing on unknown would loop re-probes offline)
+- [Phase 03]: P8 width limit applies to the string itself (K6 = 492.5px); slot overflow asserted separately
+- [Phase 03]: 03-08: native UAT accepted on user attestation; library persistence and Cmd+Q staging cleanup not natively evidenced on this install, flagged for phase verifier
+- [Phase 03]: 03-08: Clips MP4 paste skipped natively (GIPHY key not Clips-approved); fixture-proven only
+- [Phase 3 close]: Native UAT passed on a fresh signed install (favorites/recents/searches persisted mode 600; staging empty after quit); CR-01 square-crop budget fixed; 7 Info items (IN-01..IN-07) left open in 03-REVIEW-DISPOSITION.md
+- [Phase 3 close]: Clips link/Markdown use the GIF rendition (D-18), copy/paste as 720p MP4; Klipy staged files deleted 30 s after paste/next copy/quit; single-instance added
 
 ### Pending Todos
 
@@ -124,10 +158,13 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 1→3/4]: N10, N13 and paste in Slack, Discord, Telegram, Safari/Chrome composers untested; re-check in later UAT (GO WITH FALLBACKS limit 2)
-- [Phase 2→]: The user's GIPHY key is not approved for Clips (C2 shown); approval via clips@giphy.com is a user action
+- [Phase 2→4]: The user's GIPHY key is not approved for Clips (C2 shown; Clips MP4 paste fixture-proven only); approval via clips@giphy.com is a user action
 - [Phase 2→]: The Finer Gifs Club API was down on 2026-10-17; Phase 2 UAT accepted either results or the down message, so availability is still unconfirmed
-- [Phase 4]: Klipy written clearance for temp file copies (developers@klipy.com) is a pre-release gate; request early, and ask about labelling Klipy ads (IN-09)
-- [Phase 2→4]: Public repo github.com/scottkw/gifsmith holds only the MIT LICENSE; push code after the Phase 2 merge to main and add the Raycast GIF Search authors' MIT notice to LICENSE
+- [Phase 4]: Klipy written clearance for temp file copies (developers@klipy.com) is a pre-release gate; request early, and ask about labelling Klipy ads (IN-09, Phase 2)
+- [Phase 3→4]: Download folder picker and hide-filename toggle (SETT-04) replace the DownloadsDir seam
+- [Phase 3→4]: Animated GIF tiles ignore Reduce Motion (accessibility gap)
+- [Phase 3→4]: Favorites cap of 1000 drops the oldest silently; decide whether to warn
+- [Phase 3→4]: 7 open Info items from 03-REVIEW (IN-01..IN-07), see 03-REVIEW-DISPOSITION.md
 - [Phase 4]: Apple Developer agreement 403 (notarytool store-credentials: 'A required agreement is missing or has expired') must be resolved by the user before Phase 4 notarization; notarized dry run + N15 carried over from Phase 1
 
 ### Quick Tasks Completed
@@ -146,6 +183,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-17T23:06:34.000Z
-Stopped at: Phase 2 complete, ready to plan Phase 3
+Last session: 2026-10-18
+Stopped at: Phase 3 complete, ready to plan Phase 4
 Resume file: None

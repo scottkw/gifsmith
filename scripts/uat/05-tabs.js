@@ -24,7 +24,7 @@ const placeholder = (want) =>
   });
 const activeTab = () => page.locator("[role=tab][aria-selected=true]").innerText();
 
-// Four pills, fixed order, ⌘1–⌘4 hints, none in the Tab order.
+// Four provider pills, then the library pills, fixed order, ⌘ hints, none in the Tab order.
 const tabs = await page.locator("[role=tab]").evaluateAll((els) =>
   els.map((e) => {
     const hint = e.querySelector(".hint").textContent;
@@ -36,8 +36,10 @@ const want = [
   ["Clips", "⌘2"],
   ["Klipy", "⌘3"],
   ["Finer Gifs", "⌘4"],
+  ["Favorites", "⌘5"],
+  ["Recents", "⌘6"],
 ];
-if (tabs.length !== 4) fail(`${tabs.length} tabs`);
+if (tabs.length !== want.length) fail(`${tabs.length} tabs`);
 want.forEach(([label, hint], i) => {
   if (tabs[i].label !== label || tabs[i].hint !== hint) fail(`tab ${i}: ${JSON.stringify(tabs[i])}`);
   if (tabs[i].tabindex !== -1) fail(`tab ${label} is in the Tab order`);

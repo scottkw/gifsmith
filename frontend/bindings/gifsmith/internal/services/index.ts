@@ -3,16 +3,19 @@
 
 import * as ActionService from "./actionservice.js";
 import * as GifService from "./gifservice.js";
+import * as LibraryService from "./libraryservice.js";
 import * as PanelService from "./panelservice.js";
 import * as SettingsService from "./settingsservice.js";
 export {
     ActionService,
     GifService,
+    LibraryService,
     PanelService,
     SettingsService
 };
 
 export type {
+    DownloadResult,
     ProviderStatus,
     Result
 } from "./models.js";

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"slices"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -106,7 +106,7 @@ func TestMapperFixture(t *testing.T) {
 		// The mapper keeps duplicates in returned order; dedupe policy lives in the search service.
 		{Provider: provider.FinerGifs, ID: "02x05-dwight-bears", Title: "Bears. Beets. Battlestar Galactica.", PreviewURL: m + "02x05-dwight-bears.gif", DownloadURL: m + "02x05-dwight-bears.gif"},
 	}
-	if !slices.Equal(p.Items, want) {
+	if !reflect.DeepEqual(p.Items, want) { // also: Finer items carry none of the optional metadata
 		t.Errorf("items =\n%+v\nwant\n%+v", p.Items, want)
 	}
 	if p.Next != "3" {
@@ -134,6 +134,19 @@ func TestMapperBadCursor(t *testing.T) {
 		if n := hits.Load(); n != 0 {
 			t.Errorf("cursor %q made %d requests, want 0", cur, n)
 		}
+	}
+}
+
+// WR-02: a long subtitle is clamped to the library title limit.
+func TestMapperLongTitleClamped(t *testing.T) {
+	text := strings.Repeat("ü", provider.MaxTitleRunes+50)
+	c, _ := bodyClient(t, `{"results":[{"fields":{"name":"n","text":"`+text+`","fileid":"f1"}}]}`)
+	p, err := c.Search(context.Background(), "x", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Items) != 1 || p.Items[0].Title != string([]rune(text)[:provider.MaxTitleRunes]) {
+		t.Errorf("items = %+v, want the title clamped", p.Items)
 	}
 }
 

@@ -24,6 +24,8 @@
 	<string>13.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Gifsmith saves the GIFs you download to your Downloads folder.</string>
 	<key>NSHighResolutionCapable</key>
 	<string>true</string>
 	<key>NSHumanReadableCopyright</key>

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"unicode/utf8"
 )
 
 type ID string
@@ -27,6 +28,33 @@ func ParseID(s string) (ID, bool) {
 	return "", false
 }
 
+// Library limits (library.Validate): the mappers clamp vendor text to them, so a long
+// user-supplied title or id never makes an item unsavable (WR-02).
+const (
+	MaxTitleRunes = 500
+	MaxIDBytes    = 200
+)
+
+// ClampTitle shortens s to MaxTitleRunes runes.
+func ClampTitle(s string) string {
+	if r := []rune(s); len(r) > MaxTitleRunes {
+		return string(r[:MaxTitleRunes])
+	}
+	return s
+}
+
+// ClampID shortens s to at most MaxIDBytes bytes, never splitting a rune.
+func ClampID(s string) string {
+	if len(s) <= MaxIDBytes {
+		return s
+	}
+	i := MaxIDBytes
+	for i > 0 && !utf8.RuneStart(s[i]) {
+		i--
+	}
+	return s[:i]
+}
+
 // PageSize is the requested page size (6 rows of 4); clients clamp it to vendor limits.
 const PageSize = 24
 
@@ -37,6 +65,18 @@ type Gif struct {
 	PreviewURL  string `json:"previewUrl"`  // grid only
 	DownloadURL string `json:"downloadUrl"` // copy only
 	IsClip      bool   `json:"isClip"`
+	// Optional metadata, filled only from fields the vendor response carries (absent = unknown).
+	// Width/Height/Size describe the file Copy puts on the clipboard.
+	Width  int      `json:"width,omitempty"`
+	Height int      `json:"height,omitempty"`
+	Size   int64    `json:"size,omitempty"` // bytes
+	Tags   []string `json:"tags,omitempty"`
+	// PageURL is the vendor's https page for the item; "" = no page actions (Klipy, Finer Gifs).
+	PageURL   string `json:"pageUrl,omitempty"`
+	SourceURL string `json:"sourceUrl,omitempty"` // https only; can point anywhere
+	MediumURL string `json:"mediumUrl,omitempty"` // Details preview; "" = use PreviewURL
+	// GifURL is the GIF rendition used for link and Markdown when DownloadURL is not a GIF (Clips).
+	GifURL string `json:"gifUrl,omitempty"`
 }
 
 type Page struct {

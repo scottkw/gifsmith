@@ -2,30 +2,57 @@
   import { onMount, tick } from 'svelte';
   import { Events } from '@wailsio/runtime';
   import {
+    actionError,
     cancel,
     checkClips,
+    clearRecents,
     copy,
+    copySquare,
+    copyText,
+    download,
+    openPage,
+    openSource,
     hide,
     latest,
     lastProvider,
+    loadLibrary,
     openExternal,
     paste,
+    pasteSquare,
+    pasteText,
     providerError,
     providers,
+    removeRecent,
+    removeSearch,
     requestAccessibility,
+    saveSearch,
     search,
+    setFavorite,
     setLastProvider,
+    showDownload,
     trending,
+    undoLibrary,
     type Gif,
+    type Library,
     type Page,
     type ProviderErr,
     type ProviderStatus,
+    type Result,
+    type TextKind,
   } from './lib/api';
-  import { errorState, pagingMessage, providerName, revokedMessage } from './lib/errors';
-  import { move, nearEnd, routeKey } from './lib/grid';
-  import { CLIPS_ACCESS_MAILTO, SLOTS, slotById, type SlotId } from './lib/providers';
+  import { actionErrorText, errorState, libraryErrorText, pagingMessage, providerName, revokedMessage } from './lib/errors';
+  import { buildActions, type ActionId, type ActionRow } from './lib/actions';
+  import { COLS, move, nearEnd, routeKey } from './lib/grid';
+  import { flatItems, moveSectioned, sections } from './lib/library';
+  import { placeInDetails, placeMenu } from './lib/popover';
+  import { CHIP_MAX, SAVE_IDLE_MS, chipsVisible, shouldSave } from './lib/searches';
+  import { CLIPS_ACCESS_MAILTO, LIBRARY_TABS, SLOTS, libraryTab, slotById, type LibraryId, type SlotId } from './lib/providers';
+  import ActionMenu from './components/ActionMenu.svelte';
+  import DetailsPane from './components/DetailsPane.svelte';
+  import LibraryGrid from './components/LibraryGrid.svelte';
   import Footer from './components/Footer.svelte';
   import ProviderTabs from './components/ProviderTabs.svelte';
+  import RecentSearches from './components/RecentSearches.svelte';
   import ResultGrid from './components/ResultGrid.svelte';
   import SetupCard from './components/SetupCard.svelte';
   import StateMessage from './components/StateMessage.svelte';
@@ -33,10 +60,12 @@
   const DEBOUNCE_MS = 450;
   const HIDE_AFTER_COPY_MS = 400;
   const KEY_SAVED_MS = 2000;
-  const COPY_FAILED = "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";
-  const CLIPS_COPY = 'Copying Clips (MP4) arrives in the next update.';
+  const DOWNLOAD_TOAST_MS = 5000;
+  const CROP_BUSY_MS = 300; // a square crop shows its busy state only if it is still running then (D-16)
+  const LIBRARY_SKELETON_MS = 300; // a library read slower than this shows the S2 skeleton
+  const FAVORITE_TOAST_MS = 2000;
+  const UNDO_TOAST_MS = 5000;
   const AX_FAILED = "Couldn't ask macOS for Accessibility access. Try again.";
-  const BUSY = 'another action is still running'; // Go ErrBusy: a second call while one runs is ignored
 
   type Status = 'idle' | 'loading' | 'refreshing' | 'ready' | 'empty' | 'error';
   type Paging = 'idle' | 'loading' | 'end' | 'error';
@@ -83,23 +112,74 @@
   let selected = $state(-1);
   let status = $state(''); // footer center status line
   let tone = $state<'' | 'success' | 'error'>('');
+  // A toast may offer one action (link + shortcut hint); it goes whenever the status changes.
+  type ToastAction = { label: string; hint: string; run: () => void };
+  let toastAction = $state<ToastAction | null>(null);
+  let toastTimer: ReturnType<typeof setTimeout> | undefined;
   let copying = $state(false); // one Copy/Paste in flight; a second Enter would paste twice
+  let overlay = $state(false); // the selected tile's busy overlay; for a crop it waits CROP_BUSY_MS
   let needsAccessibility = $state(false);
+  let downloadFolder: string | undefined; // display name from the last download, for F4
   // Paste hides the panel before ⌘V; a copied-only fallback message must survive to the next show.
   let keepStatus = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let hideTimer: ReturnType<typeof setTimeout> | undefined; // pending hide after a copy
   let now = $state(Date.now()); // clock for retry countdowns; set whenever an error arrives
+  let menuOpen = $state(false); // ⌘K action menu
+  let menuRows = $state<ActionRow[]>([]);
+  let menuAt = $state({ left: 0, top: 0 });
+  let menu = $state<ActionMenu>();
+  // ⌘I Details shows the selected item of the current grid over the content area (D-10).
+  let detailsOpen = $state(false);
 
-  const footerCenter = $derived(status || cur.items[selected]?.title || '');
-  const busy = $derived(cur.status === 'loading' || cur.status === 'refreshing');
+  // Favorites / Recents (⌘5 / ⌘6) replace the provider grid while libTab is set; not persisted (D-22).
+  let libTab = $state<LibraryId | null>(null);
+  let library = $state<Library | null>(null); // null until the first load answers
+  let libSlow = $state(false); // the load has not answered within LIBRARY_SKELETON_MS
+  let libSeq = 0;
+  const keyOf = (g: Gif) => `${g.provider}:${g.id}`;
+  const noop = () => {};
+  // The query filters library titles locally: no request, no debounce (D-06).
+  const libSections = $derived(libTab && library ? sections(library[libTab].map((e) => e.gif), query) : []);
+  const libItems = $derived(flatItems(libSections));
+  const favKeys = $derived(new Set(library?.favorites.map((e) => keyOf(e.gif)) ?? []));
+  // What the selection indexes: the library's flat item list, or the provider grid.
+  const items = $derived(libTab ? libItems : cur.items);
+  const libName = $derived(libTab ? libraryTab(libTab).label : '');
+  const detail = $derived(detailsOpen ? items[selected] : undefined);
+
+  const footerCenter = $derived(status || items[selected]?.title || '');
+  const busy = $derived(!libTab && (cur.status === 'loading' || cur.status === 'refreshing'));
+  // Library attribution follows the selected item's provider; nothing selected, nothing shown.
+  const attribution = $derived(
+    !libTab ? slot.attribution : items[selected] ? slotById(items[selected].provider).attribution : '',
+  );
   // S8: Finer Gifs has no trending list, so a short query shows a prompt and makes no request.
   const finerIdle = $derived(active === 'finergifs' && [...query.trim()].length < 2);
   // S1: a key slot without a key; S13: its stored key was rejected (key_missing: Go lost it meanwhile).
   const card = $derived(
-    !!slot.keyProvider &&
+    !libTab &&
+      !!slot.keyProvider &&
       statuses !== null &&
       (!statuses[active]?.configured || cur.err?.kind === 'key_rejected' || cur.err?.kind === 'key_missing'),
   );
+  // Recent-search chips (D-12): provider tab, empty box, no setup or Clips card. chip = keyboard selection.
+  const chips = $derived(
+    chipsVisible({
+      tab: libTab ?? 'provider',
+      query,
+      card: card || (active === 'clips' && !clipsEnabled),
+      searches: library?.searches[active],
+    })
+      ? library!.searches[active].slice(0, CHIP_MAX)
+      : [],
+  );
+  let chip = $state(-1);
+  const gridShown = $derived(!finerIdle && cur.items.length > 0);
+  // D-13/D-20 idle save: the time of the last keystroke and the last provider:query saved by it.
+  let lastKeyAt = 0;
+  let saveTimer: ReturnType<typeof setTimeout> | undefined;
+  let savedKey = '';
   const cardMessage = $derived(cur.err?.kind === 'key_rejected' ? revokedMessage(slot.keyLabel!) : '');
   let setup = $state<SetupCard>();
   // Error copy comes only from errors.ts rows, never from the caught error's text.
@@ -126,7 +206,11 @@
 
   const byId = (list: ProviderStatus[]) => Object.fromEntries(list.map((p) => [p.id, p]));
   async function refreshProviders() {
+    const before = clipsState;
     statuses = byId(await providers());
+    // IN-04: Clips just became enabled, so an error stored before (e.g. GIPHY offline at boot) is stale.
+    // Only on enabled: clearing on 'unknown' would re-probe after every failed probe.
+    if (clipsEnabled && clipsState !== before && states.clips.status === 'error') setResults('clips', null, null);
     // The Clips probe settled while Clips is on screen: its grid, or one re-probe for an unknown result.
     if (active === 'clips' && clipsEnabled) show('clips');
     else if (active === 'clips' && clipsState === 'unknown' && states.clips.status !== 'error') recheckClips();
@@ -155,10 +239,15 @@
   onMount(async () => {
     input.focus();
     Events.On('panel:show', () => {
+      clearTimeout(hideTimer); // a copy just before this show must not hide the panel again (02 IN-07)
+      menuOpen = detailsOpen = false; // never reopen on their own
+      chip = -1;
       now = Date.now();
-      if (!keepStatus) setStatus('');
+      // A toast with an action (the download toast) outlives a hide inside its 5 s: a TCC prompt can hide the panel.
+      if (!keepStatus && !toastAction) setStatus('');
       keepStatus = false;
       needsAccessibility = false;
+      refreshLibrary(); // a copy or paste while hidden may have changed Recents
       if (card) setup?.focus();
       else {
         input.focus();
@@ -174,7 +263,35 @@
     statuses = st;
     if (active === 'clips' && !clipsEnabled) bootClips();
     else load(active);
+    refreshLibrary();
   });
+
+  // Reads the saved lists (local files only). The selected item stays selected when it is still there.
+  async function refreshLibrary(want?: string) {
+    const seq = ++libSeq;
+    const slow = setTimeout(() => (libSlow = true), LIBRARY_SKELETON_MS);
+    try {
+      const snap = await loadLibrary();
+      if (seq === libSeq) applyLibrary(snap, want);
+    } catch {
+      // Go never fails Load (unreadable files are named in the snapshot); a dead bridge shows the load error.
+      if (seq === libSeq && !library) library = { favorites: [], recents: [], searches: {}, unreadable: ['favorites', 'recents'], canUndo: false };
+    } finally {
+      clearTimeout(slow);
+      if (seq === libSeq) libSlow = false;
+    }
+  }
+
+  // Applies a snapshot and reselects `want` (default: the selected item); if it is gone, the
+  // selection clamps, which lands on the next item in flat order, else the previous one.
+  function applyLibrary(snap: Library, want?: string) {
+    const prev = want ?? (libTab && items[selected] ? keyOf(items[selected]) : '');
+    library = snap;
+    if (!libTab) return;
+    const i = libItems.findIndex((g) => keyOf(g) === prev);
+    selected = i >= 0 ? i : Math.min(Math.max(selected, 0), libItems.length - 1);
+    if (!libItems[selected]) detailsOpen = false;
+  }
 
   // The Clips probe only means something after a GIPHY GIFs success with the key. Fetch GIPHY
   // trending (usually cached) behind the S2 skeleton to give it one, then re-probe once if that
@@ -196,15 +313,29 @@
     if (active === 'clips' && !clipsEnabled) recheckClips();
   }
 
-  function setStatus(text: string, t: typeof tone = '') {
+  // A later status replaces an earlier one, its action and its expiry; ms > 0 clears it after ms.
+  function setStatus(text: string, t: typeof tone = '', action: ToastAction | null = null, ms = 0) {
     status = text;
     tone = t;
+    toastAction = action;
+    clearTimeout(toastTimer);
+    if (ms) toastTimer = setTimeout(() => setStatus(''), ms);
+  }
+
+  // Running a toast's action (click or its shortcut) clears the toast.
+  function runToastAction() {
+    const a = toastAction;
+    setStatus('');
+    a?.run();
   }
 
   // A transient status (copy result, error) clears on the next keystroke or selection change.
+  // An Undo toast stays for its 5 s: the removal itself moved the selection (D-08).
   function clearTransient() {
-    if (!copying) setStatus('');
+    if (!copying && !undoVisible()) setStatus('');
   }
+
+  const undoVisible = () => toastAction?.label === 'Undo';
 
   function select(i: number) {
     if (i !== selected) clearTransient();
@@ -222,8 +353,53 @@
     if ((e as InputEvent | undefined)?.isComposing) return;
     clearTransient();
     clearTimeout(timer);
+    chip = -1;
+    lastKeyAt = Date.now();
+    savedKey = '';
+    clearTimeout(saveTimer);
+    if (libTab) {
+      selected = libItems.length ? 0 : -1;
+      return;
+    }
     if (!wanted()) show(active); // trending or S8 at once, no debounce
-    else timer = setTimeout(() => load(active), DEBOUNCE_MS);
+    else {
+      timer = setTimeout(() => load(active), DEBOUNCE_MS);
+      saveTimer = setTimeout(() => maybeSave(active), SAVE_IDLE_MS + 10);
+    }
+  }
+
+  // Saves the current query for p once 1.5 s have passed since the last keystroke and its first page
+  // has landed with a result, whichever comes last (D-13, D-20). Library filters are never saved.
+  function maybeSave(p: SlotId) {
+    const s = states[p];
+    const q = wanted();
+    if (libTab || p !== active || !q || s.q !== q || s.status !== 'ready' || savedKey === `${p}:${q}`) return;
+    if (!shouldSave({ sinceKeyMs: Date.now() - lastKeyAt, firstPageItems: s.items.length, query: q })) return;
+    savedKey = `${p}:${q}`;
+    // Go applies the list rules (dedupe, cap); a failed save only means no chip.
+    saveSearch(p, q).then(() => refreshLibrary(), noop);
+  }
+
+  // ↵ on a chip: the query becomes the chip text and the search fires at once (no debounce).
+  function runChip(q: string) {
+    chip = -1;
+    query = q;
+    clearTransient();
+    load(active);
+    input.focus();
+  }
+
+  // ⌘⌫ on a chip: removed silently (no toast, no Undo, D-22); the selection stays in the row.
+  async function removeChip() {
+    const q = chips[chip];
+    try {
+      library = await removeSearch(active, q);
+    } catch {
+      return;
+    }
+    const n = Math.min(library.searches[active]?.length ?? 0, CHIP_MAX);
+    chip = Math.min(chip, n - 1);
+    if (chip < 0 && gridShown) selected = 0;
   }
 
   // Fetches p's first page for the current query: search, trending, or (Finer Gifs) nothing.
@@ -245,15 +421,32 @@
   }
 
   function switchTo(p: SlotId) {
-    if (p !== active) {
+    menuOpen = detailsOpen = false;
+    chip = -1;
+    if (p !== active || libTab) {
+      if (p !== active) setLastProvider(p);
       active = p;
+      libTab = null;
       clearTransient();
       selected = states[p].items.length ? 0 : -1;
-      setLastProvider(p);
       if (p === 'clips' && clipsState === 'unknown') bootClips();
       else show(p);
     }
     tick().then(() => card || input.focus()); // a setup card focuses its own key field
+  }
+
+  // ⌘5 / ⌘6: the library renders from the saved snapshot; reloaded on every switch (D-09).
+  function switchLib(id: LibraryId) {
+    menuOpen = detailsOpen = false;
+    chip = -1;
+    clearTimeout(timer); // a pending provider search must not fire for the filter text
+    if (libTab !== id) {
+      libTab = id;
+      clearTransient();
+      selected = libItems.length ? 0 : -1;
+    }
+    refreshLibrary(''); // '' = no item to keep: the first item of the fresh list
+    tick().then(() => input.focus());
   }
 
   // S1c: the card gives way at once to that provider's trending page (seeded by verification).
@@ -286,6 +479,7 @@
       const page = await latest(`first:${p}`, call(''));
       if (!page) return; // cancelled or superseded: the newer call owns the state
       setResults(p, page, (cursor) => latest(`page:${p}`, call(cursor)));
+      maybeSave(p);
     } catch (e) {
       setResults(p, null, null);
       s.status = 'error';
@@ -306,7 +500,10 @@
     s.pageErr = null;
     s.err = null;
     s.status = !page ? 'idle' : s.items.length ? 'ready' : 'empty';
-    if (p === active) selected = s.items.length ? 0 : -1;
+    if (p === active) {
+      selected = s.items.length ? 0 : -1;
+      menuOpen = detailsOpen = false; // its item is gone
+    }
   }
 
   function retry() {
@@ -341,72 +538,327 @@
 
   // Every routed key is preventDefault-ed: arrows must not move the caret, and an Esc the page
   // lets through would reach the native panel's cancelOperation.
+  // ⌘⌫ and ⌘Z are the exception: they are captured only when they act (a library item is selected;
+  // an Undo toast is visible), so otherwise they stay native editing and undo in the input (Pitfall 10).
   function onKeydown(e: KeyboardEvent) {
     const a = routeKey(e);
+    // A printable key closes Details and goes on to the input as usual.
+    if (detail && a === 'none' && e.key.length === 1 && !e.metaKey && !e.ctrlKey) detailsOpen = false;
     if (a === 'none') return;
+    if (chip >= 0 && chipKey(a)) return e.preventDefault();
+    if (a === 'remove' && !(libTab && items[selected])) return;
+    if (a === 'undo' && !undoVisible()) return;
     e.preventDefault();
     switch (a) {
       case 'left':
       case 'right':
       case 'up':
       case 'down':
-        if (!cur.items.length) return;
-        select(move(selected, a, cur.items.length));
-        if (nearEnd(selected, cur.items.length)) loadMore();
+        // In Details ← → step through the grid's items (clamped) and the pane follows; ↑ ↓ do nothing.
+        if (detail && (a === 'up' || a === 'down')) return;
+        // ↑ from the grid's first row, or ↓ with no grid, selects the first chip.
+        if (chips.length && !detail && ((a === 'up' && gridShown && selected < COLS) || (a === 'down' && !gridShown))) {
+          chip = 0;
+          select(-1);
+          return;
+        }
+        if (!items.length) return;
+        if (libTab) {
+          select(moveSectioned(selected, a, libSections.map((s) => s.items.length)));
+          return;
+        }
+        select(move(selected, a, items.length));
+        if (nearEnd(selected, items.length)) loadMore();
+        return;
+      case 'favorite':
+      case 'details':
+        runAction(a);
+        return;
+      case 'remove':
+        runAction('removeRecent'); // on the Favorites tab this unfavorites
+        return;
+      case 'undo':
+        runToastAction();
         return;
       case 'copy':
       case 'paste':
         // ↵ with nothing selected runs a visible Try Again.
         if (selected < 0) {
-          if (a === 'copy' && errView?.tryAgain) retry();
+          if (a === 'copy' && libTab && library?.unreadable.includes(libTab)) refreshLibrary();
+          else if (a === 'copy' && !libTab && errView?.tryAgain) retry();
           return;
         }
-        run(a);
+        runAction(a);
+        return;
+      case 'copyLink':
+      case 'copyMarkdown':
+      case 'open':
+      case 'download':
+        runAction(a);
+        return;
+      case 'actions':
+        toggleMenu();
         return;
       case 'escape':
-        if (query) {
+        if (detail) detailsOpen = false; // selection kept
+        else if (query) {
           query = '';
           onInput();
         } else hide(); // no-op in the server build; nothing here depends on it
         return;
-      // 'actions' (⌘K, Phase 3 action menu) and 'tab': bound, no effect yet; slot1–slot4: onMainKeydown.
+      case 'reveal':
+        // Show in Finder while the download toast is up; otherwise captured and ignored (never reloads).
+        if (toastAction?.hint === '⌘R') runToastAction();
+        return;
+      // 'tab': bound, no effect; slot1–slot4: onMainKeydown.
     }
   }
 
-  // ⌘1–⌘4 from any field in the panel (search input or key field) switch provider.
+  // Keys while a chip is selected; false = not a chip key (normal handling, e.g. Esc, ⌘1–⌘6).
+  function chipKey(a: string): boolean {
+    switch (a) {
+      case 'left':
+      case 'right':
+        chip = Math.max(0, Math.min(chips.length - 1, chip + (a === 'left' ? -1 : 1)));
+        return true;
+      case 'down':
+        // Back to the first tile; with no grid (S8 or a message state) nothing happens.
+        if (gridShown) {
+          chip = -1;
+          select(0);
+        }
+        return true;
+      case 'up':
+      case 'paste':
+      case 'actions':
+        return true;
+      case 'copy':
+        runChip(chips[chip]);
+        return true;
+      case 'remove':
+        removeChip();
+        return true;
+    }
+    return false;
+  }
+
+  // ⌘1–⌘6 from any field in the panel (search input or key field) switch provider or library tab.
   function onMainKeydown(e: KeyboardEvent) {
     const a = routeKey(e);
-    if (!a.startsWith('slot')) return;
-    e.preventDefault();
-    switchTo(SLOTS[Number(a.slice(4)) - 1].id);
+    if (a.startsWith('slot')) {
+      e.preventDefault();
+      const n = Number(a.slice(4));
+      if (n <= SLOTS.length) switchTo(SLOTS[n - 1].id);
+      else switchLib(n === 5 ? 'favorites' : 'recents');
+      // The menu's filter has focus while it is open: its ⌘ shortcuts (⌘K, ⌘↵, ⌘⇧C, …) arrive here.
+    } else if (menuOpen && e.metaKey && e.target !== input) onKeydown(e);
   }
 
-  async function run(action: 'copy' | 'paste') {
-    const g = cur.items[selected];
-    if (copying || !g) return;
-    if (g.isClip) {
-      setStatus(CLIPS_COPY);
+  // ⌘K: open beside the selected tile, or close. No tile on screen (empty, loading, message, setup card): nothing.
+  async function toggleMenu() {
+    if (menuOpen) return closeMenu();
+    const g = items[selected];
+    const tile = document.getElementById(`tile-${selected}`);
+    if (!g || !(tile || detail)) return;
+    const inDetails = !!detail;
+    menuRows = buildActions({ gif: g, tab: libTab ?? 'provider', inDetails, favorited: favKeys.has(keyOf(g)) });
+    menuOpen = true;
+    await tick(); // measure the rendered menu, then place it before the browser paints
+    if (inDetails || !tile) {
+      menuAt = placeInDetails(menu!.height());
+      menu!.focus();
       return;
     }
-    copying = true;
-    setStatus('Copying…');
+    // Library sections restart the column count at each section's first tile.
+    const col = (selected - (libSections.findLast((s) => s.start <= selected)?.start ?? 0)) % COLS;
+    menuAt = placeMenu(tile.getBoundingClientRect(), col, menu!.height(), { w: innerWidth, h: innerHeight });
+    menu!.focus();
+  }
+
+  function closeMenu() {
+    menuOpen = false;
+    input.focus();
+  }
+
+  // The one dispatcher for the menu and every shortcut. The menu closes before anything runs.
+  function runAction(id: ActionId) {
+    if (menuOpen) closeMenu();
+    const g = items[selected];
+    switch (id) {
+      case 'copy':
+      case 'paste':
+        run(id);
+        return;
+      case 'copyLink':
+        textAction('link');
+        return;
+      case 'pasteLink':
+        textAction('link', true);
+        return;
+      case 'copyMarkdown':
+        textAction('markdown');
+        return;
+      case 'pasteMarkdown':
+        textAction('markdown', true);
+        return;
+      case 'copyPage':
+        textAction('page');
+        return;
+      case 'open':
+        // Only GIPHY and Clips items carry a page URL; for the rest ⌘O does nothing.
+        if (g?.pageUrl) openItem(g, openPage);
+        return;
+      case 'details':
+        if (g) detailsOpen = !detailsOpen; // the panel stays open
+        return;
+      case 'download':
+        downloadItem();
+        return;
+      case 'copySquare':
+        act(copySquare, false, true);
+        return;
+      case 'pasteSquare':
+        act(pasteSquare, true, true);
+        return;
+      case 'favorite':
+        toggleFavorite();
+        return;
+      case 'removeRecent':
+        removeSelected();
+        return;
+      case 'clearRecents':
+        clearAll();
+        return;
+    }
+  }
+
+  // ⌘⇧F / the menu row, on any grid: add (2 s toast) or remove (5 s Undo toast). The panel stays open.
+  async function toggleFavorite() {
+    const g = items[selected];
+    if (!g || !library) return;
+    const k = keyOf(g);
+    const on = !favKeys.has(k) && libTab !== 'favorites';
+    const lib = await mutate(() => setFavorite(g, on), 'favorites', on ? k : undefined);
+    if (!lib) return;
+    if (on) setStatus('Added to Favorites', 'success', null, FAVORITE_TOAST_MS);
+    else if (lib.canUndo) undoToast('Removed from Favorites', 'favorites', k); // false: Go held no such favorite (WR-03)
+  }
+
+  // ⌘⌫ on a library tab: Remove from Recents, or unfavorite on the Favorites tab. No confirmation.
+  async function removeSelected() {
+    const g = items[selected];
+    if (!g || !libTab) return;
+    if (libTab === 'favorites') return toggleFavorite();
+    if ((await mutate(() => removeRecent(g), 'recents'))?.canUndo) undoToast('Removed from Recents', 'recents', keyOf(g));
+  }
+
+  async function clearAll() {
+    if ((await mutate(clearRecents, 'recents'))?.canUndo) undoToast('Cleared Recents', 'recents', '');
+  }
+
+  // T8–T10: Undo restores the latest removal and reselects it ('' = the first item, after Clear Recents).
+  function undoToast(text: string, list: LibraryId, k: string) {
+    const run = () => void mutate(undoLibrary, list, k);
+    setStatus(text, '', { label: 'Undo', hint: '⌘Z', run }, UNDO_TOAST_MS);
+  }
+
+  // Runs one library change, applies its fresh lists and returns them; on failure F5 shows, the
+  // lists stay as they were and it returns null.
+  async function mutate(call: () => Promise<Library>, list: LibraryId, want?: string): Promise<Library | null> {
     try {
-      if (action === 'copy') {
-        const r = await copy(g);
+      const lib = await call();
+      applyLibrary(lib, want);
+      return lib;
+    } catch {
+      setStatus(libraryErrorText(list), 'error');
+      return null;
+    }
+  }
+
+  function run(action: 'copy' | 'paste') {
+    act(action === 'copy' ? copy : paste, action === 'paste');
+  }
+
+  // Go builds the text from the selected item; the webview only names the kind.
+  function textAction(kind: TextKind, pasteIt = false) {
+    if (pasteIt && kind !== 'page') act((g) => pasteText(g, kind), true);
+    else act((g) => copyText(g, kind), false); // there is no Paste Page Link
+  }
+
+  // One copy or paste of the selected item at a time. A copy confirms in the footer and hides the
+  // panel; a paste has hidden it already, unless it fell back to copying.
+  // A square crop shows the overlay and `Cropping…` only if it is still running after 300 ms.
+  async function act(call: (g: Gif) => Promise<Result>, pasteIt: boolean, crop = false) {
+    const g = items[selected];
+    if (copying || !g) return;
+    copying = true;
+    // Copying from a searched provider grid saves that search (D-13); trending and library filters never do.
+    const p = active;
+    const searched = libTab ? '' : states[p].q;
+    const busy = () => {
+      overlay = true;
+      setStatus(crop ? 'Cropping…' : 'Copying…');
+    };
+    const busyTimer = crop ? setTimeout(busy, CROP_BUSY_MS) : undefined;
+    if (!crop) busy();
+    try {
+      const r = await call(g);
+      if (searched) saveSearch(p, searched).then(() => refreshLibrary(), noop);
+      if (!pasteIt) {
         setStatus(r.message, 'success');
-        setTimeout(hide, HIDE_AFTER_COPY_MS);
+        scheduleHide();
       } else {
-        const r = await paste(g);
-        setStatus(r.message);
+        setStatus(r.message, r.pasted ? 'success' : '');
         needsAccessibility = r.needsAccessibility;
         keepStatus = r.copied && !r.pasted && !r.needsAccessibility;
       }
     } catch (err) {
-      // Compared, never rendered: Go's ErrBusy is the one error that is silently ignored.
-      if ((err as Error)?.message === BUSY) setStatus('');
-      else setStatus(COPY_FAILED, 'error');
+      actionFailed(err, g);
     } finally {
-      copying = false;
+      clearTimeout(busyTimer);
+      copying = overlay = false;
+    }
+  }
+
+  // Copy actions confirm in the footer, then hide the panel; panel:show cancels a pending hide.
+  function scheduleHide() {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(hide, HIDE_AFTER_COPY_MS);
+  }
+
+  // Fixed copy keyed by Go's error kind, never the error's text. A busy refusal is silently ignored.
+  function actionFailed(err: unknown, g: Gif, action: 'copy' | 'download' = 'copy') {
+    const kind = actionError(err)?.kind ?? '';
+    if (kind === 'busy') setStatus('');
+    else setStatus(actionErrorText(kind, g, action, downloadFolder), 'error');
+  }
+
+  // Saves the selected item into the download folder; the panel stays open (D-04). Shares the
+  // copy lock and busy overlay: one file action at a time.
+  async function downloadItem() {
+    const g = items[selected];
+    if (copying || !g) return;
+    copying = overlay = true;
+    setStatus('Downloading…');
+    try {
+      const r = await download(g);
+      downloadFolder = r.folder;
+      // A Finder failure is logged in Go; the toast simply clears (UI-SPEC has no copy for it).
+      const reveal = () => void showDownload().catch(() => {});
+      setStatus(`Downloaded to ${r.folder}`, 'success', { label: 'Show in Finder', hint: '⌘R', run: reveal }, DOWNLOAD_TOAST_MS);
+    } catch (err) {
+      actionFailed(err, g, 'download');
+    } finally {
+      copying = overlay = false;
+    }
+  }
+
+  // Success shows no toast: the browser takes focus and HideOnFocusLost hides the panel.
+  async function openItem(g: Gif, call: (g: Gif) => Promise<void>) {
+    try {
+      await call(g);
+    } catch (err) {
+      actionFailed(err, g);
     }
   }
 
@@ -425,8 +877,15 @@
 </script>
 
 <!-- Clicks anywhere except a text field keep focus in the search input (the grid never takes focus). -->
+<!-- A mousedown outside the open action menu closes it without running anything. -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<main onmousedown={(e) => e.target instanceof HTMLInputElement || e.preventDefault()} onkeydown={onMainKeydown}>
+<main
+  onmousedown={(e) => {
+    if (menuOpen && !(e.target as Element).closest('[role=dialog]')) closeMenu();
+    if (!(e.target instanceof HTMLInputElement)) e.preventDefault();
+  }}
+  onkeydown={onMainKeydown}
+>
   <header class="search">
     <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
       <circle cx="7" cy="7" r="4.5" />
@@ -438,113 +897,187 @@
       oninput={onInput}
       oncompositionend={() => onInput()}
       onkeydown={onKeydown}
-      placeholder={slot.placeholder}
+      placeholder={libTab ? libraryTab(libTab).placeholder : slot.placeholder}
       disabled={card}
       autocomplete="off"
       spellcheck="false"
       role="combobox"
-      aria-expanded={cur.items.length > 0}
+      aria-expanded={items.length > 0}
       aria-controls="grid"
-      aria-activedescendant={selected >= 0 ? `tile-${selected}` : undefined}
+      aria-activedescendant={chip >= 0 ? `chip-${chip}` : selected >= 0 && !detail ? `tile-${selected}` : undefined}
     />
     {#if busy}
       <span class="spinner busy" role="status" aria-label="Loading"></span>
     {/if}
   </header>
 
-  <ProviderTabs {active} {clipsEnabled} onswitch={switchTo} />
+  <ProviderTabs {active} lib={libTab} {clipsEnabled} onswitch={switchTo} onlib={switchLib} />
 
-  <section class="content" aria-busy={statuses === null}>
-    {#if statuses === null}
-      <!-- waiting for Providers() -->
-    {:else if card}
-      {#key `${active}:${cardMessage}`}
-        <SetupCard bind:this={setup} {slot} initialMessage={cardMessage} onsaved={keySaved} ontryfiner={tryFiner} />
-      {/key}
-    {:else if active === 'clips' && !giphyKey}
-      <StateMessage
-        heading="Clips use your GIPHY key"
-        body="Add a GIPHY key first. Gifsmith checks it for Clips access automatically."
-        button="Add GIPHY Key"
-        primary
-        onbutton={() => switchTo('giphy')}
-      />
-    {:else if active === 'clips' && (cur.err?.kind === 'key_rejected' || cur.err?.kind === 'key_missing')}
-      <!-- Clips have no key card of their own: errorState() has no row for key errors. -->
-      <StateMessage
-        heading="GIPHY rejected your saved key"
-        body="Clips use your GIPHY key. Paste a new key on the GIPHY tab to continue."
-        button="Go to GIPHY"
-        primary
-        onbutton={() => {
-          // GIPHY's own grid may still hold cached results for this key: carry the rejection over so its card shows.
-          setResults('giphy', null, null);
-          Object.assign(states.giphy, { status: 'error', err: { kind: 'key_rejected', provider: 'giphy' }, errAt: Date.now() });
-          switchTo('giphy');
-        }}
-      />
-    {:else if active === 'clips' && clipsState === 'disabled'}
-      <StateMessage
-        heading="Clips aren't enabled for your key"
-        body="Your GIPHY key works for GIFs, but GIPHY has to approve it for Clips. Email clips@giphy.com to request access, then reopen Gifsmith."
-        link="Email clips@giphy.com ↗"
-        href={CLIPS_ACCESS_MAILTO}
-        onlink={() => openExternal(CLIPS_ACCESS_MAILTO)}
-        button="Back to GIPHY"
-        onbutton={() => switchTo('giphy')}
-      />
-    {:else if active === 'clips' && !clipsEnabled && cur.status !== 'error'}
-      <div class="skeleton" aria-hidden="true">
-        {#each Array(8), i (i)}
-          <div></div>
-        {/each}
-      </div>
-    {:else if finerIdle}
-      <StateMessage
-        heading="Search The Office GIFs"
-        body="The Finer Gifs Club has no trending list. Type at least 2 characters to search."
-      />
-    {:else if cur.items.length}
-      {#key `${active}:${cur.seq}`}
-        <ResultGrid
-          items={cur.items}
-          {selected}
-          {copying}
-          paging={cur.paging}
-          pagingNote={pageView?.note}
-          pagingRetry={pageView?.state?.tryAgain ?? true}
-          onselect={select}
-          oncopy={(i) => {
-            select(i);
-            run('copy');
-          }}
-          onneedmore={loadMore}
-          onretrypage={retryPage}
+  <section class="content" aria-busy={statuses === null || (!!libTab && !library)}>
+    <!-- Details covers the content area; the grid stays mounted underneath so ← → move its selection. -->
+    {#if detail}
+      <div class="details-layer">
+        <DetailsPane
+          gif={detail}
+          favorited={favKeys.has(keyOf(detail))}
+          onopenpage={() => openItem(detail, openPage)}
+          onopensource={() => openItem(detail, openSource)}
         />
-      {/key}
-    {:else if cur.status === 'loading'}
-      <div class="skeleton" aria-hidden="true">
-        {#each Array(8), i (i)}
-          <div></div>
-        {/each}
       </div>
-    {:else if cur.status === 'empty'}
-      <StateMessage
-        heading="No GIFs found"
-        body="Nothing on {providerName(active)} matches “{cur.q}”. Try different words, or switch providers with ⌘1–⌘4."
-      />
-    {:else if errView}
-      <StateMessage
-        icon
-        heading={errView.heading}
-        body={errView.body}
-        button={errView.tryAgain ? 'Try Again' : ''}
-        onbutton={retry}
-      />
     {/if}
+    {#if chips.length}
+      <RecentSearches searches={chips} selected={chip} onrun={runChip} />
+    {/if}
+    <div class="view">
+      {#if libTab}
+        {#if !library}
+          {#if libSlow}
+            <div class="skeleton" aria-hidden="true">
+              {#each Array(8), i (i)}
+                <div></div>
+              {/each}
+            </div>
+          {/if}
+        {:else if library.unreadable.includes(libTab)}
+          <StateMessage
+            icon
+            heading="Couldn't load {libName}"
+            body="Gifsmith couldn't read its saved list. Try again, or quit and reopen Gifsmith."
+            button="Try Again"
+            onbutton={() => refreshLibrary()}
+          />
+        {:else if !library[libTab].length && libTab === 'favorites'}
+          <StateMessage
+            heading="No favorites yet"
+            body="Press ⌘⇧F on any GIF to save it here. Favorites open instantly, even offline or when a provider's request limit is reached."
+          />
+        {:else if !library[libTab].length}
+          <StateMessage heading="No recent GIFs" body="GIFs you copy or paste show up here, newest first." />
+        {:else if !libItems.length}
+          <StateMessage heading="No matches" body="Nothing in {libName} matches “{query.trim()}”. Press Esc to clear the search." />
+        {:else}
+          <!-- Remounted when the row layout changes: the virtualizer reads row sizes only on a count change. -->
+          {#key `${libTab}:${libSections.map((s) => s.items.length).join(',')}`}
+            <LibraryGrid
+              sections={libSections}
+              {selected}
+              {overlay}
+              favorites={favKeys}
+              badges={libTab !== 'favorites'}
+              onselect={select}
+              oncopy={(i) => {
+                select(i);
+                run('copy');
+              }}
+            />
+          {/key}
+        {/if}
+      {:else if statuses === null}
+        <!-- waiting for Providers() -->
+      {:else if card}
+        {#key `${active}:${cardMessage}`}
+          <SetupCard bind:this={setup} {slot} initialMessage={cardMessage} onsaved={keySaved} ontryfiner={tryFiner} />
+        {/key}
+      {:else if active === 'clips' && !giphyKey}
+        <StateMessage
+          heading="Clips use your GIPHY key"
+          body="Add a GIPHY key first. Gifsmith checks it for Clips access automatically."
+          button="Add GIPHY Key"
+          primary
+          onbutton={() => switchTo('giphy')}
+        />
+      {:else if active === 'clips' && (cur.err?.kind === 'key_rejected' || cur.err?.kind === 'key_missing')}
+        <!-- Clips have no key card of their own: errorState() has no row for key errors. -->
+        <StateMessage
+          heading="GIPHY rejected your saved key"
+          body="Clips use your GIPHY key. Paste a new key on the GIPHY tab to continue."
+          button="Go to GIPHY"
+          primary
+          onbutton={() => {
+            // GIPHY's own grid may still hold cached results for this key: carry the rejection over so its card shows.
+            setResults('giphy', null, null);
+            Object.assign(states.giphy, { status: 'error', err: { kind: 'key_rejected', provider: 'giphy' }, errAt: Date.now() });
+            switchTo('giphy');
+          }}
+        />
+      {:else if active === 'clips' && clipsState === 'disabled'}
+        <StateMessage
+          heading="Clips aren't enabled for your key"
+          body="Your GIPHY key works for GIFs, but GIPHY has to approve it for Clips. Email clips@giphy.com to request access, then reopen Gifsmith."
+          link="Email clips@giphy.com ↗"
+          href={CLIPS_ACCESS_MAILTO}
+          onlink={() => openExternal(CLIPS_ACCESS_MAILTO)}
+          button="Back to GIPHY"
+          onbutton={() => switchTo('giphy')}
+        />
+      {:else if active === 'clips' && !clipsEnabled && cur.status !== 'error'}
+        <div class="skeleton" aria-hidden="true">
+          {#each Array(8), i (i)}
+            <div></div>
+          {/each}
+        </div>
+      {:else if finerIdle}
+        <StateMessage
+          heading="Search The Office GIFs"
+          body="The Finer Gifs Club has no trending list. Type at least 2 characters to search."
+        />
+      {:else if cur.items.length}
+        {#key `${active}:${cur.seq}`}
+          <ResultGrid
+            items={cur.items}
+            {selected}
+            {overlay}
+            favorites={favKeys}
+            paging={cur.paging}
+            pagingNote={pageView?.note}
+            pagingRetry={pageView?.state?.tryAgain ?? true}
+            onselect={select}
+            oncopy={(i) => {
+              select(i);
+              run('copy');
+            }}
+            onneedmore={loadMore}
+            onretrypage={retryPage}
+          />
+        {/key}
+      {:else if cur.status === 'loading'}
+        <div class="skeleton" aria-hidden="true">
+          {#each Array(8), i (i)}
+            <div></div>
+          {/each}
+        </div>
+      {:else if cur.status === 'empty'}
+        <StateMessage
+          heading="No GIFs found"
+          body="Nothing on {providerName(active)} matches “{cur.q}”. Try different words, or switch providers with ⌘1–⌘4."
+        />
+      {:else if errView}
+        <StateMessage
+          icon
+          heading={errView.heading}
+          body={errView.body}
+          button={errView.tryAgain ? 'Try Again' : ''}
+          onbutton={retry}
+        />
+      {/if}
+    </div>
   </section>
 
-  <Footer attribution={slot.attribution} text={footerCenter} {tone} {needsAccessibility} onenable={enableAutoPaste} />
+  {#if menuOpen}
+    <ActionMenu bind:this={menu} rows={menuRows} {...menuAt} onrun={runAction} onclose={closeMenu} />
+  {/if}
+
+  <Footer
+    {attribution}
+    hints={detail ? 'details' : libTab ? 'library' : 'provider'}
+    text={footerCenter}
+    {tone}
+    {needsAccessibility}
+    onenable={enableAutoPaste}
+    actionLabel={toastAction?.label}
+    actionHint={toastAction?.hint}
+    onaction={runToastAction}
+  />
 </main>
 
 <style>
@@ -583,6 +1116,14 @@
     font: var(--display);
     caret-color: var(--accent);
   }
+  /* Opts out of the shared focus ring: the combobox always holds focus (P1). */
+  input:focus-visible {
+    outline: 0;
+  }
+  /* P7: stale query text behind a setup card reads as inactive. */
+  input:disabled {
+    color: var(--text-tertiary);
+  }
   input::placeholder {
     color: var(--text-secondary);
   }
@@ -591,8 +1132,21 @@
     color: var(--text-secondary);
   }
   .content {
+    position: relative;
     flex: 1;
     min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  /* The grid or state below the chip row: 364px, or 332px under chips. */
+  .view {
+    flex: 1;
+    min-height: 0;
+  }
+  .details-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
   }
   /* S2: 8 skeleton tiles (2 rows) in grid geometry. */
   .skeleton {

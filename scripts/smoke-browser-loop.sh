@@ -8,6 +8,8 @@
 #   scripts/smoke-browser-loop.sh --uat <file.js> start both, run the dev-browser script headless, need "UAT OK"
 #
 # FAKE_FINER=down (and FAKE_CLIPS, from plan 02-06) pass through to the fixture server.
+# UAT_SEED_FAVORITES='<bytes>' seeds bin/uat-config/favorites.json (e.g. a corrupt file); a --uat
+# run then also fails if the app changed that file (an unreadable library file is never overwritten).
 set -euo pipefail
 
 MODE=smoke
@@ -27,6 +29,13 @@ VITE_PORT="${VITE_PORT:-9245}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 [ -z "$UAT_SCRIPT" ] || [ -f "$UAT_SCRIPT" ] || { echo "no such UAT script: $UAT_SCRIPT" >&2; exit 2; }
+# Each UAT script names the fixture env it needs on its "Run via:" line (line 2). Default it from
+# there so a plain `for f in scripts/uat/*.js` loop passes; an env var set by the caller still wins.
+if [ -n "$UAT_SCRIPT" ]; then
+  RUN_VIA=$(sed -n 2p "$UAT_SCRIPT")
+  case "$RUN_VIA" in *FAKE_CLIPS=denied*) : "${FAKE_CLIPS:=denied}" ;; esac
+  case "$RUN_VIA" in *"UAT_SEED_FAVORITES='{not json'"*) : "${UAT_SEED_FAVORITES:={not json}" ;; esac
+fi
 
 fail() { echo "SMOKE FAIL: $*" >&2; exit 1; }
 
@@ -42,7 +51,13 @@ echo "building bin/gifsmith-server (CGO_ENABLED=0, -tags server)"
 mkdir -p bin
 CGO_ENABLED=0 go build -tags server -o bin/gifsmith-server .
 # Fresh first-run state every run (UAT-only dirs; the real app uses the user's cache/config dirs).
-rm -rf bin/uat-config bin/uat-cache
+# The server build downloads into bin/uat-downloads, never ~/Downloads; Download never creates it.
+rm -rf bin/uat-config bin/uat-cache bin/uat-downloads
+mkdir -p bin/uat-downloads
+if [ -n "${UAT_SEED_FAVORITES:-}" ]; then
+  mkdir -p bin/uat-config
+  printf '%s' "$UAT_SEED_FAVORITES" >bin/uat-config/favorites.json
+fi
 
 PIDS=()
 BODY=$(mktemp)
@@ -86,6 +101,10 @@ if [ "$MODE" = uat ]; then
   OUT=$(dev-browser --headless --browser gifsmith-uat --timeout 120 run "$UAT_SCRIPT" 2>&1) || true
   echo "$OUT"
   grep -q "UAT OK" <<<"$OUT" || { echo "UAT FAIL: $UAT_SCRIPT" >&2; exit 1; }
+  if [ -n "${UAT_SEED_FAVORITES:-}" ] && [ "$(cat bin/uat-config/favorites.json)" != "$UAT_SEED_FAVORITES" ]; then
+    echo "UAT FAIL: the seeded favorites.json was changed" >&2
+    exit 1
+  fi
   exit 0
 fi
 
@@ -117,13 +136,54 @@ echo "GET $PREVIEW: 200, image/gif bytes start GIF8"
 
 COPY_ID=$(method_id "$SVC/actionservice.ts" Copy)
 [ -n "$COPY_ID" ] || fail "could not find the ActionService.Copy method ID"
+# The server build runs platform.Fake: the copy succeeds without touching the real pasteboard.
 CODE=$(call "$COPY_ID" "[$ITEM]")
-if [ "$CODE" != "422" ] || ! grep -q 'not supported in this build' "$BODY"; then
+if [ "$CODE" != "200" ] || ! grep -q '"copied":true' "$BODY"; then
   fail "ActionService.Copy(gif) via proxy: HTTP $CODE, body: $(cat "$BODY")"
 fi
 STAGED=$(find bin/uat-cache/staging -name '*.gif' -type f 2>/dev/null | head -1)
 [ -n "$STAGED" ] || fail "ActionService.Copy(gif) staged no .gif under bin/uat-cache/staging"
-echo "ActionService.Copy(gif): staged $STAGED, then HTTP 422 $(cat "$BODY")"
+echo "ActionService.Copy(gif): staged $STAGED, HTTP 200 $(cat "$BODY")"
+
+SQUARE_ID=$(method_id "$SVC/actionservice.ts" CopySquare)
+[ -n "$SQUARE_ID" ] || fail "could not find the ActionService.CopySquare method ID"
+CODE=$(call "$SEARCH_ID" '["finergifs","widemedia",""]')
+[ "$CODE" = "200" ] && grep -q '/media/wide-' "$BODY" || fail "Search(finergifs, widemedia): HTTP $CODE, body: $(head -c 300 "$BODY")"
+WIDE_ITEM=$(node -e 'const p = JSON.parse(require("fs").readFileSync(0, "utf8")); process.stdout.write(JSON.stringify(p.items[0]))' <"$BODY")
+CODE=$(call "$SQUARE_ID" "[$WIDE_ITEM]")
+if [ "$CODE" != "200" ] || ! grep -q '"copied":true' "$BODY" || ! grep -q 'square GIF' "$BODY"; then
+  fail "ActionService.CopySquare(wide gif) via proxy: HTTP $CODE, body: $(cat "$BODY")"
+fi
+SQUARES=$(find bin/uat-cache/staging -name '*-square.gif' -type f | wc -l | tr -d ' ')
+STAGED_ALL=$(find bin/uat-cache/staging -type f | wc -l | tr -d ' ')
+[ "$SQUARES" = "1" ] && [ "$STAGED_ALL" = "1" ] || fail "CopySquare staged $SQUARES square files among $STAGED_ALL, want exactly one file"
+echo "ActionService.CopySquare(wide gif): HTTP 200 $(cat "$BODY"), staging holds only $(find bin/uat-cache/staging -name '*-square.gif' -type f)"
+
+DOWNLOAD_ID=$(method_id "$SVC/actionservice.ts" Download)
+[ -n "$DOWNLOAD_ID" ] || fail "could not find the ActionService.Download method ID"
+for name in "office-moment-1-office-1.gif" "office-moment-1-office-1 (2).gif"; do
+  CODE=$(call "$DOWNLOAD_ID" "[$ITEM]")
+  if [ "$CODE" != "200" ] || ! grep -qF "\"name\":\"$name\"" "$BODY" || grep -q 'uat-downloads/' "$BODY"; then
+    fail "ActionService.Download(gif) via proxy: HTTP $CODE, body: $(cat "$BODY")"
+  fi
+  [ "$(head -c 4 "bin/uat-downloads/$name")" = "GIF8" ] || fail "bin/uat-downloads/$name missing or not a GIF"
+  echo "ActionService.Download(gif): HTTP 200 $(cat "$BODY"), bin/uat-downloads/$name starts GIF8"
+done
+HTML_ITEM=$(node -e 'const g = JSON.parse(process.argv[1]); g.downloadUrl = g.downloadUrl.replace(/office-1\.gif$/, "html-1.gif"); process.stdout.write(JSON.stringify(g))' "$ITEM")
+CODE=$(call "$DOWNLOAD_ID" "[$HTML_ITEM]")
+COUNT=$(find bin/uat-downloads -type f | wc -l | tr -d ' ')
+if [ "$CODE" = "200" ] || [ "$COUNT" != "2" ]; then
+  fail "ActionService.Download(html media): HTTP $CODE, $COUNT files in bin/uat-downloads, body: $(cat "$BODY")"
+fi
+echo "ActionService.Download(html media): HTTP $CODE $(cat "$BODY"), no new file"
+
+COPYTEXT_ID=$(method_id "$SVC/actionservice.ts" CopyText)
+[ -n "$COPYTEXT_ID" ] || fail "could not find the ActionService.CopyText method ID"
+CODE=$(call "$COPYTEXT_ID" "[$ITEM,\"link\"]")
+if [ "$CODE" != "200" ] || ! grep -q '"message":"Copied link"' "$BODY"; then
+  fail "ActionService.CopyText(gif, link) via proxy: HTTP $CODE, body: $(cat "$BODY")"
+fi
+echo "ActionService.CopyText(gif, link): HTTP 200 $(cat "$BODY")"
 
 EVIL=$(node -e 'const g = JSON.parse(process.argv[1]); g.downloadUrl = "https://evil.example.test/x.gif"; process.stdout.write(JSON.stringify(g))' "$ITEM")
 CODE=$(call "$COPY_ID" "[$EVIL]")
@@ -172,6 +232,13 @@ echo "Clips probe: enabled; GifService.Trending(clips) returned isClip items"
 CODE=$(call "$TREND_ID" '["giphy",""]')
 [ "$CODE" = "200" ] && grep -q '/media/giphy-' "$BODY" || fail "Trending(giphy): HTTP $CODE, body: $(head -c 300 "$BODY")"
 echo "GifService.Trending(giphy): HTTP 200 with fixture /media/giphy- URLs"
+GIPHY_ITEM=$(node -e 'const p = JSON.parse(require("fs").readFileSync(0, "utf8")); process.stdout.write(JSON.stringify(p.items[0]))' <"$BODY")
+OPEN_ID=$(method_id "$SVC/actionservice.ts" OpenPage)
+[ -n "$OPEN_ID" ] || fail "could not find the ActionService.OpenPage method ID"
+# platform.Fake records the URL; nothing opens on this machine.
+CODE=$(call "$OPEN_ID" "[$GIPHY_ITEM]")
+[ "$CODE" = "200" ] || fail "ActionService.OpenPage(giphy item): HTTP $CODE, body: $(cat "$BODY")"
+echo "ActionService.OpenPage(giphy item): HTTP 200 (platform.Fake)"
 
 CODE=$(call "$SAVE_ID" '["klipy","uat-key-123"]')
 [ "$CODE" = "200" ] || fail "SaveKey(klipy, fixture key): HTTP $CODE, body: $(cat "$BODY")"

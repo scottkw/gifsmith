@@ -41,6 +41,27 @@ func TestCopyFileWritesFileURL(t *testing.T) {
 	}
 }
 
+// Private named pasteboard only; OpenURL is never called from tests (it opens a real browser).
+func TestCopyTextWritesString(t *testing.T) {
+	pb := fmt.Sprintf("com.kenscott.gifsmith.test.%d", time.Now().UnixNano())
+	t.Cleanup(func() { releasePasteboard(pb) })
+	const want = "https://x/y.gif"
+	if err := copyTextToPasteboard(pb, want); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := pasteboardString(pb); err != nil || got != want {
+		t.Fatalf("pasteboard = %q, %v; want %q", got, err, want)
+	}
+	for _, bad := range []string{"bad\xff", "nul\x00byte"} {
+		if err := copyTextToPasteboard(pb, bad); err == nil {
+			t.Errorf("copyTextToPasteboard(%q) = nil, want an error", bad)
+		}
+	}
+	if got, _ := pasteboardString(pb); got != want {
+		t.Errorf("rejected text replaced the pasteboard: %q", got)
+	}
+}
+
 func TestCopyFileMissingPath(t *testing.T) {
 	if err := New().CopyFile(filepath.Join(t.TempDir(), "missing.gif")); err == nil {
 		t.Fatal("CopyFile on a missing path returned nil")
