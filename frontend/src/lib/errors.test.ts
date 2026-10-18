@@ -189,3 +189,9 @@ test('download errors show F2, F3 and F4', () => {
   assert.equal(actionErrorText('not_media', g, 'download'), F3);
   assert.equal(actionErrorText('not_media', g, 'copy'), F3);
 });
+
+test('square crop errors show F6 and F7', () => {
+  const g = { provider: 'giphy' } as Parameters<typeof actionErrorText>[1];
+  assert.equal(actionErrorText('crop_failed', g), "Couldn't crop this GIF. Press ↵ to copy it as is, or pick another GIF.");
+  assert.equal(actionErrorText('crop_too_large', g), 'This GIF is too large to crop (over 15 MB). Press ↵ to copy it as is.');
+});

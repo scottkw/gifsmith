@@ -1,12 +1,16 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"image"
+	"image/color"
 	"image/gif"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -973,5 +977,146 @@ func TestCopySquareRefusesClips(t *testing.T) {
 	}
 	if n := fx.hits.Load(); n != 0 || len(f.Calls) != 0 {
 		t.Errorf("a Clip square crop made %d requests and calls %q, want none", n, f.Calls)
+	}
+}
+
+// rawService serves body as the only media file; the item points at it.
+func rawService(t *testing.T, f *platform.Fake, body io.Reader) (*ActionService, provider.Gif) {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/gif")
+		_, _ = io.Copy(w, body)
+	}))
+	t.Cleanup(srv.Close)
+	host := strings.TrimPrefix(srv.URL, "http://")
+	st := &staging.Store{Dir: t.TempDir(), HTTP: srv.Client(), Allow: func(_ provider.ID, u *url.URL) bool { return u.Host == host }}
+	g := provider.Gif{Provider: provider.FinerGifs, ID: "raw-1", Title: "Raw 1", DownloadURL: srv.URL + "/media/raw-1.gif"}
+	return &ActionService{Platform: f, Staging: st, Hide: func() { f.Note("hide") }}, g
+}
+
+// encodeGIF is a one-frame GIF with a w x h canvas (the frame itself is at most 8x8).
+func encodeGIF(t *testing.T, w, h int) []byte {
+	t.Helper()
+	fr := image.NewPaletted(image.Rect(0, 0, min(w, 8), min(h, 8)), color.Palette{color.Black, color.White})
+	var buf bytes.Buffer
+	if err := gif.EncodeAll(&buf, &gif.GIF{Image: []*image.Paletted{fr}, Delay: []int{0}, Config: image.Config{Width: w, Height: h}}); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// T-03-18: a claimed size over 15 MB is refused before any request.
+func TestCopySquareRefusesClaimedSize(t *testing.T) {
+	f := &platform.Fake{}
+	s, fx := newService(t, f)
+	g := squareOf(fx.gif, "wide-1")
+	g.Size = 16000000
+	if SquareMaxBytes != 15<<20 || SquareMaxSide != 4096 {
+		t.Fatalf("limits = %d bytes, %d px", SquareMaxBytes, SquareMaxSide)
+	}
+	_, err := s.CopySquare(context.Background(), g)
+	if actionKind(err) != "crop_too_large" {
+		t.Errorf("err = %v, want kind crop_too_large", err)
+	}
+	if n := fx.hits.Load(); n != 0 || len(f.Calls) != 0 {
+		t.Errorf("an oversized claim made %d requests and calls %q, want none", n, f.Calls)
+	}
+}
+
+// The 15 MB cap holds whatever the item claims.
+func TestCopySquareDownloadOverCap(t *testing.T) {
+	f := &platform.Fake{}
+	body := io.MultiReader(bytes.NewReader(encodeGIF(t, 10, 10)), io.LimitReader(zeros{}, SquareMaxBytes))
+	s, g := rawService(t, f, body)
+	_, err := s.CopySquare(context.Background(), g)
+	if actionKind(err) != "crop_too_large" {
+		t.Errorf("err = %v, want kind crop_too_large", err)
+	}
+	if ents, _ := os.ReadDir(s.Staging.Dir); len(ents) != 0 || len(f.Calls) != 0 {
+		t.Errorf("staging holds %d entries and calls %q after an oversized download, want none", len(ents), f.Calls)
+	}
+}
+
+type zeros struct{}
+
+func (zeros) Read(p []byte) (int, error) { clear(p); return len(p), nil }
+
+func TestCopySquareCropFailures(t *testing.T) {
+	whole := encodeGIF(t, 20, 10)
+	for name, tc := range map[string]struct {
+		body []byte
+		want string
+	}{
+		"giant canvas": {encodeGIF(t, 5000, 10), "crop_failed"},
+		"tall canvas":  {encodeGIF(t, 10, 4097), "crop_failed"},
+		"truncated":    {whole[:len(whole)-6], "crop_failed"},
+		"html":         {[]byte("<html>error</html>"), "not_media"},
+	} {
+		f := &platform.Fake{}
+		s, g := rawService(t, f, bytes.NewReader(tc.body))
+		_, err := s.CopySquare(context.Background(), g)
+		if actionKind(err) != tc.want {
+			t.Errorf("%s: err = %v, want kind %s", name, err, tc.want)
+		}
+		if len(f.Calls) != 0 {
+			t.Errorf("%s: calls = %q, want none", name, f.Calls)
+		}
+	}
+}
+
+func TestPasteSquareTrusted(t *testing.T) {
+	f := &platform.Fake{Trusted: true, Frontmost: prevApp}
+	s, fx := newPasteService(t, f)
+	r, err := s.PasteSquare(context.Background(), squareOf(fx.gif, "wide-1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.Pasted || r.Message != "Pasted square GIF" {
+		t.Errorf("result = %+v, want Pasted with message Pasted square GIF", r)
+	}
+	path := stagedPath(t, f)
+	want := []string{"CopyFile:" + path, "AccessibilityTrusted:false", "hide", "sleep:80ms", "FrontmostApp", "PasteShortcut"}
+	if !strings.HasSuffix(path, "-square.gif") || !slices.Equal(f.Calls, want) {
+		t.Errorf("calls = %q, want %q", f.Calls, want)
+	}
+}
+
+func TestPasteSquareWithoutAccessibility(t *testing.T) {
+	f := &platform.Fake{}
+	s, fx := newPasteService(t, f)
+	r, err := s.PasteSquare(context.Background(), squareOf(fx.gif, "wide-1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.Copied || r.Pasted || !r.NeedsAccessibility {
+		t.Errorf("result = %+v, want the T5a copy-only result", r)
+	}
+	if slices.Contains(f.Calls, "hide") || slices.Contains(f.Calls, "PasteShortcut") {
+		t.Errorf("calls = %q, want no hide and no ⌘V", f.Calls)
+	}
+}
+
+func TestPasteSquareRefusesClips(t *testing.T) {
+	f := &platform.Fake{Trusted: true, Frontmost: prevApp}
+	s, fx := newPasteService(t, f)
+	if _, err := s.PasteSquare(context.Background(), clipOf(fx.gif, "clip-1-720p")); actionKind(err) != "not_allowed" {
+		t.Errorf("err = %v, want kind not_allowed", err)
+	}
+}
+
+// D-19: a pasted Klipy square file is deleted KlipyPasteGrace after ⌘V, like Paste.
+func TestPasteSquareKlipyGrace(t *testing.T) {
+	f := &platform.Fake{Trusted: true, Frontmost: prevApp}
+	s, _, tm, k := klipyService(t, f)
+	if r, err := s.PasteSquare(context.Background(), k); err != nil || !r.Pasted {
+		t.Fatalf("PasteSquare = %+v, %v", r, err)
+	}
+	path := stagedPath(t, f)
+	if len(tm.d) != 1 || tm.d[0] != KlipyPasteGrace {
+		t.Fatalf("After calls = %v, want one of %v", tm.d, KlipyPasteGrace)
+	}
+	tm.fn[0]()
+	if exists(filepath.Dir(path)) {
+		t.Error("Klipy square dir still there after the grace timer ran")
 	}
 }

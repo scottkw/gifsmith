@@ -11,19 +11,19 @@ const giphy = buildActions(ctx(gif({ pageUrl: 'https://giphy.com/gifs/x' })));
 test('GIPHY item lists every row in the locked order with hints and groups', () => {
   assert.deepEqual(
     giphy.map((r) => r.id),
-    ['copy', 'paste', 'copyLink', 'pasteLink', 'copyMarkdown', 'pasteMarkdown', 'copyPage', 'open', 'download', 'copySquare'],
+    ['copy', 'paste', 'copyLink', 'pasteLink', 'copyMarkdown', 'pasteMarkdown', 'copyPage', 'open', 'download', 'copySquare', 'pasteSquare'],
   );
   assert.deepEqual(
     giphy.map((r) => r.label),
-    ['Copy GIF', 'Paste GIF', 'Copy Link', 'Paste Link', 'Copy Markdown', 'Paste Markdown', 'Copy Page Link', 'Open in Browser', 'Download GIF', 'Copy Square GIF'],
+    ['Copy GIF', 'Paste GIF', 'Copy Link', 'Paste Link', 'Copy Markdown', 'Paste Markdown', 'Copy Page Link', 'Open in Browser', 'Download GIF', 'Copy Square GIF', 'Paste Square GIF'],
   );
   assert.deepEqual(
     giphy.map((r) => r.hint),
-    ['↵', '⌘↵', '⌘⇧C', '', '⌘⇧M', '', '', '⌘O', '⌘S', ''],
+    ['↵', '⌘↵', '⌘⇧C', '', '⌘⇧M', '', '', '⌘O', '⌘S', '', ''],
   );
   assert.deepEqual(
     giphy.map((r) => r.group),
-    [1, 1, 2, 2, 2, 2, 2, 3, 3, 4],
+    [1, 1, 2, 2, 2, 2, 2, 3, 3, 4, 4],
   );
   assert.equal(giphy[2].keys, 'Meta+Shift+C');
   assert.equal(giphy[3].keys, '');
@@ -33,7 +33,7 @@ test('item without a page URL omits Copy Page Link and Open in Browser', () => {
   const ids = buildActions(ctx(gif({ provider: 'klipy' }))).map((r) => r.id);
   assert.ok(!ids.includes('copyPage'));
   assert.ok(!ids.includes('open'));
-  assert.equal(ids.length, 8);
+  assert.equal(ids.length, 9);
 });
 
 test('Clips read MP4; a Clip without a GIF rendition has no link or Markdown rows', () => {
@@ -76,4 +76,14 @@ test('Copy Square GIF follows Download in group 4 and is omitted for Clips (D-15
   assert.deepEqual([sq.label, sq.hint, sq.keys, sq.group], ['Copy Square GIF', '', '', 4]);
   const clip = buildActions(ctx(gif({ isClip: true, gifUrl: 'https://media.giphy.com/x.gif', pageUrl: 'https://giphy.com/clips/x' })));
   assert.ok(!clip.some((r) => r.id === 'copySquare' || r.label.includes('Square')));
+});
+
+test('Paste Square GIF follows Copy Square GIF; a Clip never lists a square row', () => {
+  const ids = giphy.map((r) => r.id);
+  assert.equal(ids[ids.indexOf('copySquare') + 1], 'pasteSquare');
+  const sq = giphy.find((r) => r.id === 'pasteSquare')!;
+  assert.deepEqual([sq.label, sq.hint, sq.keys, sq.group], ['Paste Square GIF', '', '', 4]);
+  for (const g of [gif({ isClip: true }), gif({ isClip: true, gifUrl: 'https://media.giphy.com/x.gif' })]) {
+    assert.ok(!buildActions(ctx(g)).some((r) => r.id === 'copySquare' || r.id === 'pasteSquare'));
+  }
 });

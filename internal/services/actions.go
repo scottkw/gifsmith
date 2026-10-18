@@ -474,3 +474,8 @@ func cropSquare(path string) ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
+
+// PasteSquare copies the square GIF like CopySquare, then pastes it like Paste.
+func (a *ActionService) PasteSquare(ctx context.Context, g provider.Gif) (Result, error) {
+	return Result{}, actionErr("download_failed") // RED skeleton
+}

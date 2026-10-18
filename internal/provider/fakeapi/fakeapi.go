@@ -143,6 +143,10 @@ func giphyGifs(w http.ResponseWriter, r *http.Request, o Options, clips bool) {
 		Video  map[string]any       `json:"video,omitempty"`
 	}
 	media := "http://" + r.Host + "/media/"
+	originalSize := "5678"
+	if hasWord(words, "hugesize") { // over the 15 MB square crop limit
+		originalSize = "16000000"
+	}
 	data := []item{}
 	for n := max(offset, 0) + 1; n <= total && len(data) < limit; n++ {
 		if clips {
@@ -161,7 +165,7 @@ func giphyGifs(w http.ResponseWriter, r *http.Request, o Options, clips bool) {
 		data = append(data, item{Type: "gif", ID: id, Slug: "moment-" + id, Title: "GIPHY moment " + strconv.Itoa(n), URL: "https://giphy.com/gifs/moment-" + id, Source: source, Images: map[string]rendition{
 			"fixed_width":  {URL: media + id + "-200w.gif", Width: "200", Height: "200", Size: "1234"},
 			"fixed_height": {URL: media + id + "-200h.gif", Width: "200", Height: "200", Size: "1234"},
-			"original":     {URL: media + id + ".gif", Width: "480", Height: "480", Size: "5678"},
+			"original":     {URL: media + id + ".gif", Width: "480", Height: "480", Size: originalSize},
 		}})
 	}
 	writeJSON(w, map[string]any{
