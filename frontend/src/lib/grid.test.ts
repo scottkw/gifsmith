@@ -106,3 +106,10 @@ test('routeKey maps Cmd+Backspace to remove, Cmd+Z (no Shift) to undo, Cmd+Shift
   assert.equal(key('f', { metaKey: true }), 'none');
   assert.equal(key('5', { metaKey: true }), 'slot5');
 });
+
+test('routeKey maps Cmd+I (no Shift) to details', () => {
+  assert.equal(key('i', { metaKey: true }), 'details');
+  assert.equal(key('I', { metaKey: true }), 'details');
+  assert.equal(key('i'), 'none');
+  assert.equal(key('i', { metaKey: true, shiftKey: true }), 'none');
+});

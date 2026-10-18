@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MENU_W, placeMenu } from './popover.ts';
+import { MENU_W, placeInDetails, placeMenu } from './popover.ts';
 
 const tile = (x: number, y: number) => ({ x, y, width: 166, height: 144 });
 
@@ -27,4 +27,8 @@ test('left never leaves the 8px inset', () => {
 
 test('window size can be passed', () => {
   assert.equal(placeMenu(tile(16, 700), 0, 280, { w: 1000, h: 800 }).top, 512);
+});
+
+test('placeInDetails sits 16px inside the content area top-right', () => {
+  assert.deepEqual(placeInDetails(280), { left: 720 - 16 - 320, top: 84 + 16 });
 });

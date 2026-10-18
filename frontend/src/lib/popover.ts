@@ -14,3 +14,7 @@ export function placeMenu(
   const clamp = (v: number, max: number) => Math.max(GAP, Math.min(v, max));
   return { left: clamp(left, win.w - GAP - MENU_W), top: clamp(tile.y, win.h - GAP - menuH) };
 }
+
+export function placeInDetails(_menuH: number): { left: number; top: number } {
+  return { left: 0, top: 0 };
+}

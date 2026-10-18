@@ -11,19 +11,19 @@ const giphy = buildActions(ctx(gif({ pageUrl: 'https://giphy.com/gifs/x' })));
 test('GIPHY item lists every row in the locked order with hints and groups', () => {
   assert.deepEqual(
     giphy.map((r) => r.id),
-    ['copy', 'paste', 'copyLink', 'pasteLink', 'copyMarkdown', 'pasteMarkdown', 'copyPage', 'open', 'download', 'copySquare', 'pasteSquare', 'favorite'],
+    ['copy', 'paste', 'copyLink', 'pasteLink', 'copyMarkdown', 'pasteMarkdown', 'copyPage', 'open', 'download', 'copySquare', 'pasteSquare', 'favorite', 'details'],
   );
   assert.deepEqual(
     giphy.map((r) => r.label),
-    ['Copy GIF', 'Paste GIF', 'Copy Link', 'Paste Link', 'Copy Markdown', 'Paste Markdown', 'Copy Page Link', 'Open in Browser', 'Download GIF', 'Copy Square GIF', 'Paste Square GIF', 'Add to Favorites'],
+    ['Copy GIF', 'Paste GIF', 'Copy Link', 'Paste Link', 'Copy Markdown', 'Paste Markdown', 'Copy Page Link', 'Open in Browser', 'Download GIF', 'Copy Square GIF', 'Paste Square GIF', 'Add to Favorites', 'Show Details'],
   );
   assert.deepEqual(
     giphy.map((r) => r.hint),
-    ['↵', '⌘↵', '⌘⇧C', '', '⌘⇧M', '', '', '⌘O', '⌘S', '', '', '⌘⇧F'],
+    ['↵', '⌘↵', '⌘⇧C', '', '⌘⇧M', '', '', '⌘O', '⌘S', '', '', '⌘⇧F', '⌘I'],
   );
   assert.deepEqual(
     giphy.map((r) => r.group),
-    [1, 1, 2, 2, 2, 2, 2, 3, 3, 4, 4, 5],
+    [1, 1, 2, 2, 2, 2, 2, 3, 3, 4, 4, 5, 5],
   );
   assert.equal(giphy[2].keys, 'Meta+Shift+C');
   assert.equal(giphy[3].keys, '');
@@ -33,7 +33,7 @@ test('item without a page URL omits Copy Page Link and Open in Browser', () => {
   const ids = buildActions(ctx(gif({ provider: 'klipy' }))).map((r) => r.id);
   assert.ok(!ids.includes('copyPage'));
   assert.ok(!ids.includes('open'));
-  assert.equal(ids.length, 10);
+  assert.equal(ids.length, 11);
 });
 
 test('Clips read MP4; a Clip without a GIF rendition has no link or Markdown rows', () => {
@@ -42,7 +42,7 @@ test('Clips read MP4; a Clip without a GIF rendition has no link or Markdown row
   assert.ok(withGif.some((r) => r.id === 'copyLink'));
   const bare = buildActions(ctx(gif({ isClip: true }))).map((r) => r.id);
   for (const id of ['copyLink', 'pasteLink', 'copyMarkdown', 'pasteMarkdown'] as const) assert.ok(!bare.includes(id), id);
-  assert.deepEqual(bare, ['copy', 'paste', 'download', 'favorite']);
+  assert.deepEqual(bare, ['copy', 'paste', 'download', 'favorite', 'details']);
 });
 
 test('filterActions matches a trimmed, case-insensitive label substring', () => {
@@ -101,17 +101,29 @@ test('favorite row toggles by state; Recents adds Remove from Recents and Clear 
 
   const recents = buildActions({ ...ctx(g), tab: 'recents' });
   assert.deepEqual(
-    recents.slice(-3).map((r) => [r.id, r.label, r.hint, r.group, r.destructive]),
+    recents.slice(-4).map((r) => [r.id, r.label, r.hint, r.group, r.destructive]),
     [
       ['favorite', 'Add to Favorites', '⌘⇧F', 5, false],
+      ['details', 'Show Details', '⌘I', 5, false],
       ['removeRecent', 'Remove from Recents', '⌘⌫', 6, true],
       ['clearRecents', 'Clear Recents', '', 6, true],
     ],
   );
   const favorites = buildActions({ ...ctx(g), tab: 'favorites', favorited: true });
   assert.deepEqual(
-    favorites.slice(-1).map((r) => [r.id, r.label, r.destructive]),
-    [['favorite', 'Remove from Favorites', true]],
+    favorites.slice(-2).map((r) => [r.id, r.label, r.destructive]),
+    [
+      ['favorite', 'Remove from Favorites', true],
+      ['details', 'Show Details', false],
+    ],
   );
   assert.ok(!favorites.some((r) => r.id === 'removeRecent' || r.id === 'clearRecents'));
+});
+
+test('Show Details follows the favorite row and is omitted in Details', () => {
+  const rows = buildActions(ctx(gif()));
+  const i = rows.findIndex((r) => r.id === 'favorite');
+  assert.deepEqual(rows[i + 1], { id: 'details', label: 'Show Details', hint: '⌘I', keys: 'Meta+I', group: 5, destructive: false });
+  const inDetails = buildActions({ ...ctx(gif()), inDetails: true }).map((r) => r.id);
+  assert.ok(!inDetails.includes('details'));
 });
