@@ -636,4 +636,4 @@ Phase 4 adds no frontend dependency. The Settings window, recorder and key cards
 - [x] Dimension 6 Registry Safety: PASS
 - [x] Dimension 7 Inventory Provenance: PASS (not applicable, `Tool: none`, section omitted per template)
 
-**Approval:** pending
+**Approval:** approved 2026-10-18 (gsd-ui-checker)
