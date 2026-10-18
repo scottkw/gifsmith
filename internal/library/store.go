@@ -227,3 +227,11 @@ func (s *Store) Touch(g provider.Gif) error {
 	}
 	return s.write(l, append([]Entry{{Gif: g, At: s.now()}}, without(l.items, key(g))...))
 }
+
+// Skeletons (RED).
+func (s *Store) SetFavorite(g provider.Gif, on bool) error   { return nil }
+func (s *Store) RemoveRecent(p provider.ID, id string) error { return nil }
+func (s *Store) ClearRecents() error                         { return nil }
+func (s *Store) Undo() error                                 { return nil }
+func (s *Store) SaveSearch(p provider.ID, q string) error    { return nil }
+func (s *Store) RemoveSearch(p provider.ID, q string) error  { return nil }
