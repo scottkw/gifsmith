@@ -1,10 +1,14 @@
 package settings
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"gifsmith/internal/provider"
@@ -114,18 +118,38 @@ func TestKeyringStoreErrors(t *testing.T) {
 	}
 }
 
-func TestPrefsRoundTrip(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "com.kenscott.gifsmith")
-	p, err := LoadPrefs(dir)
-	if err != nil || p != (Prefs{}) {
-		t.Fatalf("missing dir: %+v, %v; want zero Prefs, nil", p, err)
-	}
-	if err := SavePrefs(dir, Prefs{LastProvider: "klipy"}); err != nil {
+func readPrefsFile(t *testing.T, dir string) map[string]any {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(dir, "settings.json"))
+	if err != nil {
 		t.Fatal(err)
 	}
-	p, err = LoadPrefs(dir)
-	if err != nil || p.LastProvider != "klipy" {
-		t.Fatalf("LoadPrefs = %+v, %v", p, err)
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatalf("settings.json = %q: %v", b, err)
+	}
+	return m
+}
+
+func TestStoreFirstRunAndWrite(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "com.kenscott.gifsmith")
+	s := OpenStore(dir)
+	if got := s.Get(); got != (Prefs{}) {
+		t.Fatalf("first run Get = %+v, want zero Prefs", got)
+	}
+	if _, err := os.Stat(dir); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("OpenStore created %s (err %v); first run writes nothing", dir, err)
+	}
+	p, err := s.Update(func(p *Prefs) error { p.Theme = "dark"; return nil })
+	if err != nil || p.Theme != "dark" || s.Get().Theme != "dark" {
+		t.Fatalf("Update = %+v, %v; Get = %+v", p, err, s.Get())
+	}
+	m := readPrefsFile(t, dir)
+	if m["theme"] != "dark" {
+		t.Errorf("settings.json theme = %v, want dark", m["theme"])
+	}
+	if _, ok := m["lastProvider"]; !ok {
+		t.Errorf("settings.json lacks lastProvider: %v", m)
 	}
 	fi, err := os.Stat(filepath.Join(dir, "settings.json"))
 	if err != nil {
@@ -138,15 +162,102 @@ func TestPrefsRoundTrip(t *testing.T) {
 	if len(entries) != 1 {
 		t.Errorf("dir holds %d entries, want only settings.json (no temp files)", len(entries))
 	}
+	if got := OpenStore(dir).Get(); got.Theme != "dark" {
+		t.Errorf("reopened Get = %+v, want theme dark", got)
+	}
 }
 
-func TestPrefsInvalidJSON(t *testing.T) {
+// Each Update changes only what its mutator touches: the old SavePrefs(Prefs{...}) erased the rest.
+func TestStoreUpdateKeepsOtherFields(t *testing.T) {
+	dir := t.TempDir()
+	s := OpenStore(dir)
+	if _, err := s.Update(func(p *Prefs) error { p.LastProvider = "klipy"; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Update(func(p *Prefs) error { p.Theme = "light"; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	m := readPrefsFile(t, dir)
+	if m["lastProvider"] != "klipy" || m["theme"] != "light" {
+		t.Errorf("settings.json = %v, want lastProvider klipy and theme light", m)
+	}
+}
+
+func TestStoreUnknownEnumResets(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(`{"lastProvider":"giphy","theme":"neon"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := OpenStore(dir).Get()
+	if got.Theme != "" || got.LastProvider != "giphy" {
+		t.Errorf("Get = %+v, want theme reset to \"\" and lastProvider giphy kept", got)
+	}
+	if !strings.Contains(buf.String(), "theme") {
+		t.Errorf("log %q does not name the reset field", buf.String())
+	}
+}
+
+func TestStoreUnreadableIsFirstRun(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte("{nope"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := LoadPrefs(dir); err == nil {
-		t.Error("invalid JSON loaded without error")
+	if got := OpenStore(dir).Get(); got != (Prefs{}) {
+		t.Errorf("unreadable file: Get = %+v, want zero Prefs", got)
+	}
+	if buf.Len() == 0 {
+		t.Error("unreadable settings file was not logged")
+	}
+}
+
+func TestStoreWriteFailureKeepsPrefs(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(dir, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := OpenStore(dir) // the "dir" is a file: every write fails
+	if _, err := s.Update(func(p *Prefs) error { p.Theme = "dark"; return nil }); err == nil {
+		t.Fatal("Update into a file-as-dir succeeded")
+	}
+	if got := s.Get(); got != (Prefs{}) {
+		t.Errorf("Get after a failed write = %+v, want unchanged zero Prefs", got)
+	}
+	mutErr := errors.New("refused")
+	if _, err := OpenStore(t.TempDir()).Update(func(p *Prefs) error { p.Theme = "dark"; return mutErr }); !errors.Is(err, mutErr) {
+		t.Errorf("mutator error = %v, want it returned", err)
+	}
+}
+
+func TestStoreConcurrentUpdates(t *testing.T) {
+	dir := t.TempDir()
+	s := OpenStore(dir)
+	var wg sync.WaitGroup
+	for i := range 50 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var err error
+			if i%2 == 0 {
+				_, err = s.Update(func(p *Prefs) error { p.LastProvider = "klipy"; return nil })
+			} else {
+				_, err = s.Update(func(p *Prefs) error { p.Theme = "dark"; return nil })
+			}
+			if err != nil {
+				t.Error(err)
+			}
+			_ = s.Get()
+		}()
+	}
+	wg.Wait()
+	m := readPrefsFile(t, dir)
+	if m["lastProvider"] != "klipy" || m["theme"] != "dark" {
+		t.Errorf("settings.json = %v, want both fields after concurrent updates", m)
 	}
 }
 

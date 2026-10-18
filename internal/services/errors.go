@@ -52,3 +52,11 @@ func MarshalError(err error) []byte {
 	b, _ := json.Marshal(ae) // cannot fail for this struct
 	return b
 }
+
+// SettingsError is the error SettingsService returns to the webview: fixed text per kind.
+type SettingsError struct {
+	Kind string `json:"kind"`
+	Slot string `json:"slot,omitempty"`
+}
+
+func (e *SettingsError) Error() string { return "settings failed" } // RED skeleton

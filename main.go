@@ -72,7 +72,7 @@ func main() {
 		Blocked: func() error { return svc.BlockedErr(provider.Clips) },
 	}
 	gifs := &services.GifService{Svc: svc, Keys: keys, Clips: clips}
-	settingsSvc := &services.SettingsService{Keys: keys, Dir: d.ConfigDir, Svc: svc, Clips: clips, NewClient: func(p provider.ID, key string) provider.Provider {
+	settingsSvc := &services.SettingsService{Keys: keys, Store: settings.OpenStore(d.ConfigDir), Platform: plat, Svc: svc, Clips: clips, NewClient: func(p provider.ID, key string) provider.Provider {
 		candidate := func() (string, bool) { return key, true }
 		if p == provider.Klipy {
 			return &klipy.Client{BaseURL: d.KlipyBase, Key: candidate, HTTP: d.HTTP}
@@ -109,7 +109,7 @@ func main() {
 		// Used only by -tags server builds (browser UAT); WAILS_SERVER_PORT overrides.
 		Server: application.ServerOptions{Host: "localhost", Port: 8089},
 	})
-	settingsSvc.Emit = func(n string) { app.Event.Emit(n) }
+	settingsSvc.Emit = func(n string, data ...any) { app.Event.Emit(n, data...) }
 	clips.OnChange = func() {
 		log.Printf("clips: %s", clips.State()) // state only: records the native probe outcome
 		app.Event.Emit("providers:changed")

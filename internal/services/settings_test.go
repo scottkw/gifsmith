@@ -30,6 +30,8 @@ type settingsFixture struct {
 	store  *settings.MemoryStore
 	hits   *atomic.Int32 // fixture requests, Clips routes excluded (the probe is async)
 	events *[]string
+	data   *[]any // the payload of each event (nil when none), parallel to events
+	dir    string // holds settings.json
 	clips  *search.Clips
 	probes *atomic.Int32
 }
@@ -77,12 +79,19 @@ func newSettings(t *testing.T, base string) settingsFixture {
 	}
 	var mu sync.Mutex
 	events := []string{}
-	s := &SettingsService{Keys: keys, Dir: t.TempDir(), Svc: svc, NewClient: newClient, Emit: func(n string) {
+	data := []any{}
+	dir := t.TempDir()
+	s := &SettingsService{Keys: keys, Store: settings.OpenStore(dir), Svc: svc, NewClient: newClient, Emit: func(n string, d ...any) {
 		mu.Lock()
 		defer mu.Unlock()
 		events = append(events, n)
+		if len(d) > 0 {
+			data = append(data, d[0])
+		} else {
+			data = append(data, nil)
+		}
 	}, Clips: clips}
-	return settingsFixture{svc: s, gifs: &GifService{Svc: svc, Keys: keys, Clips: clips}, store: store, hits: &hits, events: &events, clips: clips, probes: &probes}
+	return settingsFixture{svc: s, gifs: &GifService{Svc: svc, Keys: keys, Clips: clips}, store: store, hits: &hits, events: &events, data: &data, dir: dir, clips: clips, probes: &probes}
 }
 
 func wantProviderErr(t *testing.T, err error, kind provider.Kind, p provider.ID, status int) {
@@ -370,7 +379,7 @@ func TestLastProvider(t *testing.T) {
 	if err := f.svc.SetLastProvider(ctx, "klipy"); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(f.svc.Dir, "settings.json")
+	path := filepath.Join(f.dir, "settings.json")
 	before, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -390,14 +399,156 @@ func TestLastProvider(t *testing.T) {
 func TestLastProviderUnreadable(t *testing.T) {
 	logs := captureLog(t)
 	f := newSettings(t, "")
-	if err := os.WriteFile(filepath.Join(f.svc.Dir, "settings.json"), []byte("{nope"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(f.dir, "settings.json"), []byte("{nope"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	f.svc.Store = settings.OpenStore(f.dir)
 	if got := f.svc.LastProvider(context.Background()); got != "" {
 		t.Errorf("unreadable file: %q, want \"\" (first run)", got)
 	}
 	if logs.Len() == 0 {
 		t.Error("unreadable settings file was not logged")
+	}
+}
+
+func TestSetPrefTheme(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	var applied []string
+	f.svc.ApplyTheme = func(th string) { applied = append(applied, th) }
+	snap, err := f.svc.SetPref(ctx, "theme", "dark")
+	if err != nil || snap.Theme != "dark" {
+		t.Fatalf("SetPref(theme, dark) = %+v, %v", snap, err)
+	}
+	if len(applied) != 1 || applied[0] != "dark" {
+		t.Errorf("ApplyTheme calls = %v, want [dark]", applied)
+	}
+	if got := *f.events; len(got) != 1 || got[0] != "settings:changed" {
+		t.Fatalf("events = %v, want [settings:changed]", got)
+	}
+	if got, ok := (*f.data)[0].(Snapshot); !ok || got != snap {
+		t.Errorf("settings:changed payload = %#v, want the returned Snapshot %#v", (*f.data)[0], snap)
+	}
+	if got := f.svc.Snapshot(ctx); got.Theme != "dark" {
+		t.Errorf("Snapshot = %+v, want theme dark", got)
+	}
+	b, err := os.ReadFile(filepath.Join(f.dir, "settings.json"))
+	if err != nil || !strings.Contains(string(b), `"theme":"dark"`) {
+		t.Errorf("settings.json = %s, %v", b, err)
+	}
+	// Equal value: no write, no event, no ApplyTheme.
+	if err := os.Remove(filepath.Join(f.dir, "settings.json")); err != nil {
+		t.Fatal(err)
+	}
+	snap, err = f.svc.SetPref(ctx, "theme", "dark")
+	if err != nil || snap.Theme != "dark" {
+		t.Errorf("SetPref(theme, dark) again = %+v, %v", snap, err)
+	}
+	if _, err := os.Stat(filepath.Join(f.dir, "settings.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("an unchanged value was written (stat err %v)", err)
+	}
+	if len(*f.events) != 1 || len(applied) != 1 {
+		t.Errorf("unchanged value: events %v, ApplyTheme %v; want no new calls", *f.events, applied)
+	}
+}
+
+func wantSettingsErr(t *testing.T, err error, kind string) {
+	t.Helper()
+	var se *SettingsError
+	if !errors.As(err, &se) || se.Kind != kind {
+		t.Fatalf("err = %#v, want *SettingsError %s", err, kind)
+	}
+}
+
+func TestSetPrefRejectsInvalid(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	applied := 0
+	f.svc.ApplyTheme = func(string) { applied++ }
+	for _, tc := range [][2]string{{"theme", "neon"}, {"bogus", "x"}, {"lastProvider", "giphy"}} {
+		_, err := f.svc.SetPref(ctx, tc[0], tc[1])
+		wantSettingsErr(t, err, "invalid_value")
+	}
+	if _, err := os.Stat(filepath.Join(f.dir, "settings.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a refused value wrote settings.json (stat err %v)", err)
+	}
+	if len(*f.events) != 0 || applied != 0 {
+		t.Errorf("refused values: events %v, ApplyTheme %d; want none", *f.events, applied)
+	}
+}
+
+func TestSetPrefWriteFailure(t *testing.T) {
+	logs := captureLog(t)
+	f := newSettings(t, "")
+	file := filepath.Join(f.dir, "not-a-dir")
+	if err := os.WriteFile(file, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f.svc.Store = settings.OpenStore(file)
+	_, err := f.svc.SetPref(context.Background(), "theme", "dark")
+	wantSettingsErr(t, err, "prefs_write_failed")
+	if len(*f.events) != 0 {
+		t.Errorf("events = %v after a failed write, want none", *f.events)
+	}
+	if !strings.Contains(logs.String(), "settings write failed: theme") {
+		t.Errorf("log = %q, want the failed field named", logs.String())
+	}
+}
+
+// The overwrite bug: a tab switch used to write Prefs{LastProvider} wholesale and erase the theme.
+func TestSetLastProviderKeepsTheme(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	if _, err := f.svc.SetPref(ctx, "theme", "dark"); err != nil {
+		t.Fatal(err)
+	}
+	*f.events = (*f.events)[:0]
+	if err := f.svc.SetLastProvider(ctx, "klipy"); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(filepath.Join(f.dir, "settings.json"))
+	if !strings.Contains(string(b), `"lastProvider":"klipy"`) || !strings.Contains(string(b), `"theme":"dark"`) {
+		t.Errorf("settings.json = %s, want lastProvider klipy and theme dark", b)
+	}
+	if got := f.svc.LastProvider(ctx); got != "klipy" {
+		t.Errorf("LastProvider = %q, want klipy", got)
+	}
+	if len(*f.events) != 0 {
+		t.Errorf("a tab switch emitted %v, want nothing", *f.events)
+	}
+}
+
+func TestSetPrefConcurrentWithLastProvider(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	var wg sync.WaitGroup
+	for i := range 40 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if i%2 == 0 {
+				_ = f.svc.SetLastProvider(ctx, "klipy")
+			} else {
+				_, _ = f.svc.SetPref(ctx, "theme", []string{"light", "dark"}[i%4/2])
+			}
+		}()
+	}
+	wg.Wait()
+	b, _ := os.ReadFile(filepath.Join(f.dir, "settings.json"))
+	if !strings.Contains(string(b), `"lastProvider":"klipy"`) || !strings.Contains(string(b), `"theme":"`) {
+		t.Errorf("settings.json = %s, want both fields", b)
+	}
+}
+
+func TestMarshalSettingsError(t *testing.T) {
+	if got := string(MarshalError(&SettingsError{Kind: "invalid_value"})); got != `{"kind":"invalid_value"}` {
+		t.Errorf("MarshalError(SettingsError) = %s", got)
+	}
+	if got := string(MarshalError(ErrBusy)); got != `{"kind":"busy"}` {
+		t.Errorf("MarshalError(ErrBusy) = %s", got)
+	}
+	if MarshalError(errors.New("plain")) != nil {
+		t.Error("MarshalError(plain error) is not nil")
 	}
 }
 

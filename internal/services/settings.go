@@ -9,6 +9,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"gifsmith/internal/platform"
 	"gifsmith/internal/provider"
 	"gifsmith/internal/search"
 	"gifsmith/internal/settings"
@@ -19,12 +20,14 @@ var errNoKeyProvider = errors.New("this provider does not use a key")
 // SettingsService saves verified keys and the last provider. No bound method
 // returns a key; errors and log lines name the provider and kind only.
 type SettingsService struct {
-	Keys      *settings.Keys
-	Dir       string // holds settings.json
-	Svc       *search.Service
-	NewClient func(p provider.ID, key string) provider.Provider // a client using exactly this candidate key
-	Emit      func(name string)
-	Clips     *search.Clips
+	Keys       *settings.Keys
+	Store      *settings.Store // the only owner of settings.json
+	Platform   platform.Platform
+	Svc        *search.Service
+	NewClient  func(p provider.ID, key string) provider.Provider // a client using exactly this candidate key
+	Emit       func(name string, data ...any)
+	Clips      *search.Clips
+	ApplyTheme func(theme string) // native appearance + window backgrounds; nil in tests
 
 	mu sync.Mutex // serializes SaveKey end to end: a verify never interleaves with another save's write
 }
@@ -86,25 +89,17 @@ func (s *SettingsService) SaveKey(ctx context.Context, p, key string) error {
 	return nil
 }
 
-// LastProvider is the persisted provider id, or "" on first run or an unreadable file.
-func (s *SettingsService) LastProvider(ctx context.Context) string {
-	prefs, err := settings.LoadPrefs(s.Dir)
-	if err != nil {
-		log.Printf("settings unreadable, treating as first run: %v", err)
-		return ""
-	}
-	if _, ok := provider.ParseID(prefs.LastProvider); !ok {
-		return ""
-	}
-	return prefs.LastProvider
+// Snapshot is the settings the webviews render. Never a key.
+type Snapshot struct {
+	Theme string `json:"theme"`
 }
 
-// SetLastProvider persists the provider tab to reopen on next launch.
-func (s *SettingsService) SetLastProvider(ctx context.Context, p string) error {
-	id, err := parse(p)
-	if err != nil {
-		return err
-	}
-	// No lock: each write is its own temp file + rename, so the last one wins whole.
-	return settings.SavePrefs(s.Dir, settings.Prefs{LastProvider: string(id)})
+func (s *SettingsService) Snapshot(ctx context.Context) Snapshot { return Snapshot{} } // RED skeleton
+
+func (s *SettingsService) SetPref(ctx context.Context, name, value string) (Snapshot, error) {
+	return Snapshot{}, nil // RED skeleton
 }
+
+func (s *SettingsService) LastProvider(ctx context.Context) string { return "" } // RED skeleton
+
+func (s *SettingsService) SetLastProvider(ctx context.Context, p string) error { return nil } // RED skeleton

@@ -122,7 +122,24 @@ func (k *Keys) Func(p provider.ID) func() (string, bool) {
 // Prefs is everything in settings.json. Never add a secret here.
 type Prefs struct {
 	LastProvider string `json:"lastProvider"`
+	Theme        string `json:"theme,omitempty"` // "" = system | "light" | "dark"
 }
+
+// Normalize resets invalid values to their declared defaults and returns the reset field names.
+func (p *Prefs) Normalize() []string { return nil } // RED skeleton
+
+// Store is the single owner of settings.json.
+type Store struct {
+	dir string
+	mu  sync.Mutex
+	p   Prefs
+}
+
+func OpenStore(dir string) *Store { return &Store{dir: dir} } // RED skeleton
+
+func (s *Store) Get() Prefs { return Prefs{} } // RED skeleton
+
+func (s *Store) Update(f func(*Prefs) error) (Prefs, error) { return Prefs{}, nil } // RED skeleton
 
 const prefsFile = "settings.json"
 
