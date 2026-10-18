@@ -1,6 +1,9 @@
 <script lang="ts">
   // Footer (32px): vendor attribution left, status or selected title center, key hints right.
   // A toast may carry one action link and its shortcut hint after the message.
+  import { onMount } from 'svelte';
+  import { onTheme, resolvedTheme } from '../lib/theme';
+
   let {
     attribution,
     hints = 'provider',
@@ -22,16 +25,17 @@
     actionHint?: string;
     onaction?: () => void;
   } = $props();
+
+  // The mark follows the resolved theme (a manual Light/Dark included), never a media query.
+  let theme = $state(resolvedTheme());
+  onMount(() => onTheme((t) => (theme = t)));
 </script>
 
 <footer>
   <span class="attribution">
     {#if attribution === 'giphy'}
       <!-- Official GIPHY mark, unmodified (no filter, opacity or crop), not a link. -->
-      <picture>
-        <source srcset="/attribution/giphy-powered-dark.png" media="(prefers-color-scheme: dark)" />
-        <img src="/attribution/giphy-powered-light.png" alt="Powered by GIPHY" height="16" />
-      </picture>
+      <img src="/attribution/giphy-powered-{theme}.png" alt="Powered by GIPHY" height="16" />
     {:else if attribution === 'klipy'}
       Powered by KLIPY
     {:else if attribution === 'finer'}

@@ -38,6 +38,7 @@
     type ProviderErr,
     type ProviderStatus,
     type Result,
+    type SettingsSnapshot,
     type TextKind,
   } from './lib/api';
   import { actionErrorText, errorState, libraryErrorText, pagingMessage, providerName, revokedMessage } from './lib/errors';
@@ -46,6 +47,7 @@
   import { flatItems, moveSectioned, sections } from './lib/library';
   import { placeInDetails, placeMenu } from './lib/popover';
   import { CHIP_MAX, SAVE_IDLE_MS, chipsVisible, shouldSave } from './lib/searches';
+  import { applyTheme } from './lib/theme';
   import { CLIPS_ACCESS_MAILTO, LIBRARY_TABS, SLOTS, libraryTab, slotById, type LibraryId, type SlotId } from './lib/providers';
   import ActionMenu from './components/ActionMenu.svelte';
   import DetailsPane from './components/DetailsPane.svelte';
@@ -256,6 +258,7 @@
     });
     Events.On('panel:status', (e) => setStatus(String(e.data)));
     Events.On('providers:changed', refreshProviders);
+    Events.On('settings:changed', (e) => applyTheme((e.data as SettingsSnapshot).theme));
     const [list, last] = await Promise.all([providers(), lastProvider()]);
     const st = byId(list);
     // Persisted slot; first run (or Clips without a GIPHY key) opens on GIPHY. Set with statuses in one step.

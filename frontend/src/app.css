@@ -1,6 +1,7 @@
-/* UI-SPEC tokens. Light is the default; dark follows the system appearance. */
+/* UI-SPEC tokens. Light on :root; dark under data-theme="dark", which lib/theme.ts resolves
+   from the Theme setting (System follows macOS). data-theme is the only switch. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   --bg: #ffffff;
   --surface: #f2f2f7;
   --surface-active: #e5e5ea;
@@ -24,21 +25,20 @@
   --display: 400 22px/1.2 var(--font);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1e1e1e;
-    --surface: #2c2c2e;
-    --surface-active: #3a3a3c;
-    --hairline: rgba(255, 255, 255, 0.1);
-    --text: #f5f5f7;
-    --text-secondary: #a1a1a6;
-    --text-tertiary: #6e6e73;
-    --accent: #4da3ff;
-    --destructive: #ff6961;
-    --success: #30d158;
-    --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.5);
-    --scrim: rgba(0, 0, 0, 0.6);
-  }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1e1e1e;
+  --surface: #2c2c2e;
+  --surface-active: #3a3a3c;
+  --hairline: rgba(255, 255, 255, 0.1);
+  --text: #f5f5f7;
+  --text-secondary: #a1a1a6;
+  --text-tertiary: #6e6e73;
+  --accent: #4da3ff;
+  --destructive: #ff6961;
+  --success: #30d158;
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --scrim: rgba(0, 0, 0, 0.6);
 }
 
 /* Corners come from the native frame; the root fills the window edge to edge (no border-radius). */
