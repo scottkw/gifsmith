@@ -33,6 +33,10 @@ func (darwin) CopyFile(path string) error {
 	return copyFileToPasteboard("", path)
 }
 
+func (darwin) CopyText(text string) error { return copyTextToPasteboard("", text) }
+
+func (darwin) OpenURL(u string) error { return errors.New("not implemented") }
+
 // FocusWebView takes the pointer from WebviewWindow.NativeWindow() (nil before the app runs).
 func (darwin) FocusWebView(nsWindow unsafe.Pointer) {
 	if nsWindow != nil {
@@ -116,6 +120,10 @@ func pasteboardFileURLs(name string) ([]string, bool, error) {
 	}
 	return lines[1:], hasFileURL, nil
 }
+
+func copyTextToPasteboard(name, text string) error { return errors.New("not implemented") }
+
+func pasteboardString(name string) (string, error) { return "", errors.New("not implemented") }
 
 func releasePasteboard(name string) {
 	cn := C.CString(name)

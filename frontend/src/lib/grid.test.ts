@@ -34,8 +34,8 @@ test('nearEnd is true within the last 8 tiles', () => {
   assert.equal(nearEnd(0, 3), true);
 });
 
-const key = (k: string, o: Partial<{ metaKey: boolean; isComposing: boolean; keyCode: number; repeat: boolean }> = {}) =>
-  routeKey({ key: k, metaKey: false, isComposing: false, keyCode: 0, repeat: false, ...o });
+const key = (k: string, o: Partial<{ metaKey: boolean; shiftKey: boolean; isComposing: boolean; keyCode: number; repeat: boolean }> = {}) =>
+  routeKey({ key: k, metaKey: false, shiftKey: false, isComposing: false, keyCode: 0, repeat: false, ...o });
 
 test('routeKey maps Enter, Escape, Cmd+K, Tab and arrows', () => {
   assert.equal(key('Enter'), 'copy');
@@ -65,4 +65,11 @@ test('routeKey maps Cmd+1..Cmd+4 to provider slots', () => {
   assert.equal(key('4', { metaKey: true }), 'slot4');
   assert.equal(key('5', { metaKey: true }), 'none');
   assert.equal(key('1'), 'none');
+});
+
+test('routeKey maps Cmd+Shift+C to copyLink and leaves Cmd+C to the input', () => {
+  assert.equal(key('c', { metaKey: true, shiftKey: true }), 'copyLink');
+  assert.equal(key('C', { metaKey: true, shiftKey: true }), 'copyLink');
+  assert.equal(key('c', { metaKey: true }), 'none');
+  assert.equal(key('C', { shiftKey: true }), 'none');
 });

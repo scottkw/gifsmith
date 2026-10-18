@@ -124,6 +124,11 @@ func (a *ActionService) Paste(ctx context.Context, g provider.Gif) (Result, erro
 	return Result{Copied: true, Pasted: true, Message: "Pasted GIF"}, nil
 }
 
+// CopyText puts text built from g on the clipboard as a plain string.
+func (a *ActionService) CopyText(ctx context.Context, g provider.Gif, kind string) (Result, error) {
+	return Result{}, nil
+}
+
 // RequestAccessibility raises the macOS prompt and, if still untrusted, opens the settings pane.
 // Only an explicit button click calls this.
 func (a *ActionService) RequestAccessibility(ctx context.Context) (bool, error) {

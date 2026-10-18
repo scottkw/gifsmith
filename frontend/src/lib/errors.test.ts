@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { errorState, pagingMessage, providerName, keyMessage, revokedMessage } from './errors.ts';
+import { actionErrorText, errorState, pagingMessage, providerName, keyMessage, revokedMessage } from './errors.ts';
 
 const NOW = Date.UTC(2026, 9, 17, 19, 0, 0);
 const SWITCH = 'Other providers still work: ⌘1–⌘4.';
@@ -151,4 +151,14 @@ test('keyMessage: Keychain failure', () => {
 
 test('revokedMessage (K6)', () => {
   assert.equal(revokedMessage('Klipy'), 'Klipy rejected your saved key. It may have been revoked. Paste a new key to continue.');
+});
+
+test('action error rows F1 and F3 come from the kind, never the error text', () => {
+  const F1 = "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";
+  const g = { provider: 'finergifs' } as Parameters<typeof actionErrorText>[1];
+  for (const k of ['download_failed', 'not_allowed', 'too_large', 'copy_failed', '', 'something_new']) {
+    assert.equal(actionErrorText(k, g), F1, k);
+  }
+  assert.equal(actionErrorText('not_media', g), "The Finer Gifs Club sent something that isn't a GIF. Nothing was saved. Try another GIF.");
+  assert.equal(actionErrorText('not_media', { ...g, provider: 'klipy' }), "Klipy sent something that isn't a GIF. Nothing was saved. Try another GIF.");
 });

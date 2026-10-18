@@ -88,8 +88,8 @@ func TestCopyErrorKeepsPanelOpen(t *testing.T) {
 		t.Fatal(err)
 	}
 	r, err := s.Copy(context.Background(), fx.gif)
-	if !errors.Is(err, f.CopyErr) {
-		t.Errorf("err = %v, want %v", err, f.CopyErr)
+	if actionKind(err) != "copy_failed" {
+		t.Errorf("err = %v, want kind copy_failed", err)
 	}
 	if r.Copied {
 		t.Error("Copied = true on error")
@@ -124,8 +124,8 @@ func TestCopyDisallowedURL(t *testing.T) {
 	g := fx.gif
 	g.DownloadURL = "https://evil.example.test/x.gif"
 	_, err := s.Copy(context.Background(), g)
-	if !errors.Is(err, staging.ErrNotAllowed) || strings.Contains(err.Error(), "evil.example") {
-		t.Errorf("err = %v, want ErrNotAllowed without the URL", err)
+	if actionKind(err) != "not_allowed" || strings.Contains(err.Error(), "evil.example") {
+		t.Errorf("err = %v, want kind not_allowed without the URL", err)
 	}
 	if n := fx.hits.Load(); n != 0 || len(f.Calls) != 0 {
 		t.Errorf("disallowed URL made %d requests and calls %q, want none", n, f.Calls)
@@ -270,8 +270,8 @@ func TestPasteCopyError(t *testing.T) {
 	f := &platform.Fake{Trusted: true, CopyErr: errors.New("pasteboard write failed")}
 	s, fx := newPasteService(t, f)
 	r, err := s.Paste(context.Background(), fx.gif)
-	if !errors.Is(err, f.CopyErr) {
-		t.Errorf("err = %v, want %v", err, f.CopyErr)
+	if actionKind(err) != "copy_failed" {
+		t.Errorf("err = %v, want kind copy_failed", err)
 	}
 	if r.Copied || r.Pasted {
 		t.Errorf("result = %+v on copy error", r)
@@ -315,6 +315,9 @@ func TestActionsRefuseWhileBusy(t *testing.T) {
 	if _, err := s.Paste(context.Background(), fx.gif); !errors.Is(err, ErrBusy) {
 		t.Errorf("Paste err = %v, want ErrBusy", err)
 	}
+	if _, err := s.CopyText(context.Background(), fx.gif, "link"); !errors.Is(err, ErrBusy) {
+		t.Errorf("CopyText err = %v, want ErrBusy", err)
+	}
 	if _, err := s.RequestAccessibility(context.Background()); !errors.Is(err, ErrBusy) {
 		t.Errorf("RequestAccessibility err = %v, want ErrBusy", err)
 	}
@@ -324,5 +327,91 @@ func TestActionsRefuseWhileBusy(t *testing.T) {
 	s.busy.Unlock()
 	if _, err := s.Paste(context.Background(), fx.gif); err != nil {
 		t.Errorf("Paste after release: %v", err)
+	}
+}
+
+func actionKind(err error) string {
+	var ae *ActionError
+	if errors.As(err, &ae) {
+		return ae.Kind
+	}
+	return ""
+}
+
+func TestCopyFailingMediaKinds(t *testing.T) {
+	for name, want := range map[string]string{"broken-1": "download_failed", "html-1": "not_media"} {
+		f := &platform.Fake{}
+		s, fx := newService(t, f)
+		g := fx.gif
+		g.DownloadURL = strings.Replace(g.DownloadURL, "office-1", name, 1)
+		_, err := s.Copy(context.Background(), g)
+		if actionKind(err) != want || strings.Contains(err.Error(), "http") {
+			t.Errorf("%s: err = %v, want kind %s without a URL", name, err, want)
+		}
+		if len(f.Calls) != 0 {
+			t.Errorf("%s: calls = %q, want none", name, f.Calls)
+		}
+	}
+}
+
+func TestMarshalError(t *testing.T) {
+	if got := string(MarshalError(ErrBusy)); got != `{"kind":"busy"}` {
+		t.Errorf("MarshalError(ErrBusy) = %s", got)
+	}
+	if ErrBusy.Error() != "another action is still running" {
+		t.Errorf("ErrBusy text = %q; App.svelte compares it", ErrBusy.Error())
+	}
+	if b := MarshalError(&provider.Error{Kind: provider.Network, Provider: provider.GIPHY}); b != nil {
+		t.Errorf("MarshalError(provider error) = %s, want nil (main.go composes provider first)", b)
+	}
+	if b := MarshalError(errors.New("x")); b != nil {
+		t.Errorf("MarshalError(plain) = %s, want nil", b)
+	}
+}
+
+func TestCopyTextLink(t *testing.T) {
+	for _, tc := range []struct {
+		p         provider.ID
+		raw, want string
+	}{
+		{provider.GIPHY, "https://media.giphy.com/media/a/giphy.gif?cid=1&rid=2", "https://media.giphy.com/media/a/giphy.gif"},
+		// Klipy forbids altering URLs; Finer links have no query to strip.
+		{provider.Klipy, "https://static.klipy.com/ii/a/b.gif?x=1#f", "https://static.klipy.com/ii/a/b.gif?x=1#f"},
+		{provider.FinerGifs, "https://media.thefinergifs.club/office-1.gif", "https://media.thefinergifs.club/office-1.gif"},
+	} {
+		f := &platform.Fake{}
+		s := &ActionService{Platform: f, Staging: &staging.Store{}} // nil Allow = VendorAllow
+		r, err := s.CopyText(context.Background(), provider.Gif{Provider: tc.p, ID: "a", DownloadURL: tc.raw}, "link")
+		if err != nil {
+			t.Fatalf("%s: %v", tc.p, err)
+		}
+		if !r.Copied || r.Message != "Copied link" {
+			t.Errorf("%s: result = %+v", tc.p, r)
+		}
+		if want := []string{"CopyText:" + tc.want}; !slices.Equal(f.Calls, want) {
+			t.Errorf("%s: calls = %q, want %q", tc.p, f.Calls, want)
+		}
+	}
+}
+
+func TestCopyTextRefusesDisallowedLink(t *testing.T) {
+	f := &platform.Fake{}
+	s, fx := newService(t, f)
+	g := fx.gif
+	g.DownloadURL = "https://evil.example.test/x.gif"
+	_, err := s.CopyText(context.Background(), g, "link")
+	if actionKind(err) != "not_allowed" || strings.Contains(err.Error(), "evil") {
+		t.Errorf("err = %v, want kind not_allowed without the URL", err)
+	}
+	if len(f.Calls) != 0 {
+		t.Errorf("calls = %q, want none", f.Calls)
+	}
+}
+
+func TestCopyTextCopyError(t *testing.T) {
+	f := &platform.Fake{CopyErr: errors.New("pasteboard write failed")}
+	s, fx := newService(t, f)
+	if _, err := s.CopyText(context.Background(), fx.gif, "link"); actionKind(err) != "copy_failed" {
+		t.Errorf("err = %v, want kind copy_failed", err)
 	}
 }

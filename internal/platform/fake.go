@@ -10,7 +10,8 @@ import (
 type Fake struct {
 	mu        sync.Mutex
 	Calls     []string
-	CopyErr   error
+	CopyErr   error // CopyFile and CopyText
+	OpenErr   error
 	WorkArea  Rect
 	Trusted   bool
 	Frontmost App
@@ -30,6 +31,16 @@ func (f *Fake) Note(s string) {
 func (f *Fake) CopyFile(path string) error {
 	f.Note("CopyFile:" + path)
 	return f.CopyErr
+}
+
+func (f *Fake) CopyText(text string) error {
+	f.Note("CopyText:" + text)
+	return f.CopyErr
+}
+
+func (f *Fake) OpenURL(u string) error {
+	f.Note("OpenURL:" + u)
+	return f.OpenErr
 }
 
 func (f *Fake) FocusWebView(unsafe.Pointer) { f.Note("FocusWebView") }
