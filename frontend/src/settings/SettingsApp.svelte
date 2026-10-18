@@ -5,6 +5,7 @@
   import { onMount, tick, untrack } from 'svelte';
   import type { SettingsSnapshot } from '../lib/api';
   import GeneralPane from './GeneralPane.svelte';
+  import HotkeysPane from './HotkeysPane.svelte';
   import KeysPane from './KeysPane.svelte';
   import SearchPane from './SearchPane.svelte';
 
@@ -14,6 +15,7 @@
   const PANES = [
     { id: 'general', name: 'General', component: GeneralPane },
     { id: 'keys', name: 'Keys', component: KeysPane },
+    { id: 'hotkeys', name: 'Hotkeys', component: HotkeysPane },
     { id: 'search', name: 'Search', component: SearchPane },
   ];
 

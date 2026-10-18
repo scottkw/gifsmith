@@ -1,4 +1,4 @@
-// Package shell owns the Wails panel window and the global hotkey. No cgo here.
+// Package shell owns the Wails panel and Settings windows and the tray. No cgo here.
 package shell
 
 import (
@@ -16,7 +16,6 @@ const (
 	PanelHeight    = 480
 	SettingsWidth  = 640
 	SettingsHeight = 520
-	Hotkey         = "Ctrl+Option+Cmd+G"
 )
 
 type Shell struct {
@@ -25,6 +24,10 @@ type Shell struct {
 	panel *application.WebviewWindow
 	// settings is a normal titled window, created hidden once and never closed.
 	settings *application.WebviewWindow
+	openItem *application.MenuItem // tray "Open Gifsmith"; shows the Open hotkey
+	// OnSettingsInactive runs when Settings hides or loses focus (main: resume suspended hotkeys).
+	// Set before app.Run.
+	OnSettingsInactive func()
 	// Hotkey, menu and bound calls each run on their own goroutine; mu serialises
 	// Toggle/Show/Hide/OpenSettings and guards prev and settingsPlaced.
 	mu             sync.Mutex
@@ -38,7 +41,7 @@ type Shell struct {
 	theme        string // last applied theme pref; "" (System) follows macOS changes
 }
 
-// New creates the panel once (hidden; never closed) and registers the hotkey after start.
+// New creates the panel and Settings windows once (hidden; never closed) and the tray.
 // trayIcon is the menu bar template PNG, supplied by the caller (embedded in main).
 func New(app *application.App, plat platform.Platform, trayIcon []byte) *Shell {
 	s := &Shell{app: app, plat: plat}
@@ -85,6 +88,8 @@ func New(app *application.App, plat platform.Platform, trayIcon []byte) *Shell {
 		e.Cancel()
 		s.HideSettings()
 	})
+	// A recorder loses its keys with the window: hotkeys must never stay suspended.
+	s.settings.OnWindowEvent(events.Common.WindowLostFocus, func(*application.WindowEvent) { s.settingsInactive() })
 
 	// Replaces Wails' default menu: no File (⌘W), View (⌘R reload, zoom) or Window (⌘M).
 	// App keeps ⌘Q/⌘H; Edit keeps ⌘X/⌘C/⌘V/⌘A/⌘Z for text fields.
@@ -93,12 +98,12 @@ func New(app *application.App, plat platform.Platform, trayIcon []byte) *Shell {
 	appMenu.AddRole(application.EditMenu)
 	app.Menu.SetApplicationMenu(appMenu)
 
-	// Tray is built here, not in the hotkey handler, so Open works even if the hotkey fails.
+	// Tray is independent of hotkeys, so Open works even if the hotkey fails.
 	// No window is attached: with only a menu, a click opens the menu.
 	tray := app.SystemTray.New()
 	tray.SetTemplateIcon(trayIcon)
 	menu := app.NewMenu()
-	menu.Add("Open Gifsmith").OnClick(func(*application.Context) { s.Show() })
+	s.openItem = menu.Add("Open Gifsmith").OnClick(func(*application.Context) { s.Show() })
 	menu.Add("Settings…").OnClick(func(*application.Context) { s.OpenSettings() })
 	menu.AddSeparator()
 	menu.Add("Quit Gifsmith").OnClick(func(*application.Context) { app.Quit() })
@@ -113,15 +118,6 @@ func New(app *application.App, plat platform.Platform, trayIcon []byte) *Shell {
 		if system {
 			s.ApplyTheme("")
 		}
-	})
-
-	// Registered once the app runs so an OS rejection comes back here instead of the error handler.
-	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
-		if err := app.GlobalShortcut.Register(Hotkey, s.Toggle); err != nil {
-			log.Printf("hotkey register error: %v", err)
-			return
-		}
-		log.Printf("hotkey registered: %s", Hotkey)
 	})
 	return s
 }
@@ -156,6 +152,29 @@ func (s *Shell) show() {
 	s.panel.Focus() // Show() alone never makes a non-activating panel key
 	s.plat.FocusWebView(s.panel.NativeWindow())
 	s.app.Event.Emit("panel:show")
+}
+
+// ShowTab shows the panel if needed and asks the page for a library tab; the page hides the panel
+// instead when it was already showing that tab (Favorites/Recents hotkeys toggle).
+func (s *Shell) ShowTab(tab string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	visible := s.panel.IsVisible()
+	if !visible {
+		s.show()
+	}
+	s.app.Event.Emit("panel:open-tab", map[string]any{"tab": tab, "wasVisible": visible})
+}
+
+// SetOpenAccelerator shows accel as the tray Open Gifsmith key equivalent.
+func (s *Shell) SetOpenAccelerator(accel string) {
+	application.InvokeSync(func() { s.openItem.SetAccelerator(accel) }) // AppKit: main thread only
+}
+
+func (s *Shell) settingsInactive() {
+	if s.OnSettingsInactive != nil {
+		s.OnSettingsInactive()
+	}
 }
 
 func (s *Shell) Hide() {
@@ -201,6 +220,7 @@ func (s *Shell) OpenSettings() {
 // it opened to come back (best effort). Window callbacks call it, so it never takes s.mu.
 func (s *Shell) HideSettings() {
 	s.settings.Hide()
+	s.settingsInactive()
 	s.vmu.Lock()
 	pid := s.settingsPrev
 	s.vmu.Unlock()

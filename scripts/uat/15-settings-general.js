@@ -79,7 +79,7 @@ const tab = B.getByRole("tab", { name: "General" });
 if ((await tab.getAttribute("aria-selected")) !== "true") fail("General tab not selected");
 await tab.focus();
 const last = await B.getByRole("tab").count();
-for (const [k, want] of [["ArrowUp", 0], ["ArrowDown", 1], ...Array(last).fill(["ArrowDown", last - 1]), ["ArrowUp", last - 2]]) {
+for (const [k, want] of [["ArrowUp", 0], ...Array.from({ length: last }, (_, i) => ["ArrowDown", Math.min(i + 1, last - 1)]), ["ArrowUp", last - 2]]) {
   await B.keyboard.press(k);
   const at = await B.evaluate(() => [...document.querySelectorAll("[role=tab]")].indexOf(document.activeElement));
   if (at !== Math.max(want, 0)) fail(`${k}: focus on tab ${at}, want ${want}`);

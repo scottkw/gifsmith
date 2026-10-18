@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
+	"strings"
 	"sync"
 
 	"gifsmith/internal/provider"
@@ -186,7 +188,7 @@ type Prefs struct {
 	PageSize      int     `json:"pageSize,omitempty"`     // 0 = 24
 	GiphyLang     string  `json:"giphyLang,omitempty"`    // "" = match system
 	KlipyCountry  string  `json:"klipyCountry,omitempty"` // "" = match system
-	Hotkeys       Hotkeys `json:"hotkeys"`
+	Hotkeys       Hotkeys `json:"hotkeys,omitzero"`
 }
 
 // Hotkeys are the global shortcuts as canonical Wails accelerators ("Cmd+Ctrl+Option+G").
@@ -205,8 +207,54 @@ var (
 	ErrHotkeySystem     = errors.New("the shortcut is a macOS shortcut")
 )
 
-// CanonicalHotkey validates accel and returns it in Wails' canonical form.
-func CanonicalHotkey(accel string) (string, error) { return "", nil }
+var hotkeyMods = map[string]string{"cmd": "Cmd", "ctrl": "Ctrl", "option": "Option", "shift": "Shift"}
+
+// hotkeyNamed are the non-character keys the recorder offers (all bindable by Wails on macOS).
+var hotkeyNamed = []string{"space", "up", "down", "left", "right", "return", "tab"}
+
+// systemHotkeys are macOS shortcuts Gifsmith refuses to take over (UI-SPEC H3), canonical.
+var systemHotkeys = []string{"Cmd+Q", "Cmd+W", "Cmd+H", "Cmd+M", "Cmd+TAB", "Cmd+SPACE", "Ctrl+SPACE", "Cmd+Shift+3", "Cmd+Shift+4", "Cmd+Shift+5"}
+
+func hotkeyKey(k string) bool {
+	k = strings.ToLower(k)
+	if len(k) == 1 {
+		c := k[0]
+		return c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || strings.IndexByte("=-][';\\,/.`", c) >= 0
+	}
+	if n, err := strconv.Atoi(strings.TrimPrefix(k, "f")); err == nil && k == "f"+strconv.Itoa(n) && n >= 1 && n <= 20 {
+		return true
+	}
+	return slices.Contains(hotkeyNamed, k)
+}
+
+// CanonicalHotkey validates accel against an allow-list and returns it in Wails' canonical form
+// (modifiers sorted Cmd, Ctrl, Option, Shift, then the upper-cased key), the form Wails compares.
+func CanonicalHotkey(accel string) (string, error) {
+	parts := strings.Split(accel, "+")
+	key := parts[len(parts)-1]
+	if !hotkeyKey(key) {
+		return "", ErrHotkeyInvalid
+	}
+	var mods []string
+	for _, m := range parts[:len(parts)-1] {
+		name, ok := hotkeyMods[strings.ToLower(m)]
+		if !ok {
+			return "", ErrHotkeyInvalid
+		}
+		if !slices.Contains(mods, name) {
+			mods = append(mods, name)
+		}
+	}
+	slices.Sort(mods)
+	if !slices.ContainsFunc(mods, func(m string) bool { return m != "Shift" }) {
+		return "", ErrHotkeyNoModifier
+	}
+	canon := strings.Join(append(mods, strings.ToUpper(key)), "+")
+	if slices.Contains(systemHotkeys, canon) {
+		return "", ErrHotkeySystem
+	}
+	return canon, nil
+}
 
 // Normalize resets invalid values to their declared defaults and returns the reset field names.
 func (p *Prefs) Normalize() []string {

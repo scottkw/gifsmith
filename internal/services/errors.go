@@ -70,6 +70,13 @@ var settingsText = map[string]string{
 	"autostart_failed":       "could not change Open at login",
 	"not_in_applications":    "Gifsmith is not in the Applications folder",
 	"keychain_delete_failed": "couldn't remove the key from the macOS Keychain",
+	// Slot names the other slot holding the combo.
+	"hotkey_duplicate":           "this shortcut is already used by another Gifsmith hotkey",
+	"hotkey_no_modifier":         "the shortcut needs Command, Option or Control",
+	"hotkey_system":              "this is a macOS shortcut",
+	"hotkey_register_failed":     "macOS couldn't register the shortcut; the previous one still works",
+	"hotkey_register_failed_new": "macOS couldn't register the shortcut",
+	"hotkey_invalid":             "this shortcut is not allowed",
 }
 
 func (e *SettingsError) Error() string {

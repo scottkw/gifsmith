@@ -25,19 +25,21 @@ var errNoKeyProvider = errors.New("this provider does not use a key")
 // SettingsService saves verified keys and the last provider. No bound method
 // returns a key; errors and log lines name the provider and kind only.
 type SettingsService struct {
-	Keys       *settings.Keys
-	Store      *settings.Store // the only owner of settings.json
-	Platform   platform.Platform
-	Svc        *search.Service
-	NewClient  func(p provider.ID, key string) provider.Provider // a client using exactly this candidate key
-	Emit       func(name string, data ...any)
-	Clips      *search.Clips
-	ApplyTheme func(theme string) // native appearance + window backgrounds; nil in tests
-	Autostart  Autostarter
-	Executable func() (string, error) // os.Executable; injectable for the not-in-Applications check
-	Hotkeys    *Hotkeys
+	Keys         *settings.Keys
+	Store        *settings.Store // the only owner of settings.json
+	Platform     platform.Platform
+	Svc          *search.Service
+	NewClient    func(p provider.ID, key string) provider.Provider // a client using exactly this candidate key
+	Emit         func(name string, data ...any)
+	Clips        *search.Clips
+	ApplyTheme   func(theme string) // native appearance + window backgrounds; nil in tests
+	Autostart    Autostarter
+	Executable   func() (string, error) // os.Executable; injectable for the not-in-Applications check
+	Hotkeys      *Hotkeys
+	OnOpenHotkey func(accel string) // tray key equivalent for Open Gifsmith; nil in tests
 
-	mu sync.Mutex // serializes SaveKey, TestKey and RemoveKey end to end: the Keychain ends in the last call's state
+	mu   sync.Mutex // serializes SaveKey, TestKey and RemoveKey end to end: the Keychain ends in the last call's state
+	hkMu sync.Mutex // serializes SetHotkey: the Store ends with what is registered
 }
 
 // validKey bounds what a key may contain: Klipy puts it in a URL path, GIPHY in a query.
@@ -295,7 +297,7 @@ func (s *SettingsService) snapshotOf(p settings.Prefs) Snapshot {
 	}
 	prm := s.paramsOf(p)
 	return Snapshot{Theme: p.Theme, LaunchAtLogin: on && err == nil, GiphyRating: prm.Rating, PageSize: prm.PageSize,
-		GiphyLang: p.GiphyLang, KlipyCountry: p.KlipyCountry}
+		GiphyLang: p.GiphyLang, KlipyCountry: p.KlipyCountry, Hotkeys: s.Hotkeys.Bindings()}
 }
 
 var errUnchanged = errors.New("unchanged")
@@ -460,7 +462,51 @@ func (s *SettingsService) AccessibilityStatus(ctx context.Context) bool {
 	return s.Platform.AccessibilityTrusted(false)
 }
 
-// SetHotkey binds slot to accel ("" clears favorites/recents) and stores it.
+// SetHotkey binds slot to accel ("" clears favorites/recents) and stores the canonical form.
+// Hotkeys resume first, so a recorder never leaves them suspended; the Store changes only after
+// the Registrar accepted the new binding.
 func (s *SettingsService) SetHotkey(ctx context.Context, slot, accel string) (Snapshot, error) {
-	return Snapshot{}, nil
+	s.hkMu.Lock()
+	defer s.hkMu.Unlock()
+	s.Hotkeys.Resume()
+	if err := s.Hotkeys.Bind(slot, accel); err != nil {
+		return s.Snapshot(ctx), err
+	}
+	b := s.Hotkeys.Bindings()
+	c := *slotOf(&b, slot)
+	p, err := s.Store.Update(func(p *settings.Prefs) error {
+		before := p.Hotkeys
+		*slotOf(&p.Hotkeys, slot) = c
+		if slot == "open" {
+			p.Hotkeys.Open = defaultAsEmpty(c, DefaultOpenHotkey)
+		}
+		if p.Hotkeys == before {
+			return errUnchanged
+		}
+		return nil
+	})
+	switch {
+	case errors.Is(err, errUnchanged):
+		return s.snapshotOf(p), nil
+	case err != nil:
+		log.Printf("settings write failed: hotkeys.%s", slot)
+		return s.snapshotOf(p), errPrefsWriteFailed
+	}
+	if slot == "open" && s.OnOpenHotkey != nil {
+		s.OnOpenHotkey(c)
+	}
+	snap := s.snapshotOf(p)
+	s.emit("settings:changed", snap)
+	return snap, nil
+}
+
+// SuspendHotkeys unregisters every Gifsmith hotkey while a recorder is capturing keys.
+func (s *SettingsService) SuspendHotkeys(ctx context.Context) { s.Hotkeys.Suspend() }
+
+// ResumeHotkeys registers them again; also called when the Settings window hides or loses focus.
+func (s *SettingsService) ResumeHotkeys(ctx context.Context) { s.Hotkeys.Resume() }
+
+// TestHotkey makes slot's next press within 5 s emit hotkey:test {slot}.
+func (s *SettingsService) TestHotkey(ctx context.Context, slot string) error {
+	return s.Hotkeys.ArmTest(slot)
 }

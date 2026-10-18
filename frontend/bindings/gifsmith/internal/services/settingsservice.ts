@@ -73,11 +73,27 @@ export function RemoveKey(p: string): $CancellablePromise<void> {
 }
 
 /**
+ * ResumeHotkeys registers them again; also called when the Settings window hides or loses focus.
+ */
+export function ResumeHotkeys(): $CancellablePromise<void> {
+    return $Call.ByID(406630895);
+}
+
+/**
  * SaveKey verifies key with a real first-page trending call and stores it only if that succeeds.
  * The verified page seeds the trending cache, so verification costs no extra request.
  */
 export function SaveKey(p: string, key: string): $CancellablePromise<void> {
     return $Call.ByID(3690506785, p, key);
+}
+
+/**
+ * SetHotkey binds slot to accel ("" clears favorites/recents) and stores the canonical form.
+ * Hotkeys resume first, so a recorder never leaves them suspended; the Store changes only after
+ * the Registrar accepted the new binding.
+ */
+export function SetHotkey(slot: string, accel: string): $CancellablePromise<$models.Snapshot> {
+    return $Call.ByID(3139730259, slot, accel);
 }
 
 /**
@@ -105,6 +121,20 @@ export function SetPref(name: string, value: string): $CancellablePromise<$model
 
 export function Snapshot(): $CancellablePromise<$models.Snapshot> {
     return $Call.ByID(1374333671);
+}
+
+/**
+ * SuspendHotkeys unregisters every Gifsmith hotkey while a recorder is capturing keys.
+ */
+export function SuspendHotkeys(): $CancellablePromise<void> {
+    return $Call.ByID(1840460032);
+}
+
+/**
+ * TestHotkey makes slot's next press within 5 s emit hotkey:test {slot}.
+ */
+export function TestHotkey(slot: string): $CancellablePromise<void> {
+    return $Call.ByID(1519698761, slot);
 }
 
 /**

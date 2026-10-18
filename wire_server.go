@@ -4,6 +4,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -51,7 +52,35 @@ func wire() deps {
 		Platform: &platform.Fake{},
 		// Never the real login item; FAKE_AUTOSTART=fail makes Enable/Disable fail (UAT G2).
 		Autostart: &memAutostart{fail: os.Getenv("FAKE_AUTOSTART") == "fail"},
+		// Server builds have no global shortcuts; this records bindings and never fires.
+		Registrar: &memRegistrar{bound: map[string]bool{}},
 	}
+}
+
+// memRegistrar is the UAT build's Registrar: registered accelerators in memory.
+type memRegistrar struct {
+	mu    sync.Mutex
+	bound map[string]bool
+}
+
+func (r *memRegistrar) Register(accel string, _ func()) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.bound[accel] {
+		return fmt.Errorf("global shortcut %q is already registered", accel)
+	}
+	r.bound[accel] = true
+	return nil
+}
+
+func (r *memRegistrar) Unregister(accel string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if !r.bound[accel] {
+		return fmt.Errorf("global shortcut %q is not registered", accel)
+	}
+	delete(r.bound, accel)
+	return nil
 }
 
 // memAutostart is the UAT build's login item: a flag in memory.

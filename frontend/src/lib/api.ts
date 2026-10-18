@@ -42,6 +42,20 @@ export const saveKey = (p: string, key: string) => SettingsService.SaveKey(p, ke
 export const keyStatus = async () => (await SettingsService.KeyStatus()) ?? [];
 export const testKey = (p: string) => SettingsService.TestKey(p);
 export const removeKey = (p: string) => SettingsService.RemoveKey(p);
+// Hotkeys: Go validates, registers (re-registering the old binding on failure) and stores; rejects
+// with cause.kind hotkey_* (hotkey_duplicate names the other slot). The calls run one at a time, in
+// order, so a late Suspend can never land after the Resume that ends a recording.
+let hotkeyCalls: Promise<unknown> = Promise.resolve();
+function inOrder<T>(f: () => Promise<T>): Promise<T> {
+  const p = hotkeyCalls.then(f);
+  hotkeyCalls = p.catch(() => {});
+  return p;
+}
+export const setHotkey = (slot: string, accel: string) => inOrder(() => SettingsService.SetHotkey(slot, accel));
+export const suspendHotkeys = () => inOrder(() => SettingsService.SuspendHotkeys());
+export const resumeHotkeys = () => inOrder(() => SettingsService.ResumeHotkeys());
+// Arms slot for 5 s: a press emits hotkey:test {slot} before its normal action.
+export const testHotkey = (slot: string) => SettingsService.TestHotkey(slot);
 // Re-probes Clips once when its result is unknown; resolves to the state, rejects with the probe's cause.
 export const checkClips = () => GifService.CheckClips();
 

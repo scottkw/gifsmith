@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 
 	"gifsmith/internal/library"
 	"gifsmith/internal/platform"
@@ -44,6 +45,7 @@ type deps struct {
 	Allow                 func(provider.ID, *url.URL) bool // download allowlist for staging
 	Platform              platform.Platform                // native in the app; platform.Fake in the UAT build
 	Autostart             services.Autostarter             // nil in the app (app.Autostart); in-memory in the UAT build
+	Registrar             services.Registrar               // nil in the app (app.GlobalShortcut); a fake in the UAT build
 }
 
 func main() {
@@ -125,16 +127,34 @@ func main() {
 		app.Event.Emit("providers:changed")
 	}
 	sh = shell.New(app, plat, trayIcon)
+	reg := d.Registrar
+	if reg == nil {
+		reg = app.GlobalShortcut // Carbon hotkeys: no Accessibility needed
+	}
+	hk := &services.Hotkeys{Reg: reg, Actions: map[string]func(){
+		"open":      sh.Toggle,
+		"favorites": func() { sh.ShowTab("favorites") },
+		"recents":   func() { sh.ShowTab("recents") },
+	}, Emit: settingsSvc.Emit, Now: time.Now}
+	settingsSvc.Hotkeys = hk
+	settingsSvc.OnOpenHotkey = sh.SetOpenAccelerator
+	sh.OnSettingsInactive = hk.Resume
 	actions.Hide = sh.Hide
 	actions.Previous = sh.Previous
 	panel.HideFunc = sh.Hide
 	panel.OpenSettingsFunc = sh.OpenSettings
 	settingsSvc.ApplyTheme = sh.ApplyTheme
 	// The stored theme drives native appearance and window backgrounds before any window shows.
+	// Hotkeys register once the app runs, so an OS rejection comes back to Start instead of the error handler.
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
 		sh.ApplyTheme(store.Get().Theme)
 		settingsSvc.ApplyStartup()
+		hk.Start(store.Get().Hotkeys)
+		sh.SetOpenAccelerator(hk.Bindings().Open)
 	})
+	if d.Registrar != nil {
+		hk.Start(store.Get().Hotkeys) // the server build's fake: server mode never fires ApplicationStarted (and has no tray)
+	}
 
 	// Staging holds only the clipboard's file; nothing from an earlier run is kept (D-17).
 	// ActionService.ServiceShutdown clears it again at quit.
