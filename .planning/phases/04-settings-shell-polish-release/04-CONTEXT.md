@@ -35,7 +35,8 @@ Everything is configurable from a proper Settings window (keys, hotkeys, launch 
 - Build target: Apple Silicon (arm64) DMG for macOS 13+, drag-to-Applications layout, version 1.0.0 (RELS-01).
 - Notarization: build and wire every release step now; notarize once the user resolves the Apple Developer agreement HTTP 403 (`notarytool store-credentials`). If still blocked at release time, the phase pauses at a blocking checkpoint asking the user to resolve it — never skipped silently, never shipped un-notarized as "done".
 - Klipy file actions (Copy/Paste GIF, Copy/Paste Square, Download) are disabled until written clearance is recorded: on Klipy items they're hidden, Enter copies the link and ⌘Enter pastes the link; a setting records the clearance (RELS-04). Draft the email to developers@klipy.com (temp-file copies + ad labelling IN-09) for the user to send.
-- Distribution: GitHub Release on scottkw/gifsmith with the DMG, a SHA-256 checksum and release notes; README covering install, getting keys, GIPHY/Klipy attribution and credits. No auto-updater in v1. About screen credits the original MIT-licensed Raycast GIF Search extension and its authors (RELS-03; LICENSE already carries the notice).
+- Distribution: GitHub Release on scottkw/gifsmith with the DMG, a SHA-256 checksum and release notes; README covering install, getting keys, GIPHY/Klipy attribution and credits. About screen credits the original MIT-licensed Raycast GIF Search extension and its authors (RELS-03; LICENSE already carries the notice).
+- Update check (added 2026-10-18 by user, RELS-05/06): the app checks GitHub Releases on scottkw/gifsmith for a newer version and alerts the user; Settings has a "Check for Updates…" button. If the user accepts, the app downloads the release DMG, verifies its code signature and notarization, and opens it for the usual drag-to-Applications install — no in-place self-replacement. Ships in 1.0 (plan 04-07, before the release plans) so 1.0 users learn about later versions.
 - Clean-account install test (RELS-02) is user-verified on a fresh macOS user account.
 
 ### Claude's Discretion
@@ -75,7 +76,7 @@ Everything is configurable from a proper Settings window (keys, hotkeys, launch 
 <deferred>
 ## Deferred Ideas
 
-- Universal (Intel) build, website distribution, Sparkle auto-updates — post-v1.
+- Universal (Intel) build, website distribution, Sparkle-style in-place auto-install — post-v1.
 - Mac App Store — out of scope (sandbox forbids synthesized ⌘V).
 
 </deferred>

@@ -11,7 +11,7 @@
 - [x] **SHEL-02**: Panel appears over full-screen apps, takes typing immediately, and does not steal focus from the app the user was in
 - [x] **SHEL-03**: Panel closes on Esc and on click-away
 - [x] **SHEL-04**: App lives in the menu bar with no Dock icon; menu offers Open, Settings, Quit
-- [ ] **SHEL-05**: User can enable launch at login
+- [x] **SHEL-05**: User can enable launch at login
 - [ ] **SHEL-06**: User can open Favorites or Recents directly with their own hotkeys
 
 ### Search
@@ -58,12 +58,12 @@
 
 ### Settings
 
-- [ ] **SETT-01**: Settings open in their own window, where pasting into fields works
+- [x] **SETT-01**: Settings open in their own window, where pasting into fields works
 - [ ] **SETT-02**: User can add, test, change (replace), and remove GIPHY and Klipy keys; each key row links to the provider's key sign-up page (GIPHY developer dashboard, Klipy Partner Panel)
 - [ ] **SETT-03**: User can rebind the global hotkeys; conflicts are reported and the old binding stays until the new one registers
 - [ ] **SETT-04**: User can set grid item size (search and trending), max results, download folder, hide filename, GIPHY and Klipy locales
-- [ ] **SETT-05**: Settings shows Accessibility permission status and a button to grant it
-- [ ] **SETT-06**: User can choose the window theme: Light, Dark, or System (default System, follows macOS appearance)
+- [x] **SETT-05**: Settings shows Accessibility permission status and a button to grant it
+- [x] **SETT-06**: User can choose the window theme: Light, Dark, or System (default System, follows macOS appearance)
 
 ### Release
 
@@ -71,6 +71,8 @@
 - [ ] **RELS-02**: App installs and runs on a clean user account (Gatekeeper, fresh permissions)
 - [ ] **RELS-03**: About screen credits the original MIT-licensed Raycast extension and authors
 - [ ] **RELS-04**: Klipy file actions are disabled (link/Markdown only) unless Klipy gives written clearance for temp file copies
+- [ ] **RELS-05**: App checks GitHub Releases (scottkw/gifsmith) for a newer version and alerts the user when one is available; Settings has a "Check for Updates…" button
+- [ ] **RELS-06**: If the user chooses, the app downloads the new DMG, verifies its code signature and notarization, and opens it (no in-place self-replacement)
 
 ## v2 Requirements
 
@@ -96,7 +98,7 @@
 | Intel Macs | Apple Silicon only keeps the native build simple |
 | GIF recording/editing, stickers, AI | Not the core workflow |
 | Accounts, sync, telemetry, analytics pingbacks | Not needed; privacy |
-| In-app auto-updater | Wails updater is immature; revisit post-launch |
+| In-place self-replacing auto-install | Update flow downloads, verifies and opens the DMG instead (RELS-06); self-replacement revisited post-launch |
 | AI tool / MCP server | Not the core workflow |
 
 ## Traceability
@@ -107,7 +109,7 @@
 | SHEL-02 | Phase 1 | Complete |
 | SHEL-03 | Phase 1 | Complete |
 | SHEL-04 | Phase 1 | Complete |
-| SHEL-05 | Phase 4 | Pending |
+| SHEL-05 | Phase 4 | Complete |
 | SHEL-06 | Phase 4 | Pending |
 | SRCH-01 | Phase 2 | Complete |
 | SRCH-02 | Phase 2 | Complete |
@@ -139,22 +141,24 @@
 | LIBR-03 | Phase 3 | Complete |
 | LIBR-04 | Phase 3 | Complete |
 | LIBR-05 | Phase 3 | Complete |
-| SETT-01 | Phase 4 | Pending |
+| SETT-01 | Phase 4 | Complete |
 | SETT-02 | Phase 4 | Pending |
 | SETT-03 | Phase 4 | Pending |
 | SETT-04 | Phase 4 | Pending |
-| SETT-05 | Phase 4 | Pending |
-| SETT-06 | Phase 4 | Pending |
+| SETT-05 | Phase 4 | Complete |
+| SETT-06 | Phase 4 | Complete |
 | RELS-01 | Phase 4 | Pending |
 | RELS-02 | Phase 4 | Pending |
 | RELS-03 | Phase 4 | Pending |
 | RELS-04 | Phase 4 | Pending |
+| RELS-05 | Phase 4 | Pending |
+| RELS-06 | Phase 4 | Pending |
 
 **Coverage:**
-- v1 requirements: 46 total
-- Mapped to phases: 46 (Phase 1: 6, Phase 2: 12, Phase 3: 14, Phase 4: 14)
+- v1 requirements: 48 total
+- Mapped to phases: 48 (Phase 1: 6, Phase 2: 12, Phase 3: 14, Phase 4: 16)
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-10-17*
-*Last updated: 2026-10-17 after roadmap creation (traceability filled)*
+*Last updated: 2026-10-18 — added RELS-05/06 (GitHub update check + verified DMG download) at user request during Phase 4*
