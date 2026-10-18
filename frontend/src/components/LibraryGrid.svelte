@@ -1,0 +1,117 @@
+<script lang="ts">
+  // Favorites / Recents grid (UI-SPEC "Favorites and Recents tabs"): virtual rows of two heights,
+  // a 32px provider header per section, then 152px tile rows. Tiles carry their flat index.
+  import { createVirtualizer } from '@tanstack/svelte-virtual';
+  import { untrack } from 'svelte';
+  import { rows as toRows, type Section } from '../lib/library';
+  import Tile from './Tile.svelte';
+
+  let {
+    sections,
+    selected,
+    overlay,
+    favorites,
+    badges,
+    onselect,
+    oncopy,
+  }: {
+    sections: Section[];
+    selected: number;
+    overlay: boolean;
+    favorites: Set<string>; // provider:id keys
+    badges: boolean; // favorite badges (not on the Favorites tab)
+    onselect: (i: number) => void;
+    oncopy: (i: number) => void;
+  } = $props();
+
+  let scrollEl: HTMLDivElement;
+  const rows = $derived(toRows(sections));
+
+  // Sizes are read when the count changes; App remounts this grid when the row layout changes.
+  const virt = createVirtualizer<HTMLDivElement, HTMLDivElement>({
+    count: 0,
+    getScrollElement: () => scrollEl,
+    estimateSize: (i) => rows[i]?.size ?? 0,
+    overscan: 2,
+    paddingStart: 8,
+    paddingEnd: 16,
+    scrollPaddingStart: 16,
+    scrollPaddingEnd: 16,
+  });
+
+  $effect(() => {
+    const count = rows.length;
+    untrack(() => $virt.setOptions({ count }));
+  });
+  $effect(() => {
+    const row = rows.findIndex((r) => r.kind === 'tiles' && selected >= r.start && selected < r.start + r.items.length);
+    if (row >= 0) untrack(() => $virt.scrollToIndex(row, { align: 'auto' }));
+  });
+</script>
+
+<div class="scroller" bind:this={scrollEl} id="grid" role="listbox" aria-label="Results">
+  <div class="inner" style="height: {$virt.getTotalSize()}px">
+    {#each $virt.getVirtualItems() as v (v.index)}
+      {@const row = rows[v.index]}
+      <div class="row" style="height: {v.size}px; transform: translateY({v.start}px)">
+        {#if row.kind === 'header'}
+          {@const s = sections[row.section]}
+          <div class="header" role="presentation">{s.label} <span class="count">· {s.items.length}</span></div>
+        {:else}
+          <div class="tiles">
+            {#each row.items as g, c (c)}
+              {@const i = row.start + c}
+              <Tile
+                gif={g}
+                index={i}
+                selected={i === selected}
+                {overlay}
+                provider={sections[row.section].label}
+                favorite={badges && favorites.has(`${g.provider}:${g.id}`)}
+                {onselect}
+                {oncopy}
+              />
+            {/each}
+          </div>
+        {/if}
+      </div>
+    {/each}
+  </div>
+</div>
+
+<style>
+  .scroller {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .inner {
+    position: relative;
+    width: 100%;
+  }
+  .row {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+  .header {
+    box-sizing: border-box;
+    height: 32px;
+    padding: 8px 16px;
+    font: var(--label);
+    color: var(--text-secondary);
+  }
+  .count {
+    color: var(--text-tertiary);
+  }
+  .tiles {
+    box-sizing: border-box;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, 166px);
+    grid-auto-rows: 144px;
+    gap: 8px;
+    padding: 0 16px;
+  }
+</style>

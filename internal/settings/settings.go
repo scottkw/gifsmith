@@ -139,16 +139,20 @@ func LoadPrefs(dir string) (Prefs, error) {
 	return p, json.Unmarshal(b, &p)
 }
 
-// SavePrefs writes atomically (temp file in the same dir, then rename), mode 0600 in a 0700 dir.
-func SavePrefs(dir string, p Prefs) error {
-	b, err := json.Marshal(p)
+// SavePrefs writes settings.json with WriteJSONAtomic.
+func SavePrefs(dir string, p Prefs) error { return WriteJSONAtomic(dir, prefsFile, p) }
+
+// WriteJSONAtomic writes v as JSON to dir/name: temp file in the same dir, Sync, then rename,
+// mode 0600 in a 0700 dir. On any error the previous file is untouched and the temp file removed.
+func WriteJSONAtomic(dir, name string, v any) error {
+	b, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	f, err := os.CreateTemp(dir, prefsFile+".*.tmp")
+	f, err := os.CreateTemp(dir, name+".*.tmp")
 	if err != nil {
 		return err
 	}
@@ -157,17 +161,17 @@ func SavePrefs(dir string, p Prefs) error {
 	if err == nil {
 		err = f.Chmod(0o600)
 	}
+	if err == nil {
+		err = f.Sync()
+	}
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}
 	if err == nil {
-		err = os.Rename(tmp, filepath.Join(dir, prefsFile))
+		err = os.Rename(tmp, filepath.Join(dir, name))
 	}
 	if err != nil {
 		_ = os.Remove(tmp)
 	}
 	return err
 }
-
-// WriteJSONAtomic is a skeleton (RED).
-func WriteJSONAtomic(dir, name string, v any) error { return nil }

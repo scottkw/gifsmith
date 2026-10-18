@@ -1,9 +1,21 @@
 <script lang="ts">
-  // Four fixed pills (UI-SPEC Provider Tabs Contract). Not in the Tab order: ⌘1–⌘4 is the keyboard path.
-  import { SLOTS, type SlotId } from '../lib/providers';
+  // Four fixed provider pills, a divider, then the library pills (UI-SPEC Tabs row).
+  // Not in the Tab order: ⌘1–⌘6 is the keyboard path.
+  import { LIBRARY_TABS, SLOTS, type LibraryId, type SlotId } from '../lib/providers';
 
-  let { active, clipsEnabled, onswitch }: { active: SlotId; clipsEnabled: boolean; onswitch: (id: SlotId) => void } =
-    $props();
+  let {
+    active,
+    lib,
+    clipsEnabled,
+    onswitch,
+    onlib,
+  }: {
+    active: SlotId;
+    lib: LibraryId | null; // a library tab is showing instead of the provider grid
+    clipsEnabled: boolean;
+    onswitch: (id: SlotId) => void;
+    onlib: (id: LibraryId) => void;
+  } = $props();
 </script>
 
 <div class="tabs" role="tablist">
@@ -12,14 +24,20 @@
     <button
       role="tab"
       tabindex="-1"
-      aria-selected={s.id === active}
+      aria-selected={s.id === active && !lib}
       aria-disabled={off ? 'true' : undefined}
       title={off ? 'Clips need a GIPHY key approved for Clips' : undefined}
-      class:active={s.id === active}
+      class:active={s.id === active && !lib}
       class:off
       onclick={() => onswitch(s.id)}
     >
       {s.label}<span class="hint">{s.shortcut}</span>
+    </button>
+  {/each}
+  <span class="divider" aria-hidden="true"></span>
+  {#each LIBRARY_TABS as t (t.id)}
+    <button role="tab" tabindex="-1" aria-selected={t.id === lib} class:active={t.id === lib} onclick={() => onlib(t.id)}>
+      {t.label}<span class="hint">{t.shortcut}</span>
     </button>
   {/each}
 </div>
@@ -55,6 +73,13 @@
   }
   button.off {
     color: var(--text-tertiary);
+  }
+  .divider {
+    flex: none;
+    width: 1px;
+    height: 16px;
+    margin: 0 4px;
+    background: var(--hairline);
   }
   .hint {
     font: var(--label);

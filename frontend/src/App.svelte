@@ -13,6 +13,7 @@
     hide,
     latest,
     lastProvider,
+    loadLibrary,
     openExternal,
     paste,
     pasteSquare,
@@ -25,6 +26,7 @@
     showDownload,
     trending,
     type Gif,
+    type Library,
     type Page,
     type ProviderErr,
     type ProviderStatus,
@@ -34,9 +36,11 @@
   import { actionErrorText, errorState, pagingMessage, providerName, revokedMessage } from './lib/errors';
   import { buildActions, type ActionId, type ActionRow } from './lib/actions';
   import { COLS, move, nearEnd, routeKey } from './lib/grid';
+  import { flatItems, sections } from './lib/library';
   import { placeMenu } from './lib/popover';
-  import { CLIPS_ACCESS_MAILTO, SLOTS, slotById, type SlotId } from './lib/providers';
+  import { CLIPS_ACCESS_MAILTO, LIBRARY_TABS, SLOTS, libraryTab, slotById, type LibraryId, type SlotId } from './lib/providers';
   import ActionMenu from './components/ActionMenu.svelte';
+  import LibraryGrid from './components/LibraryGrid.svelte';
   import Footer from './components/Footer.svelte';
   import ProviderTabs from './components/ProviderTabs.svelte';
   import ResultGrid from './components/ResultGrid.svelte';
@@ -48,6 +52,7 @@
   const KEY_SAVED_MS = 2000;
   const DOWNLOAD_TOAST_MS = 5000;
   const CROP_BUSY_MS = 300; // a square crop shows its busy state only if it is still running then (D-16)
+  const LIBRARY_SKELETON_MS = 300; // a library read slower than this shows the S2 skeleton
   const AX_FAILED = "Couldn't ask macOS for Accessibility access. Try again.";
 
   type Status = 'idle' | 'loading' | 'refreshing' | 'ready' | 'empty' | 'error';
@@ -113,13 +118,32 @@
   let menuAt = $state({ left: 0, top: 0 });
   let menu = $state<ActionMenu>();
 
-  const footerCenter = $derived(status || cur.items[selected]?.title || '');
-  const busy = $derived(cur.status === 'loading' || cur.status === 'refreshing');
+  // Favorites / Recents (⌘5 / ⌘6) replace the provider grid while libTab is set; not persisted (D-22).
+  let libTab = $state<LibraryId | null>(null);
+  let library = $state<Library | null>(null); // null until the first load answers
+  let libSlow = $state(false); // the load has not answered within LIBRARY_SKELETON_MS
+  let libSeq = 0;
+  const keyOf = (g: Gif) => `${g.provider}:${g.id}`;
+  // The query filters library titles locally: no request, no debounce (D-06).
+  const libSections = $derived(libTab && library ? sections(library[libTab].map((e) => e.gif), query) : []);
+  const libItems = $derived(flatItems(libSections));
+  const favKeys = $derived(new Set(library?.favorites.map((e) => keyOf(e.gif)) ?? []));
+  // What the selection indexes: the library's flat item list, or the provider grid.
+  const items = $derived(libTab ? libItems : cur.items);
+  const libName = $derived(libTab ? libraryTab(libTab).label : '');
+
+  const footerCenter = $derived(status || items[selected]?.title || '');
+  const busy = $derived(!libTab && (cur.status === 'loading' || cur.status === 'refreshing'));
+  // Library attribution follows the selected item's provider; nothing selected, nothing shown.
+  const attribution = $derived(
+    !libTab ? slot.attribution : items[selected] ? slotById(items[selected].provider).attribution : '',
+  );
   // S8: Finer Gifs has no trending list, so a short query shows a prompt and makes no request.
   const finerIdle = $derived(active === 'finergifs' && [...query.trim()].length < 2);
   // S1: a key slot without a key; S13: its stored key was rejected (key_missing: Go lost it meanwhile).
   const card = $derived(
-    !!slot.keyProvider &&
+    !libTab &&
+      !!slot.keyProvider &&
       statuses !== null &&
       (!statuses[active]?.configured || cur.err?.kind === 'key_rejected' || cur.err?.kind === 'key_missing'),
   );
@@ -185,6 +209,7 @@
       if (!keepStatus && !toastAction) setStatus('');
       keepStatus = false;
       needsAccessibility = false;
+      refreshLibrary(); // a copy or paste while hidden may have changed Recents
       if (card) setup?.focus();
       else {
         input.focus();
@@ -200,7 +225,34 @@
     statuses = st;
     if (active === 'clips' && !clipsEnabled) bootClips();
     else load(active);
+    refreshLibrary();
   });
+
+  // Reads the saved lists (local files only). The selected item stays selected when it is still there.
+  async function refreshLibrary(want?: string) {
+    const seq = ++libSeq;
+    const slow = setTimeout(() => (libSlow = true), LIBRARY_SKELETON_MS);
+    try {
+      const snap = await loadLibrary();
+      if (seq === libSeq) applyLibrary(snap, want);
+    } catch {
+      // Go never fails Load (unreadable files are named in the snapshot); a dead bridge shows the load error.
+      if (seq === libSeq && !library) library = { favorites: [], recents: [], searches: {}, unreadable: ['favorites', 'recents'] };
+    } finally {
+      clearTimeout(slow);
+      if (seq === libSeq) libSlow = false;
+    }
+  }
+
+  // Applies a snapshot and reselects `want` (default: the selected item); if it is gone, the
+  // selection clamps, which lands on the next item in flat order, else the previous one.
+  function applyLibrary(snap: Library, want?: string) {
+    const prev = want ?? (libTab && items[selected] ? keyOf(items[selected]) : '');
+    library = snap;
+    if (!libTab) return;
+    const i = libItems.findIndex((g) => keyOf(g) === prev);
+    selected = i >= 0 ? i : Math.min(Math.max(selected, 0), libItems.length - 1);
+  }
 
   // The Clips probe only means something after a GIPHY GIFs success with the key. Fetch GIPHY
   // trending (usually cached) behind the S2 skeleton to give it one, then re-probe once if that
@@ -259,6 +311,10 @@
     if ((e as InputEvent | undefined)?.isComposing) return;
     clearTransient();
     clearTimeout(timer);
+    if (libTab) {
+      selected = libItems.length ? 0 : -1;
+      return;
+    }
     if (!wanted()) show(active); // trending or S8 at once, no debounce
     else timer = setTimeout(() => load(active), DEBOUNCE_MS);
   }
@@ -283,15 +339,29 @@
 
   function switchTo(p: SlotId) {
     menuOpen = false;
-    if (p !== active) {
+    if (p !== active || libTab) {
+      if (p !== active) setLastProvider(p);
       active = p;
+      libTab = null;
       clearTransient();
       selected = states[p].items.length ? 0 : -1;
-      setLastProvider(p);
       if (p === 'clips' && clipsState === 'unknown') bootClips();
       else show(p);
     }
     tick().then(() => card || input.focus()); // a setup card focuses its own key field
+  }
+
+  // ⌘5 / ⌘6: the library renders from the saved snapshot; reloaded on every switch (D-09).
+  function switchLib(id: LibraryId) {
+    menuOpen = false;
+    clearTimeout(timer); // a pending provider search must not fire for the filter text
+    if (libTab !== id) {
+      libTab = id;
+      clearTransient();
+      selected = libItems.length ? 0 : -1;
+    }
+    refreshLibrary(''); // '' = no item to keep: the first item of the fresh list
+    tick().then(() => input.focus());
   }
 
   // S1c: the card gives way at once to that provider's trending page (seeded by verification).
@@ -391,15 +461,15 @@
       case 'right':
       case 'up':
       case 'down':
-        if (!cur.items.length) return;
-        select(move(selected, a, cur.items.length));
-        if (nearEnd(selected, cur.items.length)) loadMore();
+        if (!items.length) return;
+        select(move(selected, a, items.length));
+        if (!libTab && nearEnd(selected, items.length)) loadMore();
         return;
       case 'copy':
       case 'paste':
         // ↵ with nothing selected runs a visible Try Again.
         if (selected < 0) {
-          if (a === 'copy' && errView?.tryAgain) retry();
+          if (a === 'copy' && !libTab && errView?.tryAgain) retry();
           return;
         }
         runAction(a);
@@ -427,12 +497,14 @@
     }
   }
 
-  // ⌘1–⌘4 from any field in the panel (search input or key field) switch provider.
+  // ⌘1–⌘6 from any field in the panel (search input or key field) switch provider or library tab.
   function onMainKeydown(e: KeyboardEvent) {
     const a = routeKey(e);
     if (a.startsWith('slot')) {
       e.preventDefault();
-      switchTo(SLOTS[Number(a.slice(4)) - 1].id);
+      const n = Number(a.slice(4));
+      if (n <= SLOTS.length) switchTo(SLOTS[n - 1].id);
+      else switchLib(n === 5 ? 'favorites' : 'recents');
       // The menu's filter has focus while it is open: its ⌘ shortcuts (⌘K, ⌘↵, ⌘⇧C, …) arrive here.
     } else if (menuOpen && e.metaKey && e.target !== input) onKeydown(e);
   }
@@ -440,13 +512,15 @@
   // ⌘K: open beside the selected tile, or close. No tile on screen (empty, loading, message, setup card): nothing.
   async function toggleMenu() {
     if (menuOpen) return closeMenu();
-    const g = cur.items[selected];
+    const g = items[selected];
     const tile = document.getElementById(`tile-${selected}`);
     if (!g || !tile) return;
-    menuRows = buildActions({ gif: g, tab: 'provider', inDetails: false, favorited: false });
+    menuRows = buildActions({ gif: g, tab: libTab ?? 'provider', inDetails: false, favorited: favKeys.has(keyOf(g)) });
     menuOpen = true;
     await tick(); // measure the rendered menu, then place it before the browser paints
-    menuAt = placeMenu(tile.getBoundingClientRect(), selected % COLS, menu!.height(), { w: innerWidth, h: innerHeight });
+    // Library sections restart the column count at each section's first tile.
+    const col = (selected - (libSections.findLast((s) => s.start <= selected)?.start ?? 0)) % COLS;
+    menuAt = placeMenu(tile.getBoundingClientRect(), col, menu!.height(), { w: innerWidth, h: innerHeight });
     menu!.focus();
   }
 
@@ -458,7 +532,7 @@
   // The one dispatcher for the menu and every shortcut. The menu closes before anything runs.
   function runAction(id: ActionId) {
     if (menuOpen) closeMenu();
-    const g = cur.items[selected];
+    const g = items[selected];
     switch (id) {
       case 'copy':
       case 'paste':
@@ -509,7 +583,7 @@
   // panel; a paste has hidden it already, unless it fell back to copying.
   // A square crop shows the overlay and `Cropping…` only if it is still running after 300 ms.
   async function act(call: (g: Gif) => Promise<Result>, pasteIt: boolean, crop = false) {
-    const g = cur.items[selected];
+    const g = items[selected];
     if (copying || !g) return;
     copying = true;
     const busy = () => {
@@ -552,7 +626,7 @@
   // Saves the selected item into the download folder; the panel stays open (D-04). Shares the
   // copy lock and busy overlay: one file action at a time.
   async function downloadItem() {
-    const g = cur.items[selected];
+    const g = items[selected];
     if (copying || !g) return;
     copying = overlay = true;
     setStatus('Downloading…');
@@ -613,12 +687,12 @@
       oninput={onInput}
       oncompositionend={() => onInput()}
       onkeydown={onKeydown}
-      placeholder={slot.placeholder}
+      placeholder={libTab ? libraryTab(libTab).placeholder : slot.placeholder}
       disabled={card}
       autocomplete="off"
       spellcheck="false"
       role="combobox"
-      aria-expanded={cur.items.length > 0}
+      aria-expanded={items.length > 0}
       aria-controls="grid"
       aria-activedescendant={selected >= 0 ? `tile-${selected}` : undefined}
     />
@@ -627,10 +701,38 @@
     {/if}
   </header>
 
-  <ProviderTabs {active} {clipsEnabled} onswitch={switchTo} />
+  <ProviderTabs {active} lib={libTab} {clipsEnabled} onswitch={switchTo} onlib={switchLib} />
 
-  <section class="content" aria-busy={statuses === null}>
-    {#if statuses === null}
+  <section class="content" aria-busy={statuses === null || (!!libTab && !library)}>
+    {#if libTab}
+      {#if !library}
+        {#if libSlow}
+          <div class="skeleton" aria-hidden="true">
+            {#each Array(8), i (i)}
+              <div></div>
+            {/each}
+          </div>
+        {/if}
+      {:else if !library[libTab].length}
+        <StateMessage heading="No recent GIFs" body="GIFs you copy or paste show up here, newest first." />
+      {:else}
+        <!-- Remounted when the row layout changes: the virtualizer reads row sizes only on a count change. -->
+        {#key `${libTab}:${libSections.map((s) => s.items.length).join(',')}`}
+          <LibraryGrid
+            sections={libSections}
+            {selected}
+            {overlay}
+            favorites={favKeys}
+            badges={libTab !== 'favorites'}
+            onselect={select}
+            oncopy={(i) => {
+              select(i);
+              run('copy');
+            }}
+          />
+        {/key}
+      {/if}
+    {:else if statuses === null}
       <!-- waiting for Providers() -->
     {:else if card}
       {#key `${active}:${cardMessage}`}
@@ -724,7 +826,8 @@
   {/if}
 
   <Footer
-    attribution={slot.attribution}
+    {attribution}
+    hints={libTab ? 'library' : 'provider'}
     text={footerCenter}
     {tone}
     {needsAccessibility}

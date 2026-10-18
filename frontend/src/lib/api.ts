@@ -2,6 +2,7 @@
 import {
   ActionService,
   GifService,
+  LibraryService,
   PanelService,
   SettingsService,
   type DownloadResult,
@@ -9,10 +10,11 @@ import {
   type Result,
 } from '../../bindings/gifsmith/internal/services';
 import type { Gif, Page } from '../../bindings/gifsmith/internal/provider';
+import type { Entry, Snapshot } from '../../bindings/gifsmith/internal/library';
 import { Browser, CancelError, type CancellablePromise } from '@wailsio/runtime';
 import { CLIPS_ACCESS_MAILTO, GIPHY_KEY_URL, KLIPY_KEY_URL } from './providers';
 
-export type { DownloadResult, Gif, Page, ProviderStatus, Result };
+export type { DownloadResult, Entry, Gif, Page, ProviderStatus, Result };
 
 export const search = (p: string, q: string, cursor: string) => GifService.Search(p, q, cursor);
 export const trending = (p: string, cursor: string) => GifService.Trending(p, cursor);
@@ -88,3 +90,14 @@ export const download = (g: Gif) => ActionService.Download(g);
 export const showDownload = () => ActionService.ShowDownload();
 export const requestAccessibility = () => ActionService.RequestAccessibility();
 export const hide = () => PanelService.Hide();
+
+// Favorites, Recents and recent searches: local files only, never a provider request (D-09).
+// Go never sends null lists; the generated types allow it, so normalize once here.
+export type Library = { favorites: Entry[]; recents: Entry[]; searches: Record<string, string[]>; unreadable: string[] };
+const library = (s: Snapshot): Library => ({
+  favorites: s.favorites ?? [],
+  recents: s.recents ?? [],
+  searches: (s.searches ?? {}) as Record<string, string[]>,
+  unreadable: s.unreadable ?? [],
+});
+export const loadLibrary = async () => library(await LibraryService.Load());

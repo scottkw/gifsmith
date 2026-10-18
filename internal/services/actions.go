@@ -47,7 +47,7 @@ type ActionService struct {
 	// DownloadsDir is the download destination (desktop ~/Downloads; Phase 4's picker replaces it).
 	DownloadsDir func() string
 	// Recents records every successful copy or paste (D-07); nil records nothing.
-	Recents interface{ Touch(provider.Gif) error }
+	Recents      interface{ Touch(provider.Gif) error }
 	busy         sync.Mutex    // one action at a time: no racing pasteboard writes, no double ⌘V
 	gen          atomic.Uint64 // bumped on every clipboard write; a Klipy timer deletes only if unchanged
 	lastDownload string        // the file Show in Finder reveals; guarded by busy
@@ -98,6 +98,7 @@ func (a *ActionService) Copy(ctx context.Context, g provider.Gif) (Result, error
 		return Result{}, err
 	}
 	log.Printf("copy: staged and copied")
+	a.recent(g, "copy")
 	if g.IsClip {
 		return Result{Copied: true, Message: "Copied MP4 — press ⌘V to paste"}, nil
 	}
@@ -117,6 +118,7 @@ func (a *ActionService) Paste(ctx context.Context, g provider.Gif) (Result, erro
 	}
 	var path string
 	r, err := a.paste(func() (err error) { path, err = a.stage(ctx, g); return err }, msg)
+	a.recentIf(r, g, "paste")
 	if r.Pasted && g.Provider == provider.Klipy {
 		a.expire(path)
 	}
@@ -208,6 +210,9 @@ func (a *ActionService) CopyText(ctx context.Context, g provider.Gif, kind strin
 	if err := a.putText(g, kind); err != nil {
 		return Result{}, err
 	}
+	if kind != "page" { // a page link is not the GIF itself (D-07)
+		a.recent(g, kind)
+	}
 	return Result{Copied: true, Message: copiedText[kind]}, nil
 }
 
@@ -221,7 +226,27 @@ func (a *ActionService) PasteText(ctx context.Context, g provider.Gif, kind stri
 	if !ok {
 		return Result{}, actionErr("not_allowed")
 	}
-	return a.paste(func() error { return a.putText(g, kind) }, msg)
+	r, err := a.paste(func() error { return a.putText(g, kind) }, msg)
+	a.recentIf(r, g, "paste "+kind)
+	return r, err
+}
+
+// recent records g in Recents after a successful copy or paste (D-07). A failure is logged,
+// never reported: the clipboard already holds what the user asked for.
+func (a *ActionService) recent(g provider.Gif, kind string) {
+	if a.Recents == nil {
+		return
+	}
+	if err := a.Recents.Touch(g); err != nil {
+		log.Printf("recents: %s: %v", kind, err)
+	}
+}
+
+// recentIf records g when r says the clipboard was filled (a paste that fell back to copying counts).
+func (a *ActionService) recentIf(r Result, g provider.Gif, kind string) {
+	if r.Copied {
+		a.recent(g, kind)
+	}
 }
 
 func (a *ActionService) putText(g provider.Gif, kind string) error {
@@ -423,6 +448,7 @@ func (a *ActionService) CopySquare(ctx context.Context, g provider.Gif) (Result,
 		return Result{}, err
 	}
 	log.Printf("copy square: staged and copied")
+	a.recent(g, "square")
 	return Result{Copied: true, Message: "Copied square GIF — press ⌘V to paste"}, nil
 }
 
@@ -502,6 +528,7 @@ func (a *ActionService) PasteSquare(ctx context.Context, g provider.Gif) (Result
 	defer a.busy.Unlock()
 	var path string
 	r, err := a.paste(func() (err error) { path, err = a.stageSquare(ctx, g); return err }, "Pasted square GIF")
+	a.recentIf(r, g, "paste square")
 	if r.Pasted && g.Provider == provider.Klipy {
 		a.expire(path)
 	}

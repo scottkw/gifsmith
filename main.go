@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"gifsmith/internal/library"
 	"gifsmith/internal/platform"
 	"gifsmith/internal/provider"
 	"gifsmith/internal/provider/finergifs"
@@ -35,7 +36,7 @@ type deps struct {
 	FinerBase, FinerMedia string
 	GiphyBase, KlipyBase  string
 	Secrets               settings.SecretStore
-	ConfigDir             string // settings.json lives here
+	ConfigDir             string // settings.json and the library files live here
 	StagingDir            string
 	DownloadsDir          string                           // Download saves here; never created by the app
 	Allow                 func(provider.ID, *url.URL) bool // download allowlist for staging
@@ -49,6 +50,9 @@ func main() {
 	// API client's 15 s timeout would cut off a multi-MB original on a slow link.
 	stage := &staging.Store{Dir: d.StagingDir, HTTP: &http.Client{}, Allow: d.Allow}
 	actions := &services.ActionService{Platform: plat, Staging: stage, DownloadsDir: func() string { return d.DownloadsDir }}
+	// Favorites, Recents and recent searches live next to settings.json; metadata only (D-09).
+	lib := &library.Store{Dir: d.ConfigDir, Allow: d.Allow}
+	actions.Recents = lib
 	panel := &services.PanelService{}
 	keys := settings.NewKeys(d.Secrets)
 	keys.Load()
@@ -84,6 +88,7 @@ func main() {
 			application.NewService(gifs),
 			application.NewService(panel),
 			application.NewService(settingsSvc),
+			application.NewService(&services.LibraryService{Store: lib}),
 		},
 		MarshalError: func(err error) []byte {
 			if b := provider.MarshalError(err); b != nil {

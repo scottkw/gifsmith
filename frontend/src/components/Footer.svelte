@@ -3,6 +3,7 @@
   // A toast may carry one action link and its shortcut hint after the message.
   let {
     attribution,
+    hints = 'provider',
     text,
     tone,
     needsAccessibility,
@@ -11,7 +12,8 @@
     actionHint,
     onaction,
   }: {
-    attribution: 'giphy' | 'klipy' | 'finer';
+    attribution: 'giphy' | 'klipy' | 'finer' | ''; // '' = nothing to attribute (empty library tab)
+    hints?: 'provider' | 'library';
     text: string;
     tone: '' | 'success' | 'error';
     needsAccessibility: boolean;
@@ -32,7 +34,7 @@
       </picture>
     {:else if attribution === 'klipy'}
       Powered by KLIPY
-    {:else}
+    {:else if attribution === 'finer'}
       GIFs from The Finer Gifs Club
     {/if}
   </span>
@@ -50,6 +52,8 @@
   </span>
   {#if needsAccessibility}
     <button onclick={onenable}>Enable Automatic Paste…</button>
+  {:else if hints === 'library'}
+    <span class="hints"><b>↵</b> Copy&nbsp;&nbsp;&nbsp;<b>⌘K</b> Actions&nbsp;&nbsp;&nbsp;<b>⌘⌫</b> Remove</span>
   {:else}
     <span class="hints"><b>↵</b> Copy&nbsp;&nbsp;&nbsp;<b>⌘↵</b> Paste&nbsp;&nbsp;&nbsp;<b>⌘K</b> Actions</span>
   {/if}
