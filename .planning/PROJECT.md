@@ -19,19 +19,20 @@ Hotkey → type → Enter puts the right GIF on the clipboard (or into the front
 - ✓ Animated, row-virtualized grid that pages as you scroll or arrow near the end; full keyboard navigation (SRCH-04, SRCH-05) — Phase 2
 - ✓ Debounced search, in-memory trending/search caches, local 429 budget with a retry countdown; per-provider network/timeout/provider errors that never block other providers (SRCH-06, SRCH-07) — Phase 2
 - ✓ First-run GIPHY setup card with "Try Finer Gifs (no key)"; keys verified with a real call, stored in the macOS Keychain, never shown to the webview or logs; provider attribution; providers never blended or reordered (ONBD-01..05) — Phase 2
+- ✓ Action pipeline: copy/paste GIF link and Markdown, copy page link and open in browser (GIPHY/Clips only), download to Downloads (validated, never overwrites), copy/paste square-cropped GIF (not for Clips), ⌘K action menu; Clips handled as 720p MP4; temp files deleted promptly, Klipy staged files 30 s after paste/next copy/quit (ACTN-03..07, ACTN-09..11) — Phase 3
+- ✓ Favorites and Recents per provider (never blended), rendered from saved metadata offline, removable; GIF details view (title, size, dimensions, tags, source links); recent searches shown when the box is empty (LIBR-01..05, SRCH-08) — Phase 3
 
 ### Active
 
 - [ ] Users manage (add, test, replace, remove) their own GIPHY and Klipy API keys in Settings, with key sign-up links (SETT-02; first-run key entry shipped in Phase 2)
 - [ ] Configurable grid item size
-- [ ] Actions: copy GIF file, paste GIF into frontmost app, copy/paste GIF link, copy/paste GIF Markdown, copy page link, open in browser, download, copy/paste square-cropped GIF
 - [ ] Configurable default (Enter) action; default is Copy GIF
-- [ ] Favorites and recents per provider, browsable as their own views
-- [ ] GIF details view (metadata, tags, source links)
 - [ ] Settings: API keys, hotkey, grid sizes, max results, default action, download folder, hide filename, GIPHY/Klipy locales
 - [ ] Signed and notarized macOS download (Developer ID), distributed outside the Mac App Store
 - [ ] Accessibility onboarding deep-links to the permission list (macOS 27 has no browsable path) — emerged in Phase 1
 - [ ] Window theme: Light, Dark or System (SETT-06) — emerged in Phase 2
+- [ ] Download folder picker and hide-original-filename toggle (SETT-04; Phase 3 ships Downloads as the fixed default behind a DownloadsDir seam) — emerged in Phase 3
+- [ ] Honour Reduce Motion for animated GIF tiles (Phase 3 gap) — emerged in Phase 3
 
 ### Out of Scope
 
@@ -49,7 +50,7 @@ Hotkey → type → Enter puts the right GIF on the clipboard (or into the front
 - Raycast-provided pieces that must be rebuilt: grid UI, search bar + dropdown, action menu, toasts, details view, preferences UI, LocalStorage, frecency sorting, window/hotkey handling, `Clipboard.copy({file})`, `Clipboard.paste`.
 - The extension's square crop shells out to `/usr/bin/swift`; Gifsmith should do it natively (Go `image/gif` or cgo ImageIO).
 - GIPHY free (beta) keys have a low hourly request cap — search must be debounced and trending cached.
-- Current state (after Phase 2): hotkey panel with GIPHY, Klipy and Finer Gifs search/trending, Clips gated on key approval, Keychain-backed first-run key setup, Enter copies the GIF as a file. Actions menu, favorites/recents, details, Settings and release work remain (Phases 3–4).
+- Current state (after Phase 3): hotkey panel with GIPHY, Klipy and Finer Gifs search/trending (Clips gated on key approval), Keychain-backed first-run key setup, full ⌘K action menu (copy/paste file, link, Markdown, square crop; page link; open in browser; download), Favorites/Recents/recent searches persisted as 0600 JSON, details view, single-instance app. Native UAT passed on a fresh signed install. Settings window, configurable default action, notarized release remain (Phase 4).
 - Claude Code does the implementation. Frontend can be exercised with dev-browser against the `wails dev` server; native behaviors (paste, focus restore, Accessibility prompt, panel over full-screen apps) need manual testing by the user.
 
 ## Constraints
@@ -83,7 +84,16 @@ Hotkey → type → Enter puts the right GIF on the clipboard (or into the front
 | Staging downloads re-check the vendor allowlist on every redirect | A redirect must not turn the copy path into a fetch of an arbitrary host | ✓ Built (Phase 2 review fix) |
 | Designed icons via a layered Icon Composer app icon plus template menu bar icon; light back frame in Dark/Tinted styles | Keeps the back frame visible in every macOS icon style | ✓ Shipped (quick 261017-npc) |
 | MVP mode dropped for Phases 2–4 | Thin vertical slices added overhead without reducing risk once the Phase 1 spike passed | ✓ Applied from Phase 2 |
-| Public repo github.com/scottkw/gifsmith (MIT) | Free public release; code is pushed after the Phase 2 merge to main, with the Raycast GIF Search authors' MIT notice added to LICENSE | ⚠ Repo created (LICENSE only); push pending |
+| Public repo github.com/scottkw/gifsmith (MIT) | Free public release, with the Raycast GIF Search authors' MIT notice in LICENSE | ✓ main is pushed after each phase merge |
+| Clips link/Markdown use the GIF rendition (D-18); Clips copy/paste stage the 720p MP4 | Text targets expect an animated image URL; the file action keeps Clips' video | ✓ Built (Phase 3); Clips MP4 paste fixture-proven only (key not Clips-approved) |
+| Klipy staged files deleted 30 s after paste, on the next copy, or at quit | Klipy forbids retaining copies; the grace period lets the target app read the file | ✓ Built (Phase 3); staging empty after quit in native UAT. ⚠ Klipy written clearance still a Phase 4 gate |
+| Copy Page Link / Open in Browser offered only for GIPHY and Clips; URLs open only through the Go platform layer | Only GIPHY pages pass the https giphy.com page allowlist; the webview never opens URLs itself | ✓ Built (Phase 3) |
+| Downloads: content validated (real GIF/MP4), names claimed atomically with os.Link, never overwrite or create the folder; DownloadsDir is an injected seam | No error pages saved as GIFs, no collisions; the Phase 4 folder picker replaces the seam | ✓ Built (Phase 3); picker + hide-filename deferred to Phase 4 (SETT-04) |
+| Library JSON files (favorites, recents, searches) written atomically with mode 0600; a corrupt file is refused, not overwritten | Never silently destroy user data | ✓ Built (Phase 3); persisted mode 600 verified natively. Favorites cap 1000 drops the oldest silently (noted for Phase 4) |
+| Recent-search chip recorded only when the search returned ≥1 result | Empty or failed searches are noise | ✓ Built (Phase 3) |
+| Single instance via Wails SingleInstance; long titles/ids clamped | A second launch must not start a second hotkey owner; untrusted vendor strings must not blow up the UI or files | ✓ Built (Phase 3) |
+| Square crop decode budget counts frame area plus a fixed per-frame overhead; >15 MB or >4096 px canvases refused before decoding | CR-01: three budget bypasses (many tiny frames) closed | ✓ Fixed (Phase 3 review) |
+| The -tags server UAT build wires platform.Fake | Browser UAT must never touch the real pasteboard, Accessibility or URL opening | ✓ Built (Phase 3) |
 
 ## Evolution
 
@@ -103,4 +113,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-17 after Phase 2*
+*Last updated: 2026-10-18 after Phase 3*

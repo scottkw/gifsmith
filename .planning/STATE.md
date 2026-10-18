@@ -22,10 +22,10 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-17)
+See: .planning/PROJECT.md (updated 2026-10-18)
 
 **Core value:** Hotkey → type → Enter puts the right GIF on the clipboard (or into the frontmost app) in seconds, without Raycast.
-**Current focus:** Phase 3 — Action Pipeline & Library
+**Current focus:** Phase 4 — Settings, Shell Polish & Release
 
 ## Current Position
 
@@ -34,7 +34,7 @@ Plan: Not started
 Status: Ready to plan
 Last activity: 2026-10-18 — Phase 3 complete, transitioned to Phase 4
 
-Progress: [████████░░] 75% (2/4 phases; 10/10 planned plans complete)
+Progress: [████████░░] 75% (3/4 phases; 18/18 planned plans complete)
 
 ## Performance Metrics
 
@@ -148,6 +148,8 @@ Recent decisions affecting current work:
 - [Phase 03]: P8 width limit applies to the string itself (K6 = 492.5px); slot overflow asserted separately
 - [Phase 03]: 03-08: native UAT accepted on user attestation; library persistence and Cmd+Q staging cleanup not natively evidenced on this install, flagged for phase verifier
 - [Phase 03]: 03-08: Clips MP4 paste skipped natively (GIPHY key not Clips-approved); fixture-proven only
+- [Phase 3 close]: Native UAT passed on a fresh signed install (favorites/recents/searches persisted mode 600; staging empty after quit); CR-01 square-crop budget fixed; 7 Info items (IN-01..IN-07) left open in 03-REVIEW-DISPOSITION.md
+- [Phase 3 close]: Clips link/Markdown use the GIF rendition (D-18), copy/paste as 720p MP4; Klipy staged files deleted 30 s after paste/next copy/quit; single-instance added
 
 ### Pending Todos
 
@@ -156,10 +158,13 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 1→3/4]: N10, N13 and paste in Slack, Discord, Telegram, Safari/Chrome composers untested; re-check in later UAT (GO WITH FALLBACKS limit 2)
-- [Phase 2→]: The user's GIPHY key is not approved for Clips (C2 shown); approval via clips@giphy.com is a user action
+- [Phase 2→4]: The user's GIPHY key is not approved for Clips (C2 shown; Clips MP4 paste fixture-proven only); approval via clips@giphy.com is a user action
 - [Phase 2→]: The Finer Gifs Club API was down on 2026-10-17; Phase 2 UAT accepted either results or the down message, so availability is still unconfirmed
-- [Phase 4]: Klipy written clearance for temp file copies (developers@klipy.com) is a pre-release gate; request early, and ask about labelling Klipy ads (IN-09)
-- [Phase 2→4]: Public repo github.com/scottkw/gifsmith holds only the MIT LICENSE; push code after the Phase 2 merge to main and add the Raycast GIF Search authors' MIT notice to LICENSE
+- [Phase 4]: Klipy written clearance for temp file copies (developers@klipy.com) is a pre-release gate; request early, and ask about labelling Klipy ads (IN-09, Phase 2)
+- [Phase 3→4]: Download folder picker and hide-filename toggle (SETT-04) replace the DownloadsDir seam
+- [Phase 3→4]: Animated GIF tiles ignore Reduce Motion (accessibility gap)
+- [Phase 3→4]: Favorites cap of 1000 drops the oldest silently; decide whether to warn
+- [Phase 3→4]: 7 open Info items from 03-REVIEW (IN-01..IN-07), see 03-REVIEW-DISPOSITION.md
 - [Phase 4]: Apple Developer agreement 403 (notarytool store-credentials: 'A required agreement is missing or has expired') must be resolved by the user before Phase 4 notarization; notarized dry run + N15 carried over from Phase 1
 
 ### Quick Tasks Completed
@@ -178,6 +183,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-18T16:50:22.148Z
+Last session: 2026-10-18
 Stopped at: Phase 3 complete, ready to plan Phase 4
 Resume file: None
