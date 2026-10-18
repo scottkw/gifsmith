@@ -104,9 +104,16 @@ type Snapshot struct {
 	LaunchAtLogin bool   `json:"launchAtLogin"`
 }
 
-func (s *SettingsService) Snapshot(ctx context.Context) Snapshot { return snapshotOf(s.Store.Get()) }
+func (s *SettingsService) Snapshot(ctx context.Context) Snapshot { return s.snapshotOf(s.Store.Get()) }
 
-func snapshotOf(p settings.Prefs) Snapshot { return Snapshot{Theme: p.Theme} }
+// snapshotOf reports launchAtLogin from the OS, not the pref: the checkbox shows what will happen.
+func (s *SettingsService) snapshotOf(p settings.Prefs) Snapshot {
+	on, err := s.Autostart.IsEnabled()
+	if err != nil {
+		log.Printf("autostart: status failed")
+	}
+	return Snapshot{Theme: p.Theme, LaunchAtLogin: on && err == nil}
+}
 
 var errUnchanged = errors.New("unchanged")
 
@@ -133,17 +140,17 @@ func (s *SettingsService) SetPref(ctx context.Context, name, value string) (Snap
 	})
 	switch {
 	case errors.Is(err, errUnchanged):
-		return snapshotOf(p), nil
+		return s.snapshotOf(p), nil
 	case errors.Is(err, errInvalidValue):
-		return snapshotOf(p), err
+		return s.snapshotOf(p), err
 	case err != nil:
 		log.Printf("settings write failed: %s", name)
-		return snapshotOf(p), errPrefsWriteFailed
+		return s.snapshotOf(p), errPrefsWriteFailed
 	}
 	if name == "theme" && s.ApplyTheme != nil {
 		s.ApplyTheme(p.Theme)
 	}
-	snap := snapshotOf(p)
+	snap := s.snapshotOf(p)
 	if s.Emit != nil {
 		s.Emit("settings:changed", snap)
 	}
@@ -172,10 +179,59 @@ func (s *SettingsService) SetLastProvider(ctx context.Context, p string) error {
 	return nil
 }
 
+// SetLaunchAtLogin registers or removes the login item now and persists the choice for ApplyStartup.
 func (s *SettingsService) SetLaunchAtLogin(ctx context.Context, on bool) (Snapshot, error) {
-	return Snapshot{}, nil // RED skeleton
+	if on {
+		// A copy run from the DMG or a translocated path would register a login item that goes away.
+		exe, err := s.Executable()
+		if err == nil && (strings.Contains(exe, "/AppTranslocation/") || strings.HasPrefix(exe, "/Volumes/")) {
+			log.Printf("autostart: not enabled, the app is not in Applications")
+			return s.Snapshot(ctx), errNotInApplications
+		}
+	}
+	op, apply := "disable", s.Autostart.Disable
+	if on {
+		op, apply = "enable", s.Autostart.Enable
+	}
+	if err := apply(); err != nil {
+		log.Printf("autostart: %s failed", op)
+		return s.Snapshot(ctx), errAutostartFailed
+	}
+	p, err := s.Store.Update(func(p *settings.Prefs) error { p.LaunchAtLogin = on; return nil })
+	if err != nil {
+		log.Printf("settings write failed: launchAtLogin")
+		return s.snapshotOf(p), errPrefsWriteFailed
+	}
+	snap := s.snapshotOf(p)
+	if s.Emit != nil {
+		s.Emit("settings:changed", snap)
+	}
+	return snap, nil
 }
 
-func (s *SettingsService) ApplyStartup() {} // RED skeleton
+// ApplyStartup runs once at launch: when the pref is on and the OS reports the login item off,
+// register it again. It never disables. Risk (A4): IsEnabled also reports "off" for an item the user
+// switched off in System Settings, so this re-registers it; verify natively what register does then.
+func (s *SettingsService) ApplyStartup() {
+	if !s.Store.Get().LaunchAtLogin {
+		return
+	}
+	on, err := s.Autostart.IsEnabled()
+	switch {
+	case err != nil:
+		log.Printf("autostart: status failed at startup")
+	case on:
+		log.Printf("autostart: login item registered")
+	default:
+		if err := s.Autostart.Enable(); err != nil {
+			log.Printf("autostart: re-enable at startup failed")
+			return
+		}
+		log.Printf("autostart: re-enabled at startup")
+	}
+}
 
-func (s *SettingsService) AccessibilityStatus(ctx context.Context) bool { return false } // RED skeleton
+// AccessibilityStatus reports the Automatic paste grant without prompting.
+func (s *SettingsService) AccessibilityStatus(ctx context.Context) bool {
+	return s.Platform.AccessibilityTrusted(false)
+}

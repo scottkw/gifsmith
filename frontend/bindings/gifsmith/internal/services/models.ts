@@ -30,4 +30,5 @@ export interface Result {
  */
 export interface Snapshot {
     "theme": string;
+    "launchAtLogin": boolean;
 }

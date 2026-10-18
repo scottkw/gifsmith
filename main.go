@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 
 	"gifsmith/internal/library"
 	"gifsmith/internal/platform"
@@ -42,6 +43,7 @@ type deps struct {
 	DownloadsDir          string                           // Download saves here; never created by the app
 	Allow                 func(provider.ID, *url.URL) bool // download allowlist for staging
 	Platform              platform.Platform                // native in the app; platform.Fake in the UAT build
+	Autostart             services.Autostarter             // nil in the app (app.Autostart); in-memory in the UAT build
 }
 
 func main() {
@@ -74,7 +76,7 @@ func main() {
 	}
 	store := settings.OpenStore(d.ConfigDir) // the only settings.json owner
 	gifs := &services.GifService{Svc: svc, Keys: keys, Clips: clips}
-	settingsSvc := &services.SettingsService{Keys: keys, Store: store, Platform: plat, Svc: svc, Clips: clips, NewClient: func(p provider.ID, key string) provider.Provider {
+	settingsSvc := &services.SettingsService{Keys: keys, Store: store, Platform: plat, Executable: os.Executable, Svc: svc, Clips: clips, NewClient: func(p provider.ID, key string) provider.Provider {
 		candidate := func() (string, bool) { return key, true }
 		if p == provider.Klipy {
 			return &klipy.Client{BaseURL: d.KlipyBase, Key: candidate, HTTP: d.HTTP}
@@ -112,6 +114,10 @@ func main() {
 		Server: application.ServerOptions{Host: "localhost", Port: 8089},
 	})
 	settingsSvc.Emit = func(n string, data ...any) { app.Event.Emit(n, data...) }
+	settingsSvc.Autostart = d.Autostart
+	if d.Autostart == nil {
+		settingsSvc.Autostart = app.Autostart // SMAppService on macOS 13+ for the bundled app
+	}
 	clips.OnChange = func() {
 		log.Printf("clips: %s", clips.State()) // state only: records the native probe outcome
 		app.Event.Emit("providers:changed")
@@ -125,6 +131,7 @@ func main() {
 	// The stored theme drives native appearance and window backgrounds before any window shows.
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
 		sh.ApplyTheme(store.Get().Theme)
+		settingsSvc.ApplyStartup()
 	})
 
 	// Staging holds only the clipboard's file; nothing from an earlier run is kept (D-17).

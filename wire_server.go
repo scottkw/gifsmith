@@ -3,11 +3,13 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"sync"
 	"time"
 
 	"gifsmith/internal/platform"
@@ -47,5 +49,32 @@ func wire() deps {
 		},
 		// Never the real pasteboard or browser; Trusted false, so paste reports needsAccessibility.
 		Platform: &platform.Fake{},
+		// Never the real login item; FAKE_AUTOSTART=fail makes Enable/Disable fail (UAT G2).
+		Autostart: &memAutostart{fail: os.Getenv("FAKE_AUTOSTART") == "fail"},
 	}
+}
+
+// memAutostart is the UAT build's login item: a flag in memory.
+type memAutostart struct {
+	mu            sync.Mutex
+	enabled, fail bool
+}
+
+func (a *memAutostart) set(on bool) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.fail {
+		return errors.New("autostart fixture failure")
+	}
+	a.enabled = on
+	return nil
+}
+
+func (a *memAutostart) Enable() error  { return a.set(true) }
+func (a *memAutostart) Disable() error { return a.set(false) }
+
+func (a *memAutostart) IsEnabled() (bool, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.enabled, nil
 }

@@ -16,6 +16,22 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * AccessibilityStatus reports the Automatic paste grant without prompting.
+ */
+export function AccessibilityStatus(): $CancellablePromise<boolean> {
+    return $Call.ByID(3542966547);
+}
+
+/**
+ * ApplyStartup runs once at launch: when the pref is on and the OS reports the login item off,
+ * register it again. It never disables. Risk (A4): IsEnabled also reports "off" for an item the user
+ * switched off in System Settings, so this re-registers it; verify natively what register does then.
+ */
+export function ApplyStartup(): $CancellablePromise<void> {
+    return $Call.ByID(4042654710);
+}
+
+/**
  * LastProvider is the persisted provider id, or "" on first run or an unreadable file.
  */
 export function LastProvider(): $CancellablePromise<string> {
@@ -35,6 +51,13 @@ export function SaveKey(p: string, key: string): $CancellablePromise<void> {
  */
 export function SetLastProvider(p: string): $CancellablePromise<void> {
     return $Call.ByID(2165858912, p);
+}
+
+/**
+ * SetLaunchAtLogin registers or removes the login item now and persists the choice for ApplyStartup.
+ */
+export function SetLaunchAtLogin(on: boolean): $CancellablePromise<$models.Snapshot> {
+    return $Call.ByID(374994992, on);
 }
 
 /**
