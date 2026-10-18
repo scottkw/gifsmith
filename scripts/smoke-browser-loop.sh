@@ -29,6 +29,13 @@ VITE_PORT="${VITE_PORT:-9245}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 [ -z "$UAT_SCRIPT" ] || [ -f "$UAT_SCRIPT" ] || { echo "no such UAT script: $UAT_SCRIPT" >&2; exit 2; }
+# Each UAT script names the fixture env it needs on its "Run via:" line (line 2). Default it from
+# there so a plain `for f in scripts/uat/*.js` loop passes; an env var set by the caller still wins.
+if [ -n "$UAT_SCRIPT" ]; then
+  RUN_VIA=$(sed -n 2p "$UAT_SCRIPT")
+  case "$RUN_VIA" in *FAKE_CLIPS=denied*) : "${FAKE_CLIPS:=denied}" ;; esac
+  case "$RUN_VIA" in *"UAT_SEED_FAVORITES='{not json'"*) : "${UAT_SEED_FAVORITES:={not json}" ;; esac
+fi
 
 fail() { echo "SMOKE FAIL: $*" >&2; exit 1; }
 
