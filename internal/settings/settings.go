@@ -8,9 +8,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 
 	"gifsmith/internal/provider"
+	"gifsmith/internal/provider/giphy"
+	"gifsmith/internal/provider/klipy"
 
 	"github.com/zalando/go-keyring"
 )
@@ -138,6 +141,22 @@ func (p *Prefs) Normalize() []string {
 	default:
 		p.Theme = ""
 		reset = append(reset, "theme")
+	}
+	if p.GiphyRating != "" && !slices.Contains(provider.Ratings, p.GiphyRating) {
+		p.GiphyRating = ""
+		reset = append(reset, "giphyRating")
+	}
+	if p.PageSize != 0 && !slices.Contains(provider.PageSizes, p.PageSize) {
+		p.PageSize = 0
+		reset = append(reset, "pageSize")
+	}
+	if p.GiphyLang != "" && !slices.Contains(giphy.Languages, p.GiphyLang) {
+		p.GiphyLang = ""
+		reset = append(reset, "giphyLang")
+	}
+	if p.KlipyCountry != "" && !slices.Contains(klipy.Countries, p.KlipyCountry) {
+		p.KlipyCountry = ""
+		reset = append(reset, "klipyCountry")
 	}
 	return reset
 }

@@ -15,6 +15,7 @@ export {
 };
 
 export type {
+    Choices,
     DownloadResult,
     ProviderStatus,
     Result,

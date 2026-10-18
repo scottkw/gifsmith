@@ -1,10 +1,12 @@
 package services
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"log"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"unicode"
@@ -12,6 +14,8 @@ import (
 
 	"gifsmith/internal/platform"
 	"gifsmith/internal/provider"
+	"gifsmith/internal/provider/giphy"
+	"gifsmith/internal/provider/klipy"
 	"gifsmith/internal/search"
 	"gifsmith/internal/settings"
 )
@@ -120,7 +124,47 @@ type Choices struct {
 }
 
 // Choices lists the Search-pane options; the webview names them.
-func (s *SettingsService) Choices(ctx context.Context) Choices { return Choices{} }
+func (s *SettingsService) Choices(ctx context.Context) Choices {
+	lang, country := s.systemParams()
+	return Choices{Ratings: provider.Ratings, PageSizes: provider.PageSizes, Languages: giphy.Languages, Countries: klipy.Countries,
+		SystemLanguage: lang, SystemCountry: country}
+}
+
+// systemParams is what Match System means now: the macOS language mapped to a GIPHY code
+// (else English) and the macOS region if it is a known country (else the United States).
+func (s *SettingsService) systemParams() (lang, country string) {
+	l, r := s.Platform.SystemLocale()
+	lang, country = giphyLang(l), strings.ToLower(r)
+	if !slices.Contains(klipy.Countries, country) {
+		country = provider.DefaultParams().Country
+	}
+	return lang, country
+}
+
+// giphyLang maps a BCP 47 tag ("pt-BR", "zh-Hant-TW") to a GIPHY lang code, or "en".
+func giphyLang(tag string) string {
+	parts := strings.Split(strings.ReplaceAll(tag, "_", "-"), "-")
+	code := strings.ToLower(parts[0])
+	switch code {
+	case "zh":
+		for _, p := range parts[1:] {
+			if p == "Hant" || p == "TW" || p == "HK" || p == "MO" {
+				return "zh-TW"
+			}
+		}
+		return "zh-CN"
+	case "nb", "nn":
+		code = "no"
+	case "fil":
+		code = "tl"
+	case "iw":
+		code = "he"
+	}
+	if slices.Contains(giphy.Languages, code) {
+		return code
+	}
+	return provider.DefaultParams().Lang
+}
 
 // Params are the provider parameters for the next request: the defaults overlaid with the
 // stored choices. Clients call it on every request.
@@ -130,6 +174,14 @@ func (s *SettingsService) paramsOf(p settings.Prefs) provider.Params {
 	prm := provider.DefaultParams()
 	if p.GiphyRating != "" {
 		prm.Rating = p.GiphyRating
+	}
+	if p.PageSize != 0 {
+		prm.PageSize = p.PageSize
+	}
+	prm.Lang, prm.Country = p.GiphyLang, p.KlipyCountry
+	if prm.Lang == "" || prm.Country == "" { // Match System, resolved per request
+		lang, country := s.systemParams()
+		prm.Lang, prm.Country = cmp.Or(prm.Lang, lang), cmp.Or(prm.Country, country)
 	}
 	return prm
 }
@@ -143,7 +195,8 @@ func (s *SettingsService) snapshotOf(p settings.Prefs) Snapshot {
 		log.Printf("autostart: status failed")
 	}
 	prm := s.paramsOf(p)
-	return Snapshot{Theme: p.Theme, LaunchAtLogin: on && err == nil, GiphyRating: prm.Rating}
+	return Snapshot{Theme: p.Theme, LaunchAtLogin: on && err == nil, GiphyRating: prm.Rating, PageSize: prm.PageSize,
+		GiphyLang: p.GiphyLang, KlipyCountry: p.KlipyCountry}
 }
 
 var errUnchanged = errors.New("unchanged")
@@ -163,6 +216,28 @@ func (s *SettingsService) SetPref(ctx context.Context, name, value string) (Snap
 		}
 		set = func(p *settings.Prefs) { p.GiphyRating = defaultAsEmpty(value, provider.DefaultParams().Rating) }
 		flush = []provider.ID{provider.GIPHY} // Clips share GIPHY's budget, so their pages go too
+	case "pageSize":
+		n, err := strconv.Atoi(value)
+		if err != nil || strconv.Itoa(n) != value || !slices.Contains(provider.PageSizes, n) {
+			return s.Snapshot(ctx), errInvalidValue
+		}
+		if n == provider.DefaultPageSize {
+			n = 0
+		}
+		set = func(p *settings.Prefs) { p.PageSize = n }
+		flush = []provider.ID{provider.GIPHY, provider.Klipy, provider.FinerGifs}
+	case "giphyLang": // "" = Match System
+		if value != "" && !slices.Contains(giphy.Languages, value) {
+			return s.Snapshot(ctx), errInvalidValue
+		}
+		set = func(p *settings.Prefs) { p.GiphyLang = value }
+		flush = []provider.ID{provider.GIPHY}
+	case "klipyCountry": // "" = Match System
+		if value != "" && !slices.Contains(klipy.Countries, value) {
+			return s.Snapshot(ctx), errInvalidValue
+		}
+		set = func(p *settings.Prefs) { p.KlipyCountry = value }
+		flush = []provider.ID{provider.Klipy}
 	default:
 		return s.Snapshot(ctx), errInvalidValue
 	}

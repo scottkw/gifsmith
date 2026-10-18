@@ -36,6 +36,13 @@ export function ApplyStartup(): $CancellablePromise<void> {
 }
 
 /**
+ * Choices lists the Search-pane options; the webview names them.
+ */
+export function Choices(): $CancellablePromise<$models.Choices> {
+    return $Call.ByID(1231919149);
+}
+
+/**
  * LastProvider is the persisted provider id, or "" on first run or an unreadable file.
  */
 export function LastProvider(): $CancellablePromise<string> {
