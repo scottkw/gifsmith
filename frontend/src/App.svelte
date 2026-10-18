@@ -11,6 +11,7 @@
     copyText,
     download,
     openPage,
+    openSource,
     hide,
     latest,
     lastProvider,
@@ -41,9 +42,10 @@
   import { buildActions, type ActionId, type ActionRow } from './lib/actions';
   import { COLS, move, nearEnd, routeKey } from './lib/grid';
   import { flatItems, moveSectioned, sections } from './lib/library';
-  import { placeMenu } from './lib/popover';
+  import { placeInDetails, placeMenu } from './lib/popover';
   import { CLIPS_ACCESS_MAILTO, LIBRARY_TABS, SLOTS, libraryTab, slotById, type LibraryId, type SlotId } from './lib/providers';
   import ActionMenu from './components/ActionMenu.svelte';
+  import DetailsPane from './components/DetailsPane.svelte';
   import LibraryGrid from './components/LibraryGrid.svelte';
   import Footer from './components/Footer.svelte';
   import ProviderTabs from './components/ProviderTabs.svelte';
@@ -123,6 +125,8 @@
   let menuRows = $state<ActionRow[]>([]);
   let menuAt = $state({ left: 0, top: 0 });
   let menu = $state<ActionMenu>();
+  // ⌘I Details shows the selected item of the current grid over the content area (D-10).
+  let detailsOpen = $state(false);
 
   // Favorites / Recents (⌘5 / ⌘6) replace the provider grid while libTab is set; not persisted (D-22).
   let libTab = $state<LibraryId | null>(null);
@@ -137,6 +141,7 @@
   // What the selection indexes: the library's flat item list, or the provider grid.
   const items = $derived(libTab ? libItems : cur.items);
   const libName = $derived(libTab ? libraryTab(libTab).label : '');
+  const detail = $derived(detailsOpen ? items[selected] : undefined);
 
   const footerCenter = $derived(status || items[selected]?.title || '');
   const busy = $derived(!libTab && (cur.status === 'loading' || cur.status === 'refreshing'));
@@ -209,7 +214,7 @@
     input.focus();
     Events.On('panel:show', () => {
       clearTimeout(hideTimer); // a copy just before this show must not hide the panel again (02 IN-07)
-      menuOpen = false; // never reopens on its own
+      menuOpen = detailsOpen = false; // never reopen on their own
       now = Date.now();
       // A toast with an action (the download toast) outlives a hide inside its 5 s: a TCC prompt can hide the panel.
       if (!keepStatus && !toastAction) setStatus('');
@@ -258,6 +263,7 @@
     if (!libTab) return;
     const i = libItems.findIndex((g) => keyOf(g) === prev);
     selected = i >= 0 ? i : Math.min(Math.max(selected, 0), libItems.length - 1);
+    if (!libItems[selected]) detailsOpen = false;
   }
 
   // The Clips probe only means something after a GIPHY GIFs success with the key. Fetch GIPHY
@@ -347,7 +353,7 @@
   }
 
   function switchTo(p: SlotId) {
-    menuOpen = false;
+    menuOpen = detailsOpen = false;
     if (p !== active || libTab) {
       if (p !== active) setLastProvider(p);
       active = p;
@@ -362,7 +368,7 @@
 
   // ⌘5 / ⌘6: the library renders from the saved snapshot; reloaded on every switch (D-09).
   function switchLib(id: LibraryId) {
-    menuOpen = false;
+    menuOpen = detailsOpen = false;
     clearTimeout(timer); // a pending provider search must not fire for the filter text
     if (libTab !== id) {
       libTab = id;
@@ -425,7 +431,7 @@
     s.status = !page ? 'idle' : s.items.length ? 'ready' : 'empty';
     if (p === active) {
       selected = s.items.length ? 0 : -1;
-      menuOpen = false; // its item is gone
+      menuOpen = detailsOpen = false; // its item is gone
     }
   }
 
@@ -465,6 +471,8 @@
   // an Undo toast is visible), so otherwise they stay native editing and undo in the input (Pitfall 10).
   function onKeydown(e: KeyboardEvent) {
     const a = routeKey(e);
+    // A printable key closes Details and goes on to the input as usual.
+    if (detail && a === 'none' && e.key.length === 1 && !e.metaKey && !e.ctrlKey) detailsOpen = false;
     if (a === 'none') return;
     if (a === 'remove' && !(libTab && items[selected])) return;
     if (a === 'undo' && !undoVisible()) return;
@@ -474,7 +482,8 @@
       case 'right':
       case 'up':
       case 'down':
-        if (!items.length) return;
+        // In Details ← → step through the grid's items (clamped) and the pane follows; ↑ ↓ do nothing.
+        if (!items.length || (detail && (a === 'up' || a === 'down'))) return;
         if (libTab) {
           select(moveSectioned(selected, a, libSections.map((s) => s.items.length)));
           return;
@@ -483,7 +492,8 @@
         if (nearEnd(selected, items.length)) loadMore();
         return;
       case 'favorite':
-        runAction('favorite');
+      case 'details':
+        runAction(a);
         return;
       case 'remove':
         runAction('removeRecent'); // on the Favorites tab this unfavorites
@@ -511,7 +521,8 @@
         toggleMenu();
         return;
       case 'escape':
-        if (query) {
+        if (detail) detailsOpen = false; // selection kept
+        else if (query) {
           query = '';
           onInput();
         } else hide(); // no-op in the server build; nothing here depends on it
@@ -541,10 +552,16 @@
     if (menuOpen) return closeMenu();
     const g = items[selected];
     const tile = document.getElementById(`tile-${selected}`);
-    if (!g || !tile) return;
-    menuRows = buildActions({ gif: g, tab: libTab ?? 'provider', inDetails: false, favorited: favKeys.has(keyOf(g)) });
+    if (!g || !(tile || detail)) return;
+    const inDetails = !!detail;
+    menuRows = buildActions({ gif: g, tab: libTab ?? 'provider', inDetails, favorited: favKeys.has(keyOf(g)) });
     menuOpen = true;
     await tick(); // measure the rendered menu, then place it before the browser paints
+    if (inDetails || !tile) {
+      menuAt = placeInDetails(menu!.height());
+      menu!.focus();
+      return;
+    }
     // Library sections restart the column count at each section's first tile.
     const col = (selected - (libSections.findLast((s) => s.start <= selected)?.start ?? 0)) % COLS;
     menuAt = placeMenu(tile.getBoundingClientRect(), col, menu!.height(), { w: innerWidth, h: innerHeight });
@@ -582,7 +599,10 @@
         return;
       case 'open':
         // Only GIPHY and Clips items carry a page URL; for the rest ⌘O does nothing.
-        if (g?.pageUrl) openItem(g);
+        if (g?.pageUrl) openItem(g, openPage);
+        return;
+      case 'details':
+        if (g) detailsOpen = !detailsOpen; // the panel stays open
         return;
       case 'download':
         downloadItem();
@@ -720,9 +740,9 @@
   }
 
   // Success shows no toast: the browser takes focus and HideOnFocusLost hides the panel.
-  async function openItem(g: Gif) {
+  async function openItem(g: Gif, call: (g: Gif) => Promise<void>) {
     try {
-      await openPage(g);
+      await call(g);
     } catch (err) {
       actionFailed(err, g);
     }
@@ -770,7 +790,7 @@
       role="combobox"
       aria-expanded={items.length > 0}
       aria-controls="grid"
-      aria-activedescendant={selected >= 0 ? `tile-${selected}` : undefined}
+      aria-activedescendant={selected >= 0 && !detail ? `tile-${selected}` : undefined}
     />
     {#if busy}
       <span class="spinner busy" role="status" aria-label="Loading"></span>
@@ -780,6 +800,17 @@
   <ProviderTabs {active} lib={libTab} {clipsEnabled} onswitch={switchTo} onlib={switchLib} />
 
   <section class="content" aria-busy={statuses === null || (!!libTab && !library)}>
+    <!-- Details covers the content area; the grid stays mounted underneath so ← → move its selection. -->
+    {#if detail}
+      <div class="details-layer">
+        <DetailsPane
+          gif={detail}
+          favorited={favKeys.has(keyOf(detail))}
+          onopenpage={() => openItem(detail, openPage)}
+          onopensource={() => openItem(detail, openSource)}
+        />
+      </div>
+    {/if}
     {#if libTab}
       {#if !library}
         {#if libSlow}
@@ -919,7 +950,7 @@
 
   <Footer
     {attribution}
-    hints={libTab ? 'library' : 'provider'}
+    hints={detail ? 'details' : libTab ? 'library' : 'provider'}
     text={footerCenter}
     {tone}
     {needsAccessibility}
@@ -974,8 +1005,14 @@
     color: var(--text-secondary);
   }
   .content {
+    position: relative;
     flex: 1;
     min-height: 0;
+  }
+  .details-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
   }
   /* S2: 8 skeleton tiles (2 rows) in grid geometry. */
   .skeleton {

@@ -49,6 +49,7 @@ const ROWS: Row[] = [
   { id: 'copySquare', label: 'Copy Square GIF', hint: '', keys: '', group: 4, applies: (c) => !c.gif.isClip },
   { id: 'pasteSquare', label: 'Paste Square GIF', hint: '', keys: '', group: 4, applies: (c) => !c.gif.isClip },
   { id: 'favorite', label: (c) => (fav(c) ? 'Remove from Favorites' : 'Add to Favorites'), destructive: fav, hint: '⌘⇧F', keys: 'Meta+Shift+F', group: 5 },
+  { id: 'details', label: 'Show Details', hint: '⌘I', keys: 'Meta+I', group: 5, applies: (c) => !c.inDetails },
   { id: 'removeRecent', label: 'Remove from Recents', destructive: true, hint: '⌘⌫', keys: 'Meta+Backspace', group: 6, applies: onRecents },
   { id: 'clearRecents', label: 'Clear Recents', destructive: true, hint: '', keys: '', group: 6, applies: onRecents },
 ];

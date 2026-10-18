@@ -13,7 +13,7 @@
     onaction,
   }: {
     attribution: 'giphy' | 'klipy' | 'finer' | ''; // '' = nothing to attribute (empty library tab)
-    hints?: 'provider' | 'library';
+    hints?: 'provider' | 'library' | 'details';
     text: string;
     tone: '' | 'success' | 'error';
     needsAccessibility: boolean;
@@ -52,6 +52,9 @@
   </span>
   {#if needsAccessibility}
     <button onclick={onenable}>Enable Automatic Paste…</button>
+  {:else if hints === 'details'}
+    <!-- Details: "↵ Copy   ⌘K Actions   Esc Back" -->
+    <span class="hints"><b>↵</b> Copy&nbsp;&nbsp;&nbsp;<b>⌘K</b> Actions&nbsp;&nbsp;&nbsp;<b>Esc</b> Back</span>
   {:else if hints === 'library'}
     <span class="hints"><b>↵</b> Copy&nbsp;&nbsp;&nbsp;<b>⌘K</b> Actions&nbsp;&nbsp;&nbsp;<b>⌘⌫</b> Remove</span>
   {:else}

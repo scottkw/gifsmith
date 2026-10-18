@@ -15,6 +15,9 @@ export function placeMenu(
   return { left: clamp(left, win.w - GAP - MENU_W), top: clamp(tile.y, win.h - GAP - menuH) };
 }
 
+// In Details the menu hangs 16px inside the content area's top-right corner (content top = search 48 + tabs 36).
+const CONTENT_TOP = 84;
+const DETAILS_INSET = 16;
 export function placeInDetails(_menuH: number): { left: number; top: number } {
-  return { left: 0, top: 0 };
+  return { left: 720 - DETAILS_INSET - MENU_W, top: CONTENT_TOP + DETAILS_INSET };
 }
