@@ -7,3 +7,5 @@ import "gifsmith/internal/platform"
 func panelOrigin(wa platform.Rect, w, h int) (x, y int) {
 	return wa.X + (wa.Width-w)/2, wa.Y + wa.Height/6
 }
+
+func settingsOrigin(wa platform.Rect, w, h int) (x, y int) { return 0, 0 } // RED skeleton
