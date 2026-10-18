@@ -5,16 +5,16 @@ milestone_name: Gifsmith MVP
 current_phase: 3
 current_phase_name: Action Pipeline & Library
 status: executing
-stopped_at: Completed 03-04-PLAN.md
-last_updated: "2026-10-18T01:03:49.151Z"
+stopped_at: Completed 03-05-PLAN.md
+last_updated: "2026-10-18T01:18:14.006Z"
 last_activity: 2026-10-17
 last_activity_desc: Phase 3 execution started
-state_head: 56d569c4340dfcf35d10bb934f38264c76932331
+state_head: 66c32bfd23d4328e9e1ca7945a44c95d760126bd
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 18
-  completed_plans: 14
+  completed_plans: 15
 ---
 
 # Project State
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-17)
 ## Current Position
 
 Phase: 3 (Action Pipeline & Library) — EXECUTING
-Plan: 5 of 8
+Plan: 6 of 8
 Status: Ready to execute
 Last activity: 2026-10-17 — Phase 3 execution started
 
@@ -72,6 +72,7 @@ Progress: [█████░░░░░] 50% (2/4 phases; 10/10 planned plans 
 | Phase 3 P02 | 11min | 2 tasks | 10 files |
 | Phase 03 P03 | 10min | 2 tasks | 16 files |
 | Phase 03 P04 | 15min | 2 tasks | 31 files |
+| Phase 03 P05 | 12min | 2 tasks | 20 files |
 
 ## Accumulated Context
 
@@ -130,6 +131,9 @@ Recent decisions affecting current work:
 - [Phase 03]: Download claims names with os.Link from a hidden temp file; never overwrites, never creates the folder
 - [Phase 03]: ActionService.DownloadsDir is an injected func (Phase 4 picker replaces it); results carry only file and folder names
 - [Phase 03]: Toast model: setStatus(text, tone, action, ms); a toast with an action survives panel:show inside its expiry
+- [Phase 03]: Square crop: a 1x1 placeholder for a frame outside the window gets disposal None (Background cleared the visible pixel (0,0)); golden test proves 0 mismatches
+- [Phase 03]: Derived clipboard files (square) are staged under sha1(provider:id:variant) so Sweep(derived) removes the downloaded original
+- [Phase 03]: Square actions: claimed Size > 15 MB refused before any request; DecodeConfig refuses canvases over 4096 before DecodeAll
 
 ### Pending Todos
 
@@ -160,6 +164,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-18T01:03:49.011Z
-Stopped at: Completed 03-04-PLAN.md
+Last session: 2026-10-18T01:18:13.859Z
+Stopped at: Completed 03-05-PLAN.md
 Resume file: None

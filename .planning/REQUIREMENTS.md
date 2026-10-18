@@ -41,7 +41,7 @@
 - [x] **ACTN-03**: User can copy or paste the GIF link, and copy or paste GIF Markdown
 - [x] **ACTN-04**: User can copy the page link and open the GIF page in the browser
 - [x] **ACTN-05**: User can download the GIF to a chosen folder (default Downloads)
-- [ ] **ACTN-06**: User can copy or paste a center-cropped square version of a GIF (not offered for Clips)
+- [x] **ACTN-06**: User can copy or paste a center-cropped square version of a GIF (not offered for Clips)
 - [x] **ACTN-07**: User can open an action menu (⌘K) listing all actions for the selected GIF
 - [ ] **ACTN-08**: User can choose the default Enter action and a second ⌘Enter action in settings
 - [ ] **ACTN-09**: Clips are handled as MP4 (labelled accordingly, 720p default)
@@ -128,7 +128,7 @@
 | ACTN-03 | Phase 3 | Complete |
 | ACTN-04 | Phase 3 | Complete |
 | ACTN-05 | Phase 3 | Complete |
-| ACTN-06 | Phase 3 | Pending |
+| ACTN-06 | Phase 3 | Complete |
 | ACTN-07 | Phase 3 | Complete |
 | ACTN-08 | Phase 4 | Pending |
 | ACTN-09 | Phase 3 | Pending |

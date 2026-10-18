@@ -104,7 +104,7 @@ Plans:
   4. The user can add or remove a favorite, and every successful copy or paste appears in Recents (most recent first, capped). Favorites and Recents are browsable grouped by provider (never blended), items can be removed from Recents, and both render from saved metadata with no API calls.
   5. The user can open a details view for a GIF (title, size, dimensions, tags, source links), and an empty search box shows recent searches that can be rerun.
 
-**Plans:** 4/8 plans executed
+**Plans:** 5/8 plans executed
 
 Plans:
 **Wave 1**
@@ -120,7 +120,7 @@ Plans:
 - [x] 03-04-PLAN.md — Download (validated, atomic no-overwrite, injected folder) with Show in Finder (⌘R) and the Downloads usage description
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 03-05-PLAN.md — Square GIF: lossless image/gif crop with golden tests, 15 MB/canvas limits, Copy/Paste Square, 300 ms busy rule
+- [x] 03-05-PLAN.md — Square GIF: lossless image/gif crop with golden tests, 15 MB/canvas limits, Copy/Paste Square, 300 ms busy rule
 
 **Wave 6** *(blocked on Wave 5 completion)*
 - [ ] 03-06-PLAN.md — Favorites & Recents: library store + LibraryService, Recents recording, sectioned tabs ⌘5/⌘6, remove/Clear/Undo
@@ -164,5 +164,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Native Spike & Signed Dev Loop | 4/4 | Complete    | 2026-10-17 |
 | 2. Providers, Search UI & First Run | 6/6 | Complete    | 2026-10-17 |
-| 3. Action Pipeline & Library | 4/8 | In Progress | - |
+| 3. Action Pipeline & Library | 5/8 | In Progress | - |
 | 4. Settings, Shell Polish & Release | 0/TBD | Not started | - |
