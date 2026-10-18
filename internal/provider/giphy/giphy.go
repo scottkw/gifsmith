@@ -10,6 +10,7 @@ import (
 
 	"gifsmith/internal/provider"
 	"gifsmith/internal/provider/httpx"
+	"gifsmith/internal/staging"
 )
 
 const (
@@ -42,9 +43,12 @@ func (f *flexInt) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// rendition decodes only the URL; width/height/size (strings on the wire) wait for Phase 3 details.
+// rendition: width/height/size are strings on the wire and display-only, so decoded loosely.
 type rendition struct {
-	URL string `json:"url"`
+	URL    string         `json:"url"`
+	Width  httpx.LooseInt `json:"width"`
+	Height httpx.LooseInt `json:"height"`
+	Size   httpx.LooseInt `json:"size"`
 }
 
 type response struct {
@@ -52,9 +56,12 @@ type response struct {
 		ID     string `json:"id"`
 		Slug   string `json:"slug"`
 		Title  string `json:"title"`
+		URL    any    `json:"url"`    // page; display-only, so any type decodes
+		Source any    `json:"source"` // third-party page; display-only
 		Images struct {
-			FixedWidth rendition `json:"fixed_width"`
-			Original   rendition `json:"original"`
+			FixedWidth  rendition `json:"fixed_width"`
+			FixedHeight rendition `json:"fixed_height"`
+			Original    rendition `json:"original"`
 		} `json:"images"`
 	} `json:"data"`
 	Pagination struct {
@@ -106,6 +113,31 @@ func (c *Client) ProbeClips(ctx context.Context) error {
 	return httpx.Remap(err, 401, 403)
 }
 
+// pageURL keeps the vendor page only on giphy.com (http upgraded to https); anything else is dropped.
+func pageURL(p provider.ID, v any) string {
+	s, _ := v.(string)
+	u, err := url.Parse(s)
+	if err != nil {
+		return ""
+	}
+	if u.Scheme == "http" {
+		u.Scheme = "https"
+	}
+	if !staging.PageAllow(p, u) {
+		return ""
+	}
+	return u.String()
+}
+
+// sourceURL keeps a third-party source only when it is https with a host.
+func sourceURL(v any) string {
+	s, _ := v.(string)
+	if u, err := url.Parse(s); err != nil || u.Scheme != "https" || u.Host == "" {
+		return ""
+	}
+	return s
+}
+
 // get pages with an opaque cursor that is the decimal offset.
 func (c *Client) get(ctx context.Context, path string, v url.Values, cursor string, offsetCap int) (provider.Page, error) {
 	offset := 0
@@ -148,9 +180,14 @@ func (c *Client) get(ctx context.Context, path string, v url.Values, cursor stri
 		if title == "" {
 			title = d.Slug
 		}
-		g := provider.Gif{Provider: c.id(), ID: d.ID, Title: title, PreviewURL: d.Images.FixedWidth.URL, IsClip: c.Clips}
-		if !c.Clips {
-			g.DownloadURL = d.Images.Original.URL
+		g := provider.Gif{Provider: c.id(), ID: d.ID, Title: title, PreviewURL: d.Images.FixedWidth.URL, IsClip: c.Clips,
+			PageURL: pageURL(c.id(), d.URL), SourceURL: sourceURL(d.Source)}
+		if c.Clips {
+			g.GifURL = d.Images.Original.URL // D-18: links and Markdown use the GIF rendition, not the MP4
+		} else {
+			o := d.Images.Original
+			g.DownloadURL, g.Width, g.Height, g.Size = o.URL, int(o.Width), int(o.Height), int64(o.Size)
+			g.MediumURL = d.Images.FixedHeight.URL
 		}
 		items = append(items, g)
 	}

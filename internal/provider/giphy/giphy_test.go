@@ -425,7 +425,7 @@ func TestProbeClips(t *testing.T) {
 // one maps a single GIPHY item built from extra top-level fields and extra renditions.
 func one(t *testing.T, clips bool, fields, images string) provider.Gif {
 	t.Helper()
-	body := `{"data":[{"id":"a","slug":"s","title":"t"` + fields + `,"images":{"fixed_width":{"url":"https://media.giphy.com/a/200w.gif"},"original":{"url":"https://media.giphy.com/a/giphy.gif"` + images + `}}],"pagination":{"total_count":1}}`
+	body := `{"data":[{"id":"a","slug":"s","title":"t"` + fields + `,"images":{"fixed_width":{"url":"https://media.giphy.com/a/200w.gif"},"original":{"url":"https://media.giphy.com/a/giphy.gif"` + images + `}}}],"pagination":{"total_count":1}}`
 	c, _, _ := stubClient(t, 200, nil, body)
 	c.Clips = clips
 	p, err := c.Search(context.Background(), "cat", "")

@@ -95,4 +95,11 @@ func Remap(err error, reject ...int) error {
 // (which becomes 0). It never fails, so one odd field cannot fail a whole page.
 type LooseInt int64
 
-func (n *LooseInt) UnmarshalJSON(b []byte) error { return nil }
+func (n *LooseInt) UnmarshalJSON(b []byte) error {
+	v, err := strconv.ParseInt(strings.Trim(string(b), `"`), 10, 64)
+	if err != nil {
+		v = 0
+	}
+	*n = LooseInt(v)
+	return nil
+}

@@ -132,6 +132,8 @@ func giphyGifs(w http.ResponseWriter, r *http.Request, o Options, clips bool) {
 		ID     string               `json:"id"`
 		Slug   string               `json:"slug"`
 		Title  string               `json:"title"`
+		URL    string               `json:"url"`
+		Source string               `json:"source,omitempty"`
 		Images map[string]rendition `json:"images"`
 		Video  map[string]any       `json:"video,omitempty"`
 	}
@@ -140,15 +142,21 @@ func giphyGifs(w http.ResponseWriter, r *http.Request, o Options, clips bool) {
 	for n := max(offset, 0) + 1; n <= total && len(data) < limit; n++ {
 		if clips {
 			id := "clip-" + strconv.Itoa(n)
-			data = append(data, item{Type: "video", ID: id, Slug: "clip-" + id, Title: "GIPHY clip " + strconv.Itoa(n), Images: map[string]rendition{
+			data = append(data, item{Type: "video", ID: id, Slug: "clip-" + id, Title: "GIPHY clip " + strconv.Itoa(n), URL: "https://giphy.com/clips/clip-" + id, Images: map[string]rendition{
 				"fixed_width": {URL: media + id + "-200w.gif", Width: "200", Height: "112", Size: "1234"},
+				"original":    {URL: media + id + ".gif", Width: "480", Height: "270", Size: "4321"},
 			}, Video: map[string]any{"assets": map[string]rendition{"360p": {URL: media + id + "-360p.mp4", Width: "640", Height: "360"}}}})
 			continue
 		}
 		id := "giphy-" + strconv.Itoa(n)
-		data = append(data, item{Type: "gif", ID: id, Slug: "moment-" + id, Title: "GIPHY moment " + strconv.Itoa(n), Images: map[string]rendition{
-			"fixed_width": {URL: media + id + "-200w.gif", Width: "200", Height: "200", Size: "1234"},
-			"original":    {URL: media + id + ".gif", Width: "480", Height: "480", Size: "5678"},
+		source := "" // odd items carry a source page, even ones none
+		if n%2 == 1 {
+			source = "https://example.org/source/" + id
+		}
+		data = append(data, item{Type: "gif", ID: id, Slug: "moment-" + id, Title: "GIPHY moment " + strconv.Itoa(n), URL: "https://giphy.com/gifs/moment-" + id, Source: source, Images: map[string]rendition{
+			"fixed_width":  {URL: media + id + "-200w.gif", Width: "200", Height: "200", Size: "1234"},
+			"fixed_height": {URL: media + id + "-200h.gif", Width: "200", Height: "200", Size: "1234"},
+			"original":     {URL: media + id + ".gif", Width: "480", Height: "480", Size: "5678"},
 		}})
 	}
 	writeJSON(w, map[string]any{
@@ -201,6 +209,7 @@ func klipyGifs(w http.ResponseWriter, r *http.Request, o Options) {
 		Slug  string                        `json:"slug"`
 		Title string                        `json:"title"`
 		Type  string                        `json:"type"`
+		Tags  []any                         `json:"tags"`
 		File  map[string]map[string]gifFile `json:"file"`
 	}
 	media := "http://" + r.Host + "/media/"
@@ -212,8 +221,13 @@ func klipyGifs(w http.ResponseWriter, r *http.Request, o Options) {
 		if n <= 2 {
 			slug = "klipy-dup"
 		}
-		data = append(data, item{ID: 8041071659142944 + int64(n), Slug: slug, Title: "Klipy moment " + strconv.Itoa(n), Type: "gif", File: map[string]map[string]gifFile{
+		tags := []any{"funny", "cat"}
+		if n == 3 { // an object element the client must skip without failing the page
+			tags = []any{map[string]string{"name": "obj"}, "funny"}
+		}
+		data = append(data, item{ID: 8041071659142944 + int64(n), Slug: slug, Title: "Klipy moment " + strconv.Itoa(n), Type: "gif", Tags: tags, File: map[string]map[string]gifFile{
 			"sm": {"gif": {URL: media + name + "-sm.gif", Width: 220, Height: 220, Size: 1234}},
+			"md": {"gif": {URL: media + name + "-md.gif", Width: 320, Height: 320, Size: 3456}},
 			"hd": {"gif": {URL: media + name + "-hd.gif", Width: 498, Height: 498, Size: 5678}},
 		}})
 	}
