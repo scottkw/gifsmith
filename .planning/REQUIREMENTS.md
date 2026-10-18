@@ -23,7 +23,7 @@
 - [x] **SRCH-05**: User can navigate the grid entirely by keyboard (arrows, Enter, ⌘K, Esc)
 - [x] **SRCH-06**: Searches are debounced so free keys (100 calls/hour) last; a rate-limit hit shows a clear message with when to retry
 - [x] **SRCH-07**: Network, timeout, and provider errors show a per-provider message; one provider failing never blocks the others
-- [ ] **SRCH-08**: User sees recent searches when the box is empty and can rerun one
+- [x] **SRCH-08**: User sees recent searches when the box is empty and can rerun one
 - [ ] **SRCH-09**: User can set GIPHY content rating (default PG-13)
 
 ### Onboarding & Compliance
@@ -54,7 +54,7 @@
 - [x] **LIBR-02**: Every successful copy/paste records the GIF in Recents (most recent first, capped)
 - [x] **LIBR-03**: User can browse Favorites and Recents, grouped by provider (never blended), and remove items from Recents
 - [x] **LIBR-04**: Favorites and Recents render from saved metadata without API calls (work offline/rate-limited)
-- [ ] **LIBR-05**: User can open a details view for a GIF (title, size, dimensions, tags, source links)
+- [x] **LIBR-05**: User can open a details view for a GIF (title, size, dimensions, tags, source links)
 
 ### Settings
 
@@ -116,7 +116,7 @@
 | SRCH-05 | Phase 2 | Complete |
 | SRCH-06 | Phase 2 | Complete |
 | SRCH-07 | Phase 2 | Complete |
-| SRCH-08 | Phase 3 | Pending |
+| SRCH-08 | Phase 3 | Complete |
 | SRCH-09 | Phase 4 | Pending |
 | ONBD-01 | Phase 2 | Complete |
 | ONBD-02 | Phase 2 | Complete |
@@ -138,7 +138,7 @@
 | LIBR-02 | Phase 3 | Complete |
 | LIBR-03 | Phase 3 | Complete |
 | LIBR-04 | Phase 3 | Complete |
-| LIBR-05 | Phase 3 | Pending |
+| LIBR-05 | Phase 3 | Complete |
 | SETT-01 | Phase 4 | Pending |
 | SETT-02 | Phase 4 | Pending |
 | SETT-03 | Phase 4 | Pending |
