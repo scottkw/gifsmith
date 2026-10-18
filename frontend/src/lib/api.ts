@@ -101,3 +101,11 @@ const library = (s: Snapshot): Library => ({
   unreadable: s.unreadable ?? [],
 });
 export const loadLibrary = async () => library(await LibraryService.Load());
+// Each mutation resolves to the fresh lists; failures reject with cause.kind library_read |
+// library_write | invalid_item, and the previous lists stay as they were.
+export const setFavorite = async (g: Gif, on: boolean) => library(await LibraryService.SetFavorite(g, on));
+export const removeRecent = async (g: Gif) => library(await LibraryService.RemoveRecent(g.provider, g.id));
+export const clearRecents = async () => library(await LibraryService.ClearRecents());
+export const undoLibrary = async () => library(await LibraryService.Undo());
+export const saveSearch = (p: string, q: string) => LibraryService.SaveSearch(p, q);
+export const removeSearch = async (p: string, q: string) => library(await LibraryService.RemoveSearch(p, q));

@@ -364,7 +364,9 @@ func TestInvalidEntryOnDiskIsUnreadable(t *testing.T) {
 	}
 }
 
-func searches(s *Store, p provider.ID) string { return strings.Join(s.Snapshot().Searches[string(p)], "|") }
+func searches(s *Store, p provider.ID) string {
+	return strings.Join(s.Snapshot().Searches[string(p)], "|")
+}
 
 func TestSaveSearchTrim(t *testing.T) {
 	s := newStore(t)

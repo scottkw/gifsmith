@@ -15,10 +15,46 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as library$0 from "../library/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as provider$0 from "../provider/models.js";
+
+export function ClearRecents(): $CancellablePromise<library$0.Snapshot> {
+    return $Call.ByID(917470592);
+}
 
 /**
  * Load returns the saved lists; a file that failed to load is named in Snapshot.Unreadable.
  */
 export function Load(): $CancellablePromise<library$0.Snapshot> {
     return $Call.ByID(833687807);
+}
+
+export function RemoveRecent(p: string, id: string): $CancellablePromise<library$0.Snapshot> {
+    return $Call.ByID(3735216472, p, id);
+}
+
+export function RemoveSearch(p: string, q: string): $CancellablePromise<library$0.Snapshot> {
+    return $Call.ByID(3689119347, p, q);
+}
+
+/**
+ * SaveSearch records a search that returned results; too short or long queries are ignored.
+ */
+export function SaveSearch(p: string, q: string): $CancellablePromise<void> {
+    return $Call.ByID(1205702394, p, q);
+}
+
+/**
+ * SetFavorite adds g to Favorites (on) or removes it (undoable).
+ */
+export function SetFavorite(g: provider$0.Gif, on: boolean): $CancellablePromise<library$0.Snapshot> {
+    return $Call.ByID(729267301, g, on);
+}
+
+/**
+ * Undo restores the latest removal (Remove from Favorites/Recents, Clear Recents).
+ */
+export function Undo(): $CancellablePromise<library$0.Snapshot> {
+    return $Call.ByID(2782943473);
 }

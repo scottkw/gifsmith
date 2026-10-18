@@ -9,10 +9,12 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"maps"
 	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -72,6 +74,8 @@ type Store struct {
 
 	mu       sync.Mutex
 	fav, rec list
+	srch     map[string][]string // nil until searches.json read cleanly
+	undo     *undo
 }
 
 func key(g provider.Gif) string { return string(g.Provider) + ":" + g.ID }
@@ -211,6 +215,12 @@ func (s *Store) Snapshot() Snapshot {
 	} else {
 		snap.Recents = append(snap.Recents, l.items...)
 	}
+	// Lists are replaced, never changed in place, so a shallow copy is safe to hand out.
+	if m, err := s.loadSearches(); err != nil {
+		snap.Unreadable = append(snap.Unreadable, "searches")
+	} else {
+		snap.Searches = maps.Clone(m)
+	}
 	return snap
 }
 
@@ -228,10 +238,221 @@ func (s *Store) Touch(g provider.Gif) error {
 	return s.write(l, append([]Entry{{Gif: g, At: s.now()}}, without(l.items, key(g))...))
 }
 
-// Skeletons (RED).
-func (s *Store) SetFavorite(g provider.Gif, on bool) error   { return nil }
-func (s *Store) RemoveRecent(p provider.ID, id string) error { return nil }
-func (s *Store) ClearRecents() error                         { return nil }
-func (s *Store) Undo() error                                 { return nil }
-func (s *Store) SaveSearch(p provider.ID, q string) error    { return nil }
-func (s *Store) RemoveSearch(p provider.ID, q string) error  { return nil }
+// SetFavorite adds g at the top of Favorites (a repeat is a no-op) or removes it (undoable).
+func (s *Store) SetFavorite(g provider.Gif, on bool) error {
+	if on {
+		if err := Validate(g, s.Allow); err != nil {
+			return err
+		}
+	} else if _, ok := provider.ParseID(string(g.Provider)); !ok {
+		return fmt.Errorf("%w: provider", ErrInvalid)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	l, err := s.favorites()
+	if err != nil {
+		return err
+	}
+	at := l.index(key(g))
+	if !on {
+		return s.remove(l, at)
+	}
+	if at != nil {
+		return nil
+	}
+	return s.write(l, append([]Entry{{Gif: g, At: s.now()}}, l.items...))
+}
+
+// RemoveRecent removes one Recents item (undoable); a missing item is a no-op.
+func (s *Store) RemoveRecent(p provider.ID, id string) error {
+	if _, ok := provider.ParseID(string(p)); !ok {
+		return fmt.Errorf("%w: provider", ErrInvalid)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	l, err := s.recents()
+	if err != nil {
+		return err
+	}
+	return s.remove(l, l.index(string(p)+":"+id))
+}
+
+// ClearRecents empties Recents; Undo restores the whole list.
+func (s *Store) ClearRecents() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	l, err := s.recents()
+	if err != nil {
+		return err
+	}
+	all := make([]int, len(l.items))
+	for i := range all {
+		all[i] = i
+	}
+	return s.remove(l, all)
+}
+
+// Undo restores the latest removal at its original positions, skipping items that are back in
+// the list meanwhile, then re-applies the cap. With nothing to undo it is a no-op.
+func (s *Store) Undo() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	u := s.undo
+	if u == nil {
+		return nil
+	}
+	items := slices.Clone(u.l.items)
+	for i, e := range u.entries {
+		if slices.ContainsFunc(items, func(x Entry) bool { return key(x.Gif) == key(e.Gif) }) {
+			continue
+		}
+		items = slices.Insert(items, min(u.indices[i], len(items)), e)
+	}
+	if err := s.write(u.l, items); err != nil {
+		return err
+	}
+	s.undo = nil
+	return nil
+}
+
+// undo is the one Undo slot: the latest removal from one list, entries with their indices (ascending).
+type undo struct {
+	l       *list
+	entries []Entry
+	indices []int
+}
+
+func (l *list) index(k string) []int {
+	if i := slices.IndexFunc(l.items, func(e Entry) bool { return key(e.Gif) == k }); i >= 0 {
+		return []int{i}
+	}
+	return nil
+}
+
+// remove deletes the entries at idx (ascending) from l and makes them the Undo slot, replacing
+// any earlier removal. The slot changes only after the write succeeded.
+func (s *Store) remove(l *list, idx []int) error {
+	if len(idx) == 0 {
+		return nil
+	}
+	items := slices.Clone(l.items)
+	gone := make([]Entry, len(idx))
+	for i := len(idx) - 1; i >= 0; i-- {
+		gone[i] = items[idx[i]]
+		items = slices.Delete(items, idx[i], idx[i]+1)
+	}
+	if err := s.write(l, items); err != nil {
+		return err
+	}
+	s.undo = &undo{l: l, entries: gone, indices: idx}
+	return nil
+}
+
+// searchFile is searches.json: per provider id, newest first.
+type searchFile struct {
+	Version  int                 `json:"version"`
+	Searches map[string][]string `json:"searches"`
+}
+
+// cleanQuery trims q; ok is false when it is shorter than 2 code points or longer than 100.
+func cleanQuery(q string) (string, bool) {
+	q = strings.TrimSpace(q)
+	n := utf8.RuneCountInString(q)
+	return q, n >= 2 && n <= 100
+}
+
+func checkSearches(f searchFile) error {
+	if f.Version != 1 {
+		return fmt.Errorf("version %d", f.Version)
+	}
+	for p, qs := range f.Searches {
+		if _, ok := provider.ParseID(p); !ok || len(qs) > SearchesMax {
+			return fmt.Errorf("provider %q", p)
+		}
+		for i, q := range qs {
+			if c, ok := cleanQuery(q); !ok || c != q || slices.ContainsFunc(qs[:i], func(x string) bool { return strings.EqualFold(x, q) }) {
+				return errors.New("bad query")
+			}
+		}
+	}
+	return nil
+}
+
+// loadSearches reads searches.json unless it already read cleanly (same rules as the lists).
+func (s *Store) loadSearches() (map[string][]string, error) {
+	if s.srch != nil {
+		return s.srch, nil
+	}
+	var f searchFile
+	found, err := s.read("searches", &f)
+	if err == nil && found {
+		if err = checkSearches(f); err != nil {
+			log.Printf("library: searches: %v", err)
+		}
+	}
+	if err != nil {
+		return nil, ErrUnreadable
+	}
+	if f.Searches == nil {
+		f.Searches = map[string][]string{}
+	}
+	s.srch = f.Searches
+	return s.srch, nil
+}
+
+// setSearches writes p's list (empty deletes it), then swaps the new map into memory.
+func (s *Store) setSearches(m map[string][]string, p provider.ID, qs []string) error {
+	next := maps.Clone(m)
+	if len(qs) == 0 {
+		delete(next, string(p))
+	} else {
+		next[string(p)] = qs
+	}
+	if err := settings.WriteJSONAtomic(s.Dir, "searches.json", searchFile{Version: 1, Searches: next}); err != nil {
+		return err
+	}
+	s.srch = next
+	return nil
+}
+
+func withoutQuery(qs []string, q string) []string {
+	return slices.DeleteFunc(slices.Clone(qs), func(x string) bool { return strings.EqualFold(x, q) })
+}
+
+// SaveSearch puts q at the front of p's recent searches (case-insensitive dedupe keeps the latest
+// casing, cap SearchesMax). Queries under 2 or over 100 code points are ignored.
+func (s *Store) SaveSearch(p provider.ID, q string) error {
+	if _, ok := provider.ParseID(string(p)); !ok {
+		return fmt.Errorf("%w: provider", ErrInvalid)
+	}
+	q, ok := cleanQuery(q)
+	if !ok {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	m, err := s.loadSearches()
+	if err != nil {
+		return err
+	}
+	qs := append([]string{q}, withoutQuery(m[string(p)], q)...)
+	return s.setSearches(m, p, qs[:min(len(qs), SearchesMax)])
+}
+
+// RemoveSearch drops q (case-insensitive) from p's recent searches; a missing query is a no-op.
+func (s *Store) RemoveSearch(p provider.ID, q string) error {
+	if _, ok := provider.ParseID(string(p)); !ok {
+		return fmt.Errorf("%w: provider", ErrInvalid)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	m, err := s.loadSearches()
+	if err != nil {
+		return err
+	}
+	qs := withoutQuery(m[string(p)], strings.TrimSpace(q))
+	if len(qs) == len(m[string(p)]) {
+		return nil
+	}
+	return s.setSearches(m, p, qs)
+}

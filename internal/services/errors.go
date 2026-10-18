@@ -25,6 +25,9 @@ var actionText = map[string]string{
 	"nothing_to_show":   "there is no download to show",
 	"crop_failed":       "could not crop this GIF",
 	"crop_too_large":    "the GIF is too large to crop",
+	"library_read":      "a saved list could not be read",
+	"library_write":     "a saved list could not be written",
+	"invalid_item":      "this item cannot be saved",
 }
 
 func (e *ActionError) Error() string {
