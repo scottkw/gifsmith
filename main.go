@@ -20,6 +20,7 @@ import (
 	"gifsmith/internal/staging"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
 //go:embed all:frontend/dist
@@ -119,6 +120,11 @@ func main() {
 	actions.Hide = sh.Hide
 	actions.Previous = sh.Previous
 	panel.HideFunc = sh.Hide
+	settingsSvc.ApplyTheme = sh.ApplyTheme
+	// The stored theme drives native appearance and window backgrounds before any window shows.
+	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
+		sh.ApplyTheme(store.Get().Theme)
+	})
 
 	// Staging holds only the clipboard's file; nothing from an earlier run is kept (D-17).
 	// ActionService.ServiceShutdown clears it again at quit.

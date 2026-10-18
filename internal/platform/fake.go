@@ -87,4 +87,7 @@ func (f *Fake) PasteShortcut() error {
 	return f.PasteErr
 }
 
-func (f *Fake) SetAppearance(mode string) error { return nil } // RED skeleton
+func (f *Fake) SetAppearance(mode string) error {
+	f.Note("SetAppearance:" + mode)
+	return nil
+}

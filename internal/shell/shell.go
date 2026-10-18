@@ -12,19 +12,24 @@ import (
 )
 
 const (
-	PanelWidth  = 720
-	PanelHeight = 480
-	Hotkey      = "Ctrl+Option+Cmd+G"
+	PanelWidth     = 720
+	PanelHeight    = 480
+	SettingsWidth  = 640
+	SettingsHeight = 520
+	Hotkey         = "Ctrl+Option+Cmd+G"
 )
 
 type Shell struct {
 	app   *application.App
 	plat  platform.Platform
 	panel *application.WebviewWindow
+	// settings is a normal titled window, created hidden once and never closed.
+	settings *application.WebviewWindow
 	// Hotkey, menu and bound calls each run on their own goroutine; mu serialises
-	// Toggle/Show/Hide and guards prev.
-	mu   sync.Mutex
-	prev platform.App // frontmost app when the panel was last shown
+	// Toggle/Show/Hide/OpenSettings and guards prev and settingsPlaced.
+	mu             sync.Mutex
+	prev           platform.App // frontmost app when the panel was last shown
+	settingsPlaced bool         // the first Settings show of a launch is centred; later ones keep the user's spot
 }
 
 // New creates the panel once (hidden; never closed) and registers the hotkey after start.
@@ -56,6 +61,23 @@ func New(app *application.App, plat platform.Platform, trayIcon []byte) *Shell {
 		s.panel.Hide()
 	})
 
+	s.settings = app.Window.NewWithOptions(application.WebviewWindowOptions{
+		Name:                "settings",
+		Title:               "Gifsmith Settings",
+		Width:               SettingsWidth,
+		Height:              SettingsHeight,
+		URL:                 "/settings.html",
+		Hidden:              true,
+		DisableResize:       true,
+		MinimiseButtonState: application.ButtonDisabled,
+		MaximiseButtonState: application.ButtonHidden,
+	})
+	// The red button hides Settings; it is never destroyed (window callback: no s.mu).
+	s.settings.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
+		e.Cancel()
+		s.settings.Hide()
+	})
+
 	// Replaces Wails' default menu: no File (⌘W), View (⌘R reload, zoom) or Window (⌘M).
 	// App keeps ⌘Q/⌘H; Edit keeps ⌘X/⌘C/⌘V/⌘A/⌘Z for text fields.
 	appMenu := app.NewMenu()
@@ -69,10 +91,7 @@ func New(app *application.App, plat platform.Platform, trayIcon []byte) *Shell {
 	tray.SetTemplateIcon(trayIcon)
 	menu := app.NewMenu()
 	menu.Add("Open Gifsmith").OnClick(func(*application.Context) { s.Show() })
-	menu.Add("Settings…").OnClick(func(*application.Context) {
-		s.Show()
-		app.Event.Emit("panel:status", "Settings window ships in Phase 4")
-	})
+	menu.Add("Settings…").OnClick(func(*application.Context) { s.OpenSettings() })
 	menu.AddSeparator()
 	menu.Add("Quit Gifsmith").OnClick(func(*application.Context) { app.Quit() })
 	tray.SetMenu(menu)
@@ -132,4 +151,34 @@ func (s *Shell) Previous() platform.App {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.prev
+}
+
+// OpenSettings hides the panel, then shows and focuses Settings: Focus activates the accessory
+// app so the window is key and takes typing. Re-opening brings it to front; the page keeps its pane.
+func (s *Shell) OpenSettings() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.panel.Hide()
+	if !s.settingsPlaced {
+		if wa := s.plat.CursorScreenWorkArea(); wa.Width > 0 && wa.Height > 0 {
+			s.settings.SetPosition(panelOrigin(wa, SettingsWidth, SettingsHeight))
+		}
+		s.settingsPlaced = true
+	}
+	s.settings.Show()
+	s.settings.Focus()
+	s.app.Event.Emit("settings:show")
+}
+
+// ApplyTheme sets the native appearance ("" follows macOS) and both windows' backgrounds to --bg.
+func (s *Shell) ApplyTheme(theme string) {
+	if err := s.plat.SetAppearance(theme); err != nil {
+		log.Printf("appearance: %v", err)
+	}
+	bg := application.NewRGB(0xFF, 0xFF, 0xFF)
+	if theme == "dark" || (theme == "" && s.app.Env.IsDarkMode()) {
+		bg = application.NewRGB(0x1E, 0x1E, 0x1E)
+	}
+	s.panel.SetBackgroundColour(bg)
+	s.settings.SetBackgroundColour(bg)
 }
