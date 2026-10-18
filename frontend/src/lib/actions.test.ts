@@ -1,0 +1,59 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { buildActions, filterActions, type ActionCtx } from './actions.ts';
+import type { Gif } from './api';
+
+const gif = (o: Partial<Gif> = {}): Gif =>
+  ({ id: '1', provider: 'giphy', title: 't', previewUrl: 'p', downloadUrl: 'd', isClip: false, ...o }) as Gif;
+const ctx = (g: Gif): ActionCtx => ({ gif: g, tab: 'provider', inDetails: false, favorited: false });
+const giphy = buildActions(ctx(gif({ pageUrl: 'https://giphy.com/gifs/x' })));
+
+test('GIPHY item lists every row in the locked order with hints and groups', () => {
+  assert.deepEqual(
+    giphy.map((r) => r.id),
+    ['copy', 'paste', 'copyLink', 'pasteLink', 'copyMarkdown', 'pasteMarkdown', 'copyPage', 'open'],
+  );
+  assert.deepEqual(
+    giphy.map((r) => r.label),
+    ['Copy GIF', 'Paste GIF', 'Copy Link', 'Paste Link', 'Copy Markdown', 'Paste Markdown', 'Copy Page Link', 'Open in Browser'],
+  );
+  assert.deepEqual(
+    giphy.map((r) => r.hint),
+    ['↵', '⌘↵', '⌘⇧C', '', '⌘⇧M', '', '', '⌘O'],
+  );
+  assert.deepEqual(
+    giphy.map((r) => r.group),
+    [1, 1, 2, 2, 2, 2, 2, 3],
+  );
+  assert.equal(giphy[2].keys, 'Meta+Shift+C');
+  assert.equal(giphy[3].keys, '');
+});
+
+test('item without a page URL omits Copy Page Link and Open in Browser', () => {
+  const ids = buildActions(ctx(gif({ provider: 'klipy' }))).map((r) => r.id);
+  assert.ok(!ids.includes('copyPage'));
+  assert.ok(!ids.includes('open'));
+  assert.equal(ids.length, 6);
+});
+
+test('Clips read MP4; a Clip without a GIF rendition has no link or Markdown rows', () => {
+  const withGif = buildActions(ctx(gif({ isClip: true, gifUrl: 'https://media.giphy.com/x.gif' })));
+  assert.deepEqual(withGif.slice(0, 2).map((r) => r.label), ['Copy MP4', 'Paste MP4']);
+  assert.ok(withGif.some((r) => r.id === 'copyLink'));
+  const bare = buildActions(ctx(gif({ isClip: true }))).map((r) => r.id);
+  for (const id of ['copyLink', 'pasteLink', 'copyMarkdown', 'pasteMarkdown'] as const) assert.ok(!bare.includes(id), id);
+  assert.deepEqual(bare, ['copy', 'paste']);
+});
+
+test('filterActions matches a trimmed, case-insensitive label substring', () => {
+  assert.deepEqual(filterActions(giphy, 'mark').map((r) => r.id), ['copyMarkdown', 'pasteMarkdown']);
+  assert.deepEqual(filterActions(giphy, '  LINK ').map((r) => r.id), ['copyLink', 'pasteLink', 'copyPage']);
+  assert.deepEqual(filterActions(giphy, 'zzz'), []);
+  assert.deepEqual(filterActions(giphy, '   '), giphy);
+});
+
+test('filterActions keeps order and buildActions never repeats an id', () => {
+  const ids = filterActions(giphy, 'paste').map((r) => r.id);
+  assert.deepEqual(ids, ['paste', 'pasteLink', 'pasteMarkdown']);
+  assert.equal(new Set(giphy.map((r) => r.id)).size, giphy.length);
+});
