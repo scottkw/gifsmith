@@ -97,7 +97,7 @@ export function revokedMessage(providerLabel: string): string {
   return `${providerLabel} rejected your saved key. It may have been revoked. Paste a new key to continue.`;
 }
 
-// Copy/paste/open/download failures (UI-SPEC F1–F4, F8), keyed by Go's ActionError kind; '' = no
+// Copy/paste/open/download/crop failures (UI-SPEC F1–F4, F6–F8), keyed by Go's ActionError kind; '' = no
 // typed cause. A Clip's file is its MP4, so F1–F3 name the MP4 for Clips. `folder` is the download
 // folder's display name, never a path.
 export function actionErrorText(kind: string, g: Gif, action: 'copy' | 'download' = 'copy', folder = 'Downloads'): string {
@@ -108,6 +108,8 @@ export function actionErrorText(kind: string, g: Gif, action: 'copy' | 'download
     return `Couldn't download this ${g.isClip ? 'MP4' : 'GIF'}. Check your connection, then try again.`;
   }
   if (kind === 'no_page' || kind === 'open_failed') return "Couldn't open the page in your browser.";
+  if (kind === 'crop_failed') return "Couldn't crop this GIF. Press ↵ to copy it as is, or pick another GIF.";
+  if (kind === 'crop_too_large') return 'This GIF is too large to crop (over 15 MB). Press ↵ to copy it as is.';
   if (g.isClip) return "Couldn't copy this MP4. The download failed. Try again or pick another clip.";
   return "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";
 }

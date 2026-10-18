@@ -68,6 +68,14 @@ export function Paste(g: provider$0.Gif): $CancellablePromise<$models.Result> {
 }
 
 /**
+ * PasteSquare copies the square GIF like CopySquare, then pastes it like Paste. A pasted Klipy
+ * square file gets the same grace delete as a pasted Klipy GIF (D-19).
+ */
+export function PasteSquare(g: provider$0.Gif): $CancellablePromise<$models.Result> {
+    return $Call.ByID(3482571520, g);
+}
+
+/**
  * PasteText copies text like CopyText, then pastes it like Paste. kind: link | markdown.
  */
 export function PasteText(g: provider$0.Gif, kind: string): $CancellablePromise<$models.Result> {

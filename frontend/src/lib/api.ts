@@ -81,6 +81,7 @@ export const openSource = (g: Gif) => ActionService.OpenSource(g);
 export const paste = (g: Gif) => ActionService.Paste(g);
 // Go downloads, crops and stages the square GIF; Clips are refused.
 export const copySquare = (g: Gif) => ActionService.CopySquare(g);
+export const pasteSquare = (g: Gif) => ActionService.PasteSquare(g);
 // Saves into the download folder Go chooses; the result is the file and folder names, never a path.
 export const download = (g: Gif) => ActionService.Download(g);
 // Reveals the file Go saved last; no path crosses from the webview.

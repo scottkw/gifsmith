@@ -15,6 +15,7 @@
     lastProvider,
     openExternal,
     paste,
+    pasteSquare,
     pasteText,
     providerError,
     providers,
@@ -46,6 +47,7 @@
   const HIDE_AFTER_COPY_MS = 400;
   const KEY_SAVED_MS = 2000;
   const DOWNLOAD_TOAST_MS = 5000;
+  const CROP_BUSY_MS = 300; // a square crop shows its busy state only if it is still running then (D-16)
   const AX_FAILED = "Couldn't ask macOS for Accessibility access. Try again.";
 
   type Status = 'idle' | 'loading' | 'refreshing' | 'ready' | 'empty' | 'error';
@@ -98,6 +100,7 @@
   let toastAction = $state<ToastAction | null>(null);
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
   let copying = $state(false); // one Copy/Paste in flight; a second Enter would paste twice
+  let overlay = $state(false); // the selected tile's busy overlay; for a crop it waits CROP_BUSY_MS
   let needsAccessibility = $state(false);
   let downloadFolder: string | undefined; // display name from the last download, for F4
   // Paste hides the panel before ⌘V; a copied-only fallback message must survive to the next show.
@@ -484,7 +487,10 @@
         downloadItem();
         return;
       case 'copySquare':
-        act(copySquare, false);
+        act(copySquare, false, true);
+        return;
+      case 'pasteSquare':
+        act(pasteSquare, true, true);
         return;
     }
   }
@@ -501,11 +507,17 @@
 
   // One copy or paste of the selected item at a time. A copy confirms in the footer and hides the
   // panel; a paste has hidden it already, unless it fell back to copying.
-  async function act(call: (g: Gif) => Promise<Result>, pasteIt: boolean) {
+  // A square crop shows the overlay and `Cropping…` only if it is still running after 300 ms.
+  async function act(call: (g: Gif) => Promise<Result>, pasteIt: boolean, crop = false) {
     const g = cur.items[selected];
     if (copying || !g) return;
     copying = true;
-    setStatus('Copying…');
+    const busy = () => {
+      overlay = true;
+      setStatus(crop ? 'Cropping…' : 'Copying…');
+    };
+    const busyTimer = crop ? setTimeout(busy, CROP_BUSY_MS) : undefined;
+    if (!crop) busy();
     try {
       const r = await call(g);
       if (!pasteIt) {
@@ -519,7 +531,8 @@
     } catch (err) {
       actionFailed(err, g);
     } finally {
-      copying = false;
+      clearTimeout(busyTimer);
+      copying = overlay = false;
     }
   }
 
@@ -541,7 +554,7 @@
   async function downloadItem() {
     const g = cur.items[selected];
     if (copying || !g) return;
-    copying = true;
+    copying = overlay = true;
     setStatus('Downloading…');
     try {
       const r = await download(g);
@@ -552,7 +565,7 @@
     } catch (err) {
       actionFailed(err, g, 'download');
     } finally {
-      copying = false;
+      copying = overlay = false;
     }
   }
 
@@ -671,7 +684,7 @@
         <ResultGrid
           items={cur.items}
           {selected}
-          {copying}
+          {overlay}
           paging={cur.paging}
           pagingNote={pageView?.note}
           pagingRetry={pageView?.state?.tryAgain ?? true}

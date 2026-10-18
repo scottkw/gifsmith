@@ -54,7 +54,7 @@ test('filterActions matches a trimmed, case-insensitive label substring', () => 
 
 test('filterActions keeps order and buildActions never repeats an id', () => {
   const ids = filterActions(giphy, 'paste').map((r) => r.id);
-  assert.deepEqual(ids, ['paste', 'pasteLink', 'pasteMarkdown']);
+  assert.deepEqual(ids, ['paste', 'pasteLink', 'pasteMarkdown', 'pasteSquare']);
   assert.equal(new Set(giphy.map((r) => r.id)).size, giphy.length);
 });
 

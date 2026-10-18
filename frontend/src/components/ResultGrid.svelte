@@ -8,7 +8,7 @@
   let {
     items,
     selected,
-    copying,
+    overlay,
     paging,
     pagingNote = "Couldn't load more.",
     pagingRetry = true,
@@ -19,7 +19,7 @@
   }: {
     items: Gif[];
     selected: number;
-    copying: boolean;
+    overlay: boolean; // busy overlay on the selected tile
     paging: Paging;
     pagingNote?: string; // E6, or E2 while a 429 window is open (S9a)
     pagingRetry?: boolean; // false while the provider is still blocked
@@ -74,7 +74,7 @@
           <div class="tiles">
             {#each items.slice(row.index * COLS, row.index * COLS + COLS) as g, c (c)}
               {@const i = row.index * COLS + c}
-              <Tile gif={g} index={i} selected={i === selected} {copying} {onselect} {oncopy} />
+              <Tile gif={g} index={i} selected={i === selected} {overlay} {onselect} {oncopy} />
             {/each}
           </div>
         {:else if extra === 'loading'}

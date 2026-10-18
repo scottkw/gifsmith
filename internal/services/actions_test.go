@@ -961,7 +961,7 @@ func TestCopySquare(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer fh.Close()
+	defer func() { _ = fh.Close() }()
 	out, err := gif.DecodeAll(fh)
 	if err != nil || out.Config.Width != 32 || out.Config.Height != 32 || len(out.Image) != 2 {
 		t.Fatalf("staged square: %v, want a 32x32 two-frame GIF (got %+v)", err, out)

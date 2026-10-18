@@ -6,7 +6,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"image/gif"
+	"io"
 	"log"
 	"net/url"
 	"os"
@@ -428,6 +430,9 @@ func (a *ActionService) stageSquare(ctx context.Context, g provider.Gif) (string
 	if g.IsClip { // a Clip is an MP4 (D-15)
 		return "", actionErr("not_allowed")
 	}
+	if g.Size > SquareMaxBytes { // refused before any request; FetchMax caps the real size anyway
+		return "", actionErr("crop_too_large")
+	}
 	orig, err := a.Staging.FetchMax(ctx, g, SquareMaxBytes)
 	if err != nil {
 		log.Printf("square %s: %v", g.Provider, err)
@@ -457,13 +462,24 @@ func (a *ActionService) stageSquare(ctx context.Context, g provider.Gif) (string
 	return path, nil
 }
 
-// cropSquare decodes the staged GIF at path and returns its square crop, encoded.
+// cropSquare decodes the staged GIF at path and returns its square crop, encoded. The canvas size
+// is checked before DecodeAll, which holds every frame in memory (Pitfall 2).
 func cropSquare(path string) ([]byte, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }() // read-only
+	cfg, err := gif.DecodeConfig(f)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Width > SquareMaxSide || cfg.Height > SquareMaxSide {
+		return nil, fmt.Errorf("canvas %dx%d over %d", cfg.Width, cfg.Height, SquareMaxSide)
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
 	g, err := gif.DecodeAll(f)
 	if err != nil {
 		return nil, err
@@ -475,7 +491,17 @@ func cropSquare(path string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// PasteSquare copies the square GIF like CopySquare, then pastes it like Paste.
+// PasteSquare copies the square GIF like CopySquare, then pastes it like Paste. A pasted Klipy
+// square file gets the same grace delete as a pasted Klipy GIF (D-19).
 func (a *ActionService) PasteSquare(ctx context.Context, g provider.Gif) (Result, error) {
-	return Result{}, actionErr("download_failed") // RED skeleton
+	if !a.busy.TryLock() {
+		return Result{}, ErrBusy
+	}
+	defer a.busy.Unlock()
+	var path string
+	r, err := a.paste(func() (err error) { path, err = a.stageSquare(ctx, g); return err }, "Pasted square GIF")
+	if r.Pasted && g.Provider == provider.Klipy {
+		a.expire(path)
+	}
+	return r, err
 }

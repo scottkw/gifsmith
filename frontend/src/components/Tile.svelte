@@ -5,14 +5,14 @@
     gif,
     index,
     selected,
-    copying,
+    overlay,
     onselect,
     oncopy,
   }: {
     gif: Gif;
     index: number;
     selected: boolean;
-    copying: boolean;
+    overlay: boolean; // busy overlay on the selected tile
     onselect: (i: number) => void;
     oncopy: (i: number) => void;
   } = $props();
@@ -51,7 +51,7 @@
   {#if gif.isClip}
     <span class="badge" aria-hidden="true">MP4</span>
   {/if}
-  {#if copying && selected}
+  {#if overlay && selected}
     <div class="overlay"><span class="spinner" role="status" aria-label="Loading"></span></div>
   {/if}
 </div>
