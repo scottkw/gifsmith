@@ -274,3 +274,7 @@ Plans 04-02..04-06 can build on settings.Store, `SetPref` + `settings:changed`, 
 ---
 *Phase: 04-settings-shell-polish-release*
 *Completed: 2026-10-18*
+
+## Self-Check: PASSED
+
+All created files exist; all 13 task commits are ancestors of HEAD; evaluation-scope resolves the plan commits; plan-level verification re-run green (see Verification).

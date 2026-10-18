@@ -148,11 +148,11 @@ Plans:
   4. A Developer ID–signed, notarized DMG installs and runs on a clean user account (Gatekeeper accepts it, permissions start fresh) on macOS 13+ Apple Silicon. (manual, user-verified)
   5. The About screen credits the original MIT-licensed Raycast extension and its authors, and Klipy file actions stay disabled (link and Markdown only) unless written clearance from Klipy is recorded.
 
-**Plans:** 6 plans
+**Plans:** 1/6 plans executed
 
 Plans:
 **Wave 1**
-- [ ] 04-01-PLAN.md — Tracer: Theme from a real Settings window through one prefs Store to both webviews and NSApp appearance; window behaviour, ⌘,, Open at login, Automatic paste status, Klipy email + Apple agreement steps
+- [x] 04-01-PLAN.md — Tracer: Theme from a real Settings window through one prefs Store to both webviews and NSApp appearance; window behaviour, ⌘,, Open at login, Automatic paste status, Klipy email + Apple agreement steps
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 04-02-PLAN.md — Content rating, page size, GIPHY language and Klipy country as per-request Params (Flush keeps 429 blocks); Keys pane add/test/change/remove with last-4 status
@@ -185,4 +185,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Native Spike & Signed Dev Loop | 4/4 | Complete    | 2026-10-17 |
 | 2. Providers, Search UI & First Run | 6/6 | Complete    | 2026-10-17 |
 | 3. Action Pipeline & Library | 8/8 | Complete    | 2026-10-18 |
-| 4. Settings, Shell Polish & Release | 0/6 | Planned | - |
+| 4. Settings, Shell Polish & Release | 1/6 | In Progress | - |

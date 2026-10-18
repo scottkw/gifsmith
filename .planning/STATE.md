@@ -5,16 +5,16 @@ milestone_name: Gifsmith MVP
 current_phase: 4
 current_phase_name: Settings, Shell Polish & Release
 status: executing
-stopped_at: Phase 4 UI-SPEC approved
-last_updated: "2026-10-18T20:46:03.040Z"
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-10-18T21:12:49.819Z"
 last_activity: 2026-10-18
-last_activity_desc: Phase 3 complete, transitioned to Phase 4
-state_head: 840e55c1a20d3075015a7100ea43f3f54b513cb4
+last_activity_desc: Phase 4 execution started
+state_head: 76fd466f206f48c500d25eaccdf7146bc612d98c
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 24
-  completed_plans: 18
+  completed_plans: 19
 ---
 
 # Project State
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-10-18)
 
 ## Current Position
 
-Phase: 4 (Settings, Shell Polish & Release) — READY TO EXECUTE
-Plan: Not started
+Phase: 4 (Settings, Shell Polish & Release) — EXECUTING
+Plan: 2 of 6
 Status: Ready to execute
-Last activity: 2026-10-18 — Phase 3 complete, transitioned to Phase 4
+Last activity: 2026-10-18 — Phase 4 execution started
 
 Progress: [████████░░] 75% (3/4 phases; 18/18 planned plans complete)
 
@@ -77,6 +77,7 @@ Progress: [████████░░] 75% (3/4 phases; 18/18 planned plans 
 | Phase 03 P06 | 20 min | 3 tasks | 35 files |
 | Phase 03 P07 | 33min | 3 tasks | 25 files |
 | Phase 03 P08 | 10min | 2 tasks | 1 files |
+| Phase 04 P01 | 22 min | 7 tasks | 42 files |
 
 ## Accumulated Context
 
@@ -149,6 +150,9 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-08: Clips MP4 paste skipped natively (GIPHY key not Clips-approved); fixture-proven only
 - [Phase 3 close]: Native UAT passed on a fresh signed install (favorites/recents/searches persisted mode 600; staging empty after quit); CR-01 square-crop budget fixed; 7 Info items (IN-01..IN-07) left open in 03-REVIEW-DISPOSITION.md
 - [Phase 3 close]: Clips link/Markdown use the GIF rendition (D-18), copy/paste as 720p MP4; Klipy staged files deleted 30 s after paste/next copy/quit; single-instance added
+- [Phase 04]: settings.Store is the single owner of settings.json; SetPref validates via Prefs.Normalize inside Update and emits settings:changed with the full Snapshot
+- [Phase 04]: Snapshot.launchAtLogin reports the OS state (Autostart.IsEnabled), not the pref
+- [Phase 04]: Vite 8 build.rolldownOptions.input serves the second settings.html entry
 
 ### Pending Todos
 
@@ -182,6 +186,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-18T19:34:34.389Z
-Stopped at: Phase 4 UI-SPEC approved
-Resume file: .planning/phases/04-settings-shell-polish-release/04-UI-SPEC.md
+Last session: 2026-10-18T21:12:49.623Z
+Stopped at: Completed 04-01-PLAN.md
+Resume file: None
