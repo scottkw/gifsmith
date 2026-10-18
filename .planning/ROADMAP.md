@@ -138,20 +138,20 @@ Plans:
 
 ### Phase 4: Settings, Shell Polish & Release
 
-**Goal**: Everything is configurable from a proper Settings window with hotkeys that can be rebound and launch at login, and a stranger can install a signed, notarized build on a clean Mac and use it within vendor and license obligations.
+**Goal**: Everything is configurable from a proper Settings window with hotkeys that can be rebound and launch at login, and a stranger can install a signed, notarized build on a clean Mac and use it within vendor and license obligations, and it tells the user when a newer release is available on GitHub, offering a verified download of the new DMG.
 **Depends on**: Phase 3
-**Requirements**: SETT-01, SETT-02, SETT-03, SETT-04, SETT-05, SETT-06, SRCH-09, ACTN-08, SHEL-05, SHEL-06, RELS-01, RELS-02, RELS-03, RELS-04
+**Requirements**: SETT-01, SETT-02, SETT-03, SETT-04, SETT-05, SETT-06, SRCH-09, ACTN-08, SHEL-05, SHEL-06, RELS-01, RELS-02, RELS-03, RELS-04, RELS-05, RELS-06
 **Success Criteria** (what must be TRUE):
   1. Choosing Settings from the menu bar menu opens a separate Settings window where pasting into fields works. There the user can add, test, change, and remove GIPHY and Klipy keys (each with a link to that provider's key sign-up page), and see Accessibility permission status with a button to grant it.
   2. The user can rebind the global hotkeys; a conflict is reported and the old binding stays until the new one registers. Favorites and Recents each open directly with their own hotkeys, and the user can turn launch at login on or off. (manual, user-verified)
   3. The user can set grid item size (search and trending), max results, download folder, hide filename, GIPHY and Klipy locales, GIPHY content rating (default PG-13), the default Enter and ⌘Enter actions, and the window theme (Light, Dark, or System), and changes take effect on next use.
   4. A Developer ID–signed, notarized DMG installs and runs on a clean user account (Gatekeeper accepts it, permissions start fresh) on macOS 13+ Apple Silicon. (manual, user-verified)
   5. The About screen credits the original MIT-licensed Raycast extension and its authors, and Klipy file actions stay disabled (link and Markdown only) unless written clearance from Klipy is recorded.
+  6. The app checks GitHub Releases for a newer version, alerts the user, and Settings has a "Check for Updates…" button; if the user accepts, it downloads the new DMG, verifies its checksum, Developer ID signature and notarization, and opens it (no self-replacement). (added 2026-10-18)
 
 **Plans:** 2/7 plans executed
 
 Plans:
-- [ ] 04-07-PLAN.md
 
 **Wave 1**
 - [x] 04-01-PLAN.md — Tracer: Theme from a real Settings window through one prefs Store to both webviews and NSApp appearance; window behaviour, ⌘,, Open at login, Automatic paste status, Klipy email + Apple agreement steps
@@ -166,9 +166,12 @@ Plans:
 - [ ] 04-04-PLAN.md — Validated download folder + hide filenames, configurable ↵/⌘↵ with the Klipy file-action gate (Go const), grid sizes and menu placement, Phase 4 UI backstops
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 04-05-PLAN.md — Signed arm64 DMG pipeline (release:build, notarized release, verify script, new background), About credits, README, release notes; blocking notary-profile checkpoint
+- [ ] 04-07-PLAN.md — GitHub update check (launch + 24 h, Settings "Check for Updates…", tray alert); download → SHA-256 digest → codesign + Team ID + spctl → open DMG; no self-replacement
 
 **Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 04-05-PLAN.md — Signed arm64 DMG pipeline (release:build, notarized release, verify script, new background), About credits, README, release notes; blocking notary-profile checkpoint
+
+**Wave 7** *(blocked on Wave 6 completion)*
 - [ ] 04-06-PLAN.md — Full regression, notarized release run and verification, dev install for native UAT, clean-account install, draft GitHub Release
 
 **UI hint**: yes

@@ -18,6 +18,7 @@ Surfaces this phase:
 1. **A new Settings window** (second Wails window, normal titled window, not the NSPanel). Six panes: General · Keys · Hotkeys · Search · Downloads · About.
 2. **Panel changes**: grid size (3/4/5 columns), configurable Enter / ⌘Enter actions, the Klipy file-action gate (RELS-04), Reduce Motion stills, theme override, ⌘, to open Settings, and the Phase 3 UI-review polish.
 3. **Release surfaces**: tray menu, DMG window, About credits.
+4. **Update check (RELS-05, RELS-06; Amended in 04-07 per D-29, D-30)**: an `Updates` section at the end of General, a tray menu item and a one-time panel toast when a newer GitHub release exists. See "Updates" under General.
 
 Sources: 04-CONTEXT.md (locked decisions), 03-UI-SPEC.md and 02-UI-SPEC.md (baseline), 03-UI-REVIEW.md and `.planning/todos/pending/phase-3-ui-review-polish.md` (polish folded in), 03-REVIEW-DISPOSITION.md (IN items), REQUIREMENTS.md (SETT-01..06, SRCH-09, ACTN-08, SHEL-05, SHEL-06, RELS-01..04), the code as built (`frontend/src/app.css`, `components/*.svelte`, `lib/actions.ts`, `lib/popover.ts`, `lib/grid.ts`, `lib/errors.ts`, `internal/shell/shell.go`, `internal/provider/provider.go`, `build/darwin/Taskfile.yml`), and `LICENSE` (credit names). Items marked **[default]** are researcher choices the upstream artifacts do not cover. "Open Questions" lists the ones the user may want to revisit; none block planning.
 
@@ -59,7 +60,7 @@ The Settings entry must also load in the `-tags server` browser build (same Vite
 |----------|-------|
 | Kind | Normal titled Wails window (standard title bar and traffic lights), not a panel. Not resizable. Content size **640×520** |
 | Title | `Gifsmith Settings` **[default]** |
-| Opened by | Tray menu `Settings…`; ⌘, in the panel (panel hides first); `Test` never opens it |
+| Opened by | Tray menu `Settings…`; ⌘, in the panel (panel hides first); `Test` never opens it. The update alerts (tray `Update to Gifsmith {latest}…`, toast action `View`) open it at General with the Updates section scrolled into view (Amended in 04-07) |
 | Activation | Showing Settings activates the app (accessory policy, still no Dock icon) so the window is key, typing works, and ⌘V pastes into the key field via the Edit menu role |
 | Position | First show of a launch: centered on the display with the mouse cursor. Later shows: where the user left it |
 | Re-open | If already open, bring to front and focus. The active pane is kept |
@@ -139,8 +140,9 @@ The Settings entry must also load in the `-tags server` browser build (same Vite
 | Automatic paste | Status line + button (below) | — | SETT-05 |
 | Enter action (`Primary action (↵)`) | Select | `Copy GIF` | ACTN-08 |
 | ⌘Enter action (`Secondary action (⌘↵)`) | Select | `Paste GIF` | ACTN-08 |
+| Updates (Amended in 04-07) | Status line + `Check for Updates…` (and `Download and Open…` when available); checkbox `Check for updates automatically` | Automatic on | RELS-05, RELS-06. See Updates below |
 
-Sections: [Theme] · [Startup] · [Automatic paste] · [Primary action, Secondary action].
+Sections: [Theme] · [Startup] · [Automatic paste] · [Primary action, Secondary action] · [Updates].
 
 **Automatic paste status (SETT-05):**
 
@@ -159,6 +161,30 @@ Sections: [Theme] · [Startup] · [Automatic paste] · [Primary action, Secondar
 - Choosing for one key the action the other key already has swaps the two, so ↵ and ⌘↵ always differ **[default]**.
 - Mapping at run time: for Clips, GIF actions run their MP4 form (`Copy MP4`, `Paste MP4`, `Download MP4`). For Klipy items while file actions are gated (RELS-04), any file action (`Copy GIF`, `Paste GIF`, `Download GIF`) runs as `Copy Link` for ↵ and `Paste Link` for ⌘↵; text actions run as chosen.
 - Helper under the pair: copy G6 (shown while the Klipy gate is closed), else none.
+
+**Updates (RELS-05, RELS-06) — Amended in 04-07 per D-29, D-30:**
+
+Last section of General, `id="updates"`. Two rows in the usual 144 / 272 grid:
+
+| Row | Control column |
+|-----|----------------|
+| `Updates` | Status line (14px Body; hidden while idle), then 8px, then the button group: `.btn-secondary` `Check for Updates…`; when an update is available `.btn-primary` `Download and Open…` comes first. Inline error (U-E1..U-E4) renders 4px below the buttons |
+| (no label) | Native checkbox `Check for updates automatically` (default on). Helper U-H |
+
+| State | Status line | Buttons |
+|-------|-------------|---------|
+| Idle (not checked this launch) | none | `Check for Updates…` |
+| Checking | 12px spinner + 4px + U2, `--text-secondary` | `Check for Updates…` disabled |
+| Up to date | `check` icon 12×12 + 4px + U3, `--success` | `Check for Updates…` |
+| Available | U4, `--text` | `Download and Open…` (primary) · `Check for Updates…` |
+| Downloading | U5 with the percent, `--text-secondary`; 4px below, a native `<progress>` 272px wide | both disabled |
+| Verifying | U6, `--text-secondary` | both disabled |
+| Opened | U7, `--text` (wraps) | `Check for Updates…` |
+| Failed | previous state's line and buttons come back; inline error U-E1 (check), U-E2 (download), U-E3 (verification; the file is deleted and nothing opened), U-E4 (open) | as the previous state |
+
+- The check is one GET to GitHub Releases for scottkw/gifsmith with no identifiers; U-H says so. Automatic checks run about 10 s after launch and every 24 h while the box is on; their failures are silent (log only).
+- When an update is found (automatically or by the button), the tray menu shows U-M between `Settings…` and the separator, and the panel footer shows toast T12 once per version per launch. Both open Settings at General → Updates.
+- Never describe dragging steps beyond U7; Gifsmith does not install, quit or relaunch itself.
 
 ### Keys (SETT-02)
 
@@ -342,7 +368,7 @@ While Klipy written clearance is not recorded (the shipped default):
 | Item | Contract |
 |------|----------|
 | ⌘, in the panel | Hides the panel, opens Settings (captured with `preventDefault` in every panel context, including the key field) |
-| Tray menu | `Open Gifsmith` (shows the Open hotkey) · `Settings…` (`⌘,` shown) · separator · `Quit Gifsmith` (`⌘Q`). The Phase 1 placeholder toast `Settings window ships in Phase 4` is removed |
+| Tray menu | `Open Gifsmith` (shows the Open hotkey) · `Settings…` (`⌘,` shown) · [`Update to Gifsmith {latest}…` (U-M), only while a newer release is known; Amended in 04-07] · separator · `Quit Gifsmith` (`⌘Q`). The Phase 1 placeholder toast `Settings window ships in Phase 4` is removed |
 
 ### Phase 3 polish (folded in from 03-UI-REVIEW.md and the polish todo)
 
@@ -380,7 +406,7 @@ Declared values (unchanged, all multiples of 4):
 
 Exceptions (not spacing, listed so the checker does not flag them):
 - Component heights: buttons, key field, hotkey recorder, sidebar items and setting-row min-height are 32px; the key-card message line is 16px.
-- Window and layout sizes: Settings window 640×520, sidebar 160px, pane 480px (432px inner), label column 144px, control column 272px, recorder 160×32, select `min-width` 160px, About icon 64×64.
+- Window and layout sizes: Settings window 640×520, sidebar 160px, pane 480px (432px inner), label column 144px, control column 272px, recorder 160×32, select `min-width` 160px, About icon 64×64, update progress bar 272px wide (native height).
 - Grid tile heights 112 / 144 / 192 and row strides 120 / 152 / 200 (Small / Medium / Large).
 - Radii: card 8px, buttons/fields/recorder/sidebar items 6px (Phase 2/3 values).
 - 1px hairlines and control borders; 2px focus rings with 2px offset.
@@ -423,7 +449,7 @@ Phase 2/3 tokens hold, with one amended and two added:
 
 **Accent reserved for (exhaustive, Amends 03):**
 1. Selection ring: selected tile, keyboard-selected chip, and a recording hotkey recorder (2px outline, 2px offset)
-2. Primary button fill (`--accent-fill`): `Save Key` (setup card and Keys pane), `Add Key…`, `Grant Access…`, `Add GIPHY Key` (C1), `Go to GIPHY`, `Email clips@giphy.com ↗` (C2)
+2. Primary button fill (`--accent-fill`): `Save Key` (setup card and Keys pane), `Add Key…`, `Grant Access…`, `Download and Open…` (Amended in 04-07), `Add GIPHY Key` (C1), `Go to GIPHY`, `Email clips@giphy.com ↗` (C2)
 3. Text links: `Get a free key ↗` (setup card and Keys pane), paging `Try Again`, Details `Page` / `Source`, toast actions `Undo` / `Show in Finder`, About links (`Website ↗`, `Report an Issue ↗`, `View License ↗`, `GIF Search extension ↗`)
 4. `:focus-visible` ring on every focusable button, link, input, select, radio and checkbox
 5. Caret in the search input, key fields and the action-menu filter
@@ -526,6 +552,24 @@ Contrast notes (measured): `--text-secondary` on `--surface` 4.54 / 5.42; `--suc
 | A4 | `© 2026 Ken Scott. MIT License.` |
 | — | Section titles `Credits`, `GIF providers`; links `Website ↗`, `Report an Issue ↗`, `View License ↗`, `GIF Search extension ↗` |
 
+**Updates** (Amended in 04-07 per D-29, D-30)
+
+| ID | Where | Copy |
+|----|-------|------|
+| — | Row label / controls | `Updates`, `Check for Updates…`, `Download and Open…`, `Check for updates automatically` |
+| U2 | Checking | `Checking for updates…` |
+| U3 | Up to date | `Gifsmith {current} is up to date.` |
+| U4 | Available | `Gifsmith {latest} is available. You have {current}.` |
+| U5 | Downloading | `Downloading Gifsmith {latest}… {n}%` (without ` {n}%` while the size is unknown) |
+| U6 | Verifying | `Checking the download's signature…` |
+| U7 | Opened | `The Gifsmith {latest} disk image is open. Quit Gifsmith, then drag the new Gifsmith to Applications and choose Replace.` |
+| U-E1 | Check failed (offline, GitHub error or limit) | `Couldn't check for updates. Check your connection, then try again.` |
+| U-E2 | Download failed | `Couldn't download Gifsmith {latest}. Check your connection, then try again.` |
+| U-E3 | Verification failed | `The download didn't pass the signature check, so Gifsmith deleted it. Nothing was opened.` |
+| U-E4 | Open failed | `Gifsmith couldn't open the downloaded disk image. Try again.` |
+| U-H | Auto-check helper | `Gifsmith asks GitHub for the latest release at launch and once a day. Nothing about you or your Mac is sent.` |
+| U-M | Tray menu item | `Update to Gifsmith {latest}…` |
+
 **Panel toasts and errors (new or amended)**
 
 | ID | Trigger | Copy | Tone |
@@ -538,6 +582,7 @@ Contrast notes (measured): `--text-secondary` on `--surface` 4.54 / 5.42; `--suc
 | F4 (amended) | Folder unwritable/missing | `Couldn't save to {folder name}. Check that the folder exists and that Gifsmith can write to it.` | error |
 | F11 (new, if touched) | Text copy/paste failed | `Couldn't copy to the clipboard. Try again.` | error |
 | F12 (new, if touched) | `invalid_item` | `This GIF's details are incomplete. Pick another GIF.` | error |
+| T12 (new, 04-07) | Newer release found | `Gifsmith {latest} is available.` · action `View` (opens Settings → General → Updates). Once per version per launch; stays until the next keystroke or status | — |
 
 **Accessible names (not visible copy).** Sidebar tablist `Settings`. Recorder `{Row label} shortcut`. Key field `{Provider} API key`. Folder display `Download folder: {name}`. About icon `alt=""` (decorative). Footer Details button `Close Details (Esc)`.
 
@@ -558,7 +603,7 @@ Contrast notes (measured): `--text-secondary` on `--surface` 4.54 / 5.42; `--suc
 
 ## UI Considerations
 
-Applicable state considerations resolved: 30 covered, 6 backstop, 1 unresolved.
+Applicable state considerations resolved: 33 covered, 7 backstop, 1 unresolved (04-07 added 3 covered and 1 backstop for the update check).
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
@@ -569,15 +614,18 @@ Applicable state considerations resolved: 30 covered, 6 backstop, 1 unresolved.
 | loading | Key test | ✅ covered | Status shows a spinner and `Testing…`; `Test` is disabled until the call returns |
 | loading | Hotkey test | ✅ covered | The row shows `Press {combo} now…` for up to 5 s, then `It works.` or the H7 error |
 | loading | Accessibility status | ✅ covered | Status re-reads on window focus and every 2 s while `Off` and General is visible; no spinner (the read is instant) |
+| loading | Update check and download | ✅ covered | U2 with a spinner, then U5 with a native progress bar and U6; both buttons disabled while busy (04-07) |
 | loading | Settings window first paint | ✅ covered | `data-theme` is set before mount and the native background matches `--bg`, so no white flash in dark mode |
 | error | Key save / test / remove | ✅ covered | Errors render in the card's message line using K2–K4, F9, K-T2–K-T4 and K-F; the previous stored key stays in place |
 | error | Hotkey recording and registration | ✅ covered | H1–H4b and H7 render under the row; the old binding stays registered on every failure path |
 | error | Download folder choice | ✅ covered | D5–D8 render under `Save to`; the old folder stays saved |
 | error | Launch at login | ✅ covered | On failure the checkbox reverts and G2 or G3 renders under it |
 | error | Accessibility request | ✅ covered | F10 renders under the Automatic paste row |
+| error | Update check, download, verification | ✅ covered | U-E1..U-E4 render as the Updates row's inline error; the previous state comes back; a failed verification deletes the file and opens nothing (04-07) |
 | error | Klipy gated actions | ✅ covered | ⌘S on a Klipy item shows T11; file rows are omitted from the menu |
 | populated | Settings panes | ✅ covered | Each pane renders the rows, defaults and helpers listed in its table at 640×520 |
 | populated | Key card, saved | ✅ covered | `Saved · ends in {last4}`, `Change Key…`, `Test`, `Remove` and `Get a free key ↗` |
+| populated | Update available | ✅ covered | U4 + `Download and Open…`, tray item U-M and the one-time toast T12 (04-07) |
 | populated | Grid sizes | ✅ covered | Small 5 × 112px, Medium 4 × 144px, Large 3 × 192px columns in the panel for trending, search and library |
 | partial | Default actions on Clips and gated Klipy items | ✅ covered | GIF actions run as MP4 for Clips; file actions run as Copy Link / Paste Link for Klipy while gated; footer and menu hints follow the selected item |
 | partial | Still renditions | ✅ covered | Under Reduce Motion tiles use the provider still when present, otherwise a one-time canvas first frame; only the selected tile animates |
@@ -598,6 +646,7 @@ Applicable state considerations resolved: 30 covered, 6 backstop, 1 unresolved.
 | a11y-screen-reader | Footer toasts | 🧪 backstop | Footer center is a polite live region; an Undo toast and an error are announced. Verify the `role="status"` / `aria-live` attributes in UAT |
 | reduced-motion | Grid tiles | 🧪 backstop | With `prefers-reduced-motion: reduce` emulated, only the selected tile has an animated `<img>`; others are stills or canvases. Verify in headless UAT with media emulation; native Reduce Motion is user-verified |
 | native | Theme override, Settings activation, ⌘V in key field, launch at login, hotkey Test clash, folder picker | 🧪 backstop | Cannot be exercised headlessly: user-verified at the phase's native checkpoint on a signed install (and the clean-account install test, RELS-02) |
+| native | Real GitHub check, verified DMG opening, tray update item | 🧪 backstop | The signed install's launch check and Check for Updates… reach GitHub; the notarized DMG passes the verifier and opens in Finder (env-gated test the user runs); the tray item renders once a newer release exists (04-07 human-checks) |
 | native | DMG window layout | ⚠ unresolved | Whether `wails3 tool package --format dmg` can position icons is not yet known; the planner researches the tool and treats the icon coordinates as the target |
 
 ---
