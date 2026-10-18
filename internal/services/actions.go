@@ -3,8 +3,10 @@
 package services
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"image/gif"
@@ -431,10 +433,13 @@ func (a *ActionService) ShowDownload(ctx context.Context) error {
 	return nil
 }
 
-// Square crop limits (D-16, T-03-18): DecodeAll holds every frame in memory.
+// Square crop limits (D-16, T-03-18): DecodeAll holds every frame in memory. The byte and side
+// limits bound the input; SquareMaxPixels bounds the decoded frames (CR-01: a 15 MB file can
+// declare a thousand 4096x4096 frames).
 const (
-	SquareMaxBytes = 15 << 20
-	SquareMaxSide  = 4096
+	SquareMaxBytes  = 15 << 20
+	SquareMaxSide   = 4096
+	SquareMaxPixels = 256 << 20 // summed w*h over all frames, about 256 MB of *image.Paletted
 )
 
 // CopySquare puts a center-cropped square copy of the GIF on the clipboard as a file (D-16).
@@ -508,6 +513,16 @@ func cropSquare(path string) ([]byte, error) {
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
+	px, err := framePixels(f)
+	if err != nil {
+		return nil, err
+	}
+	if px > SquareMaxPixels {
+		return nil, fmt.Errorf("frames total %d pixels, over %d", px, SquareMaxPixels)
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
 	g, err := gif.DecodeAll(f)
 	if err != nil {
 		return nil, err
@@ -517,6 +532,63 @@ func cropSquare(path string) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// framePixels sums the declared w*h of every frame by walking the GIF block structure, skipping
+// color tables and data sub-blocks without decoding any LZW data (CR-01).
+func framePixels(r io.Reader) (int64, error) {
+	br := bufio.NewReader(r)
+	var hdr [13]byte // signature, logical screen descriptor
+	if _, err := io.ReadFull(br, hdr[:]); err != nil {
+		return 0, err
+	}
+	if hdr[10]&0x80 != 0 { // global color table
+		if _, err := br.Discard(3 << ((hdr[10] & 7) + 1)); err != nil {
+			return 0, err
+		}
+	}
+	var px int64
+	for {
+		b, err := br.ReadByte()
+		if err != nil {
+			return 0, err
+		}
+		switch b {
+		case 0x21: // extension: a label byte, then data sub-blocks
+			if _, err := br.ReadByte(); err != nil {
+				return 0, err
+			}
+		case 0x2C: // image descriptor: x, y, w, h (uint16 LE), flags; then a local table, LZW code size, sub-blocks
+			var d [9]byte
+			if _, err := io.ReadFull(br, d[:]); err != nil {
+				return 0, err
+			}
+			px += int64(binary.LittleEndian.Uint16(d[4:])) * int64(binary.LittleEndian.Uint16(d[6:]))
+			skip := 1
+			if d[8]&0x80 != 0 {
+				skip += 3 << ((d[8] & 7) + 1)
+			}
+			if _, err := br.Discard(skip); err != nil {
+				return 0, err
+			}
+		case 0x3B: // trailer
+			return px, nil
+		default:
+			return 0, fmt.Errorf("gif: unknown block type 0x%02x", b)
+		}
+		for { // data sub-blocks, ended by a zero length
+			n, err := br.ReadByte()
+			if err != nil {
+				return 0, err
+			}
+			if n == 0 {
+				break
+			}
+			if _, err := br.Discard(int(n)); err != nil {
+				return 0, err
+			}
+		}
+	}
 }
 
 // PasteSquare copies the square GIF like CopySquare, then pastes it like Paste. A pasted Klipy

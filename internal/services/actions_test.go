@@ -1064,6 +1064,50 @@ func TestCopySquareCropFailures(t *testing.T) {
 	}
 }
 
+// bombGIF is a 4096x4096 canvas holding n copies of one uniform full-canvas frame: a few hundred
+// KB on the wire that would decode to n x 16 MB of frames.
+func bombGIF(t *testing.T, n int) []byte {
+	t.Helper()
+	fr := image.NewPaletted(image.Rect(0, 0, SquareMaxSide, SquareMaxSide), color.Palette{color.Black, color.White})
+	var buf bytes.Buffer
+	if err := gif.EncodeAll(&buf, &gif.GIF{Image: []*image.Paletted{fr}, Delay: []int{0}}); err != nil {
+		t.Fatal(err)
+	}
+	b := buf.Bytes()
+	head := 13 // header and screen descriptor; Go writes a local color table, not a global one
+	if b[10]&0x80 != 0 {
+		t.Fatal("encoder wrote a global color table")
+	}
+	frame := b[head : len(b)-1] // everything up to the trailer
+	out := append([]byte{}, b[:head]...)
+	for range n {
+		out = append(out, frame...)
+	}
+	return append(out, 0x3B)
+}
+
+// CR-01: the size and canvas checks bound the input, not the decoded frames; the frame budget
+// refuses a small file whose frames would decode to gigabytes, before DecodeAll runs.
+func TestCopySquareDecodeBudget(t *testing.T) {
+	n := SquareMaxPixels/(SquareMaxSide*SquareMaxSide) + 4
+	body := bombGIF(t, n)
+	if len(body) > SquareMaxBytes {
+		t.Fatalf("bomb is %d bytes, want under the %d byte cap", len(body), SquareMaxBytes)
+	}
+	if px, err := framePixels(bytes.NewReader(body)); err != nil || px != int64(n)*SquareMaxSide*SquareMaxSide {
+		t.Fatalf("framePixels = %d, %v; want %d frames of 4096x4096", px, err, n)
+	}
+	f := &platform.Fake{}
+	s, g := rawService(t, f, bytes.NewReader(body))
+	_, err := s.CopySquare(context.Background(), g)
+	if actionKind(err) != "crop_failed" {
+		t.Errorf("err = %v, want kind crop_failed", err)
+	}
+	if len(f.Calls) != 0 {
+		t.Errorf("calls = %q, want none", f.Calls)
+	}
+}
+
 func TestPasteSquareTrusted(t *testing.T) {
 	f := &platform.Fake{Trusted: true, Frontmost: prevApp}
 	s, fx := newPasteService(t, f)
