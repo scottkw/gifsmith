@@ -26,6 +26,10 @@ export const setLastProvider = (p: string) => SettingsService.SetLastProvider(p)
 // Settings: every change applies at once; Go validates and answers with the full snapshot.
 export const snapshot = () => SettingsService.Snapshot();
 export const setPref = (name: string, value: string) => SettingsService.SetPref(name, value);
+// Registers or removes the login item now; rejects with cause.kind autostart_failed | not_in_applications.
+export const setLaunchAtLogin = (on: boolean) => SettingsService.SetLaunchAtLogin(on);
+// The Automatic paste grant, read without prompting.
+export const accessibilityStatus = () => SettingsService.AccessibilityStatus();
 // Go's services.SettingsError arrives as err.cause: { kind, slot? }.
 export const settingsError = (e: unknown): { kind: string; slot?: string } | null => providerError(e);
 // Verifies with a real trending call, then stores in the Keychain; rejects with a provider cause.

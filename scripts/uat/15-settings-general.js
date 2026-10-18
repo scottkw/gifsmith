@@ -52,6 +52,21 @@ await B.getByRole("heading", { name: "General" }).waitFor({ timeout: 10000 });
 if (!(await radio(B, "Dark").isChecked())) fail("Dark not kept after reload");
 await themeIs(B, "dark");
 
+// Startup: off by default (OS state from the in-memory login item); checking it persists.
+const login = B.getByRole("checkbox", { name: "Open Gifsmith at login" });
+if (await login.isChecked()) fail("Open at login checked by default");
+await login.check();
+await B.waitForTimeout(300);
+await B.reload();
+await B.getByRole("heading", { name: "General" }).waitFor({ timeout: 10000 });
+if (!(await login.isChecked())) fail("Open at login not kept after reload");
+// Automatic paste: the server build's platform.Fake is not trusted.
+await B.locator("text=Off").first().waitFor({ timeout: 5000 });
+await B.getByRole("button", { name: "Grant Accessibility access" }).waitFor({ timeout: 5000 });
+if ((await B.getByRole("button", { name: "Grant Accessibility access" }).innerText()).trim() !== "Grant Access…") fail("Grant button text");
+await B.locator("text=Paste actions need Accessibility access. Copying always works without it.").waitFor({ timeout: 3000 });
+await saveScreenshot(await B.screenshot(), "gifsmith-15-settings-general.png");
+
 await radio(B, "Light").click();
 await themeIs(B, "light");
 await themeIs(A, "light");
