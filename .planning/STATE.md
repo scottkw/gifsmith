@@ -5,16 +5,16 @@ milestone_name: Gifsmith MVP
 current_phase: 3
 current_phase_name: Action Pipeline & Library
 status: executing
-stopped_at: Completed 03-03-PLAN.md
-last_updated: "2026-10-18T00:50:03.707Z"
+stopped_at: Completed 03-04-PLAN.md
+last_updated: "2026-10-18T01:03:49.151Z"
 last_activity: 2026-10-17
 last_activity_desc: Phase 3 execution started
-state_head: fa3fc531c13a5575239ea42a4e107db455f2db24
+state_head: 56d569c4340dfcf35d10bb934f38264c76932331
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 18
-  completed_plans: 13
+  completed_plans: 14
 ---
 
 # Project State
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-17)
 ## Current Position
 
 Phase: 3 (Action Pipeline & Library) — EXECUTING
-Plan: 4 of 8
+Plan: 5 of 8
 Status: Ready to execute
 Last activity: 2026-10-17 — Phase 3 execution started
 
@@ -71,6 +71,7 @@ Progress: [█████░░░░░] 50% (2/4 phases; 10/10 planned plans 
 | Phase 03 P01 | 14min | 3 tasks | 34 files |
 | Phase 3 P02 | 11min | 2 tasks | 10 files |
 | Phase 03 P03 | 10min | 2 tasks | 16 files |
+| Phase 03 P04 | 15min | 2 tasks | 31 files |
 
 ## Accumulated Context
 
@@ -126,6 +127,9 @@ Recent decisions affecting current work:
 - [Phase 3]: 03-02: any mousedown outside the action menu closes it; rows highlight on mousemove so a menu opening under the pointer keeps row 1
 - [Phase 03]: 03-03: Klipy grace delete holds busy around the gen check (no re-stage race); ServiceShutdown takes no lock
 - [Phase 03]: 03-03: text copies and pastes clear staging in putText; Clips assets reuse rendition (LooseInt)
+- [Phase 03]: Download claims names with os.Link from a hidden temp file; never overwrites, never creates the folder
+- [Phase 03]: ActionService.DownloadsDir is an injected func (Phase 4 picker replaces it); results carry only file and folder names
+- [Phase 03]: Toast model: setStatus(text, tone, action, ms); a toast with an action survives panel:show inside its expiry
 
 ### Pending Todos
 
@@ -156,6 +160,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-18T00:50:03.569Z
-Stopped at: Completed 03-03-PLAN.md
+Last session: 2026-10-18T01:03:49.011Z
+Stopped at: Completed 03-04-PLAN.md
 Resume file: None
