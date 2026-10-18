@@ -80,9 +80,17 @@ func main() {
 		return &giphy.Client{BaseURL: d.GiphyBase, Key: candidate, HTTP: d.HTTP}
 	}}
 
+	var sh *shell.Shell // set below, before app.Run; a second launch arrives only after Run starts
 	// No ApplicationShouldTerminateAfterLastWindowClosed: the hidden panel counts as closed.
 	app := application.New(application.Options{
 		Name: "Gifsmith",
+		// One process owns the library, staging and the hotkey (WR-01): a second launch, including
+		// a wails3 dev build while the installed app runs, exits and shows this panel instead.
+		// No-op in -tags server builds.
+		SingleInstance: &application.SingleInstanceOptions{
+			UniqueID:               "com.kenscott.gifsmith",
+			OnSecondInstanceLaunch: func(application.SecondInstanceData) { sh.Show() },
+		},
 		Services: []application.Service{
 			application.NewService(actions),
 			application.NewService(gifs),
@@ -106,7 +114,7 @@ func main() {
 		log.Printf("clips: %s", clips.State()) // state only: records the native probe outcome
 		app.Event.Emit("providers:changed")
 	}
-	sh := shell.New(app, plat, trayIcon)
+	sh = shell.New(app, plat, trayIcon)
 	actions.Hide = sh.Hide
 	actions.Previous = sh.Previous
 	panel.HideFunc = sh.Hide
