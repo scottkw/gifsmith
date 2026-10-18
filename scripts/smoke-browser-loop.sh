@@ -128,6 +128,20 @@ STAGED=$(find bin/uat-cache/staging -name '*.gif' -type f 2>/dev/null | head -1)
 [ -n "$STAGED" ] || fail "ActionService.Copy(gif) staged no .gif under bin/uat-cache/staging"
 echo "ActionService.Copy(gif): staged $STAGED, HTTP 200 $(cat "$BODY")"
 
+SQUARE_ID=$(method_id "$SVC/actionservice.ts" CopySquare)
+[ -n "$SQUARE_ID" ] || fail "could not find the ActionService.CopySquare method ID"
+CODE=$(call "$SEARCH_ID" '["finergifs","widemedia",""]')
+[ "$CODE" = "200" ] && grep -q '/media/wide-' "$BODY" || fail "Search(finergifs, widemedia): HTTP $CODE, body: $(head -c 300 "$BODY")"
+WIDE_ITEM=$(node -e 'const p = JSON.parse(require("fs").readFileSync(0, "utf8")); process.stdout.write(JSON.stringify(p.items[0]))' <"$BODY")
+CODE=$(call "$SQUARE_ID" "[$WIDE_ITEM]")
+if [ "$CODE" != "200" ] || ! grep -q '"copied":true' "$BODY" || ! grep -q 'square GIF' "$BODY"; then
+  fail "ActionService.CopySquare(wide gif) via proxy: HTTP $CODE, body: $(cat "$BODY")"
+fi
+SQUARES=$(find bin/uat-cache/staging -name '*-square.gif' -type f | wc -l | tr -d ' ')
+STAGED_ALL=$(find bin/uat-cache/staging -type f | wc -l | tr -d ' ')
+[ "$SQUARES" = "1" ] && [ "$STAGED_ALL" = "1" ] || fail "CopySquare staged $SQUARES square files among $STAGED_ALL, want exactly one file"
+echo "ActionService.CopySquare(wide gif): HTTP 200 $(cat "$BODY"), staging holds only $(find bin/uat-cache/staging -name '*-square.gif' -type f)"
+
 DOWNLOAD_ID=$(method_id "$SVC/actionservice.ts" Download)
 [ -n "$DOWNLOAD_ID" ] || fail "could not find the ActionService.Download method ID"
 for name in "office-moment-1-office-1.gif" "office-moment-1-office-1 (2).gif"; do

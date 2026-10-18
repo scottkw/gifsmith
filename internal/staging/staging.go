@@ -52,14 +52,36 @@ type Store struct {
 // returns that path. The first bytes must be the GIF magic, or for a Clip an MP4 ftyp box.
 // Transport errors are never wrapped: their text holds the URL.
 func (s *Store) Fetch(ctx context.Context, g provider.Gif) (string, error) {
-	body, ext, done, err := s.media(ctx, g)
+	return s.FetchMax(ctx, g, s.limit())
+}
+
+// FetchMax is Fetch with a byte cap of maxBytes: a larger download is ErrTooLarge and leaves nothing.
+func (s *Store) FetchMax(ctx context.Context, g provider.Gif, maxBytes int64) (string, error) {
+	body, ext, done, err := s.media(ctx, g, maxBytes)
 	if err != nil {
 		return "", err
 	}
 	defer done()
-	sum := sha1.Sum([]byte(string(g.Provider) + ":" + g.ID))
+	return s.put(string(g.Provider)+":"+g.ID, slug(g.Title)+ext, func(f *os.File) error { return spool(f, body, maxBytes) })
+}
+
+// WriteDerived stages b, a file made from g, as <Dir>/<sha1(provider:id:variant)[:16]>/<slug>-<variant>.gif.
+// Its own directory means Sweep(path) removes the original it was made from.
+func (s *Store) WriteDerived(g provider.Gif, variant string, b []byte) (string, error) {
+	return s.put(string(g.Provider)+":"+g.ID+":"+variant, slug(g.Title)+"-"+variant+".gif", func(f *os.File) error {
+		if _, err := f.Write(b); err != nil {
+			return ErrDownload
+		}
+		return nil
+	})
+}
+
+// put writes name inside the hash directory of key through a .part file and a rename, so the
+// pasteboard never points at a partial file.
+func (s *Store) put(key, name string, fill func(*os.File) error) (string, error) {
+	sum := sha1.Sum([]byte(key))
 	dir := filepath.Join(s.Dir, hex.EncodeToString(sum[:])[:16])
-	final := filepath.Join(dir, slug(g.Title)+ext)
+	final := filepath.Join(dir, name)
 	if rel, err := filepath.Rel(s.Dir, final); err != nil || strings.HasPrefix(rel, "..") {
 		return "", ErrNotAllowed
 	}
@@ -71,7 +93,7 @@ func (s *Store) Fetch(ctx context.Context, g provider.Gif) (string, error) {
 	if err != nil {
 		return "", ErrDownload
 	}
-	err = s.spool(f, body)
+	err = fill(f)
 	if cerr := f.Close(); err == nil && cerr != nil {
 		err = ErrDownload
 	}
@@ -86,21 +108,11 @@ func (s *Store) Fetch(ctx context.Context, g provider.Gif) (string, error) {
 	return "", err
 }
 
-// FetchMax is Fetch with a byte cap of max: a larger download is ErrTooLarge.
-func (s *Store) FetchMax(ctx context.Context, g provider.Gif, max int64) (string, error) {
-	return "", ErrDownload // RED skeleton
-}
-
-// WriteDerived stages b, a file made from g (variant "square"), in its own hash directory.
-func (s *Store) WriteDerived(g provider.Gif, variant string, b []byte) (string, error) {
-	return "", ErrDownload // RED skeleton
-}
-
 // Save downloads g into dir as <FileStem><ext>, then "<stem> (2)<ext>", " (3)"… and returns the
 // path. It never overwrites, never creates dir, and never leaves a partial file under a final name:
 // the body goes to a hidden temp file that os.Link claims under the first free name.
 func (s *Store) Save(ctx context.Context, g provider.Gif, dir string, hide bool) (string, error) {
-	body, ext, done, err := s.media(ctx, g) // validated before anything exists in dir
+	body, ext, done, err := s.media(ctx, g, s.limit()) // validated before anything exists in dir
 	if err != nil {
 		return "", err
 	}
@@ -111,7 +123,7 @@ func (s *Store) Save(ctx context.Context, g provider.Gif, dir string, hide bool)
 	}
 	tmp := f.Name()
 	defer func() { _ = os.Remove(tmp) }()
-	err = s.spool(f, body)
+	err = spool(f, body, s.limit())
 	if err == nil && (f.Sync() != nil || f.Chmod(0o644) != nil) { // CreateTemp makes 0600; a link shares it
 		err = ErrFolder
 	}
@@ -166,8 +178,8 @@ func FileStem(g provider.Gif, hide bool) string {
 
 // media requests g.DownloadURL through the allowlist (the URL and every redirect hop), needs a 200
 // and the GIF magic (a Clip: an MP4 ftyp box) before returning. body yields the whole file, capped
-// one byte past the size limit; done releases the response and the 45 s deadline.
-func (s *Store) media(ctx context.Context, g provider.Gif) (body io.Reader, ext string, done func(), err error) {
+// one byte past maxBytes; done releases the response and the 45 s deadline.
+func (s *Store) media(ctx context.Context, g provider.Gif, maxBytes int64) (body io.Reader, ext string, done func(), err error) {
 	allow := s.Allows
 	u, err := url.Parse(g.DownloadURL)
 	if err != nil || !allow(g.Provider, u) {
@@ -208,16 +220,16 @@ func (s *Store) media(ctx context.Context, g provider.Gif) (body io.Reader, ext 
 		done()
 		return nil, "", nil, notMedia
 	}
-	return io.MultiReader(bytes.NewReader(head), io.LimitReader(resp.Body, s.limit()+1-int64(len(head)))), ext, done, nil
+	return io.MultiReader(bytes.NewReader(head), io.LimitReader(resp.Body, maxBytes+1-int64(len(head)))), ext, done, nil
 }
 
-// spool copies body into f: ErrDownload on a read or write failure, ErrTooLarge past the limit.
-func (s *Store) spool(f *os.File, body io.Reader) error {
+// spool copies body into f: ErrDownload on a read or write failure, ErrTooLarge past maxBytes.
+func spool(f *os.File, body io.Reader, maxBytes int64) error {
 	n, err := io.Copy(f, body)
 	switch {
 	case err != nil:
 		return ErrDownload
-	case n > s.limit():
+	case n > maxBytes:
 		return ErrTooLarge
 	}
 	return nil

@@ -3,16 +3,20 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"image/gif"
 	"log"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"gifsmith/internal/imaging"
 	"gifsmith/internal/platform"
 	"gifsmith/internal/provider"
 	"gifsmith/internal/staging"
@@ -398,7 +402,75 @@ func (a *ActionService) ShowDownload(ctx context.Context) error {
 	return nil
 }
 
+// Square crop limits (D-16, T-03-18): DecodeAll holds every frame in memory.
+const (
+	SquareMaxBytes = 15 << 20
+	SquareMaxSide  = 4096
+)
+
 // CopySquare puts a center-cropped square copy of the GIF on the clipboard as a file (D-16).
+// The panel stays open: the frontend shows the confirmation, then hides it.
 func (a *ActionService) CopySquare(ctx context.Context, g provider.Gif) (Result, error) {
-	return Result{}, actionErr("download_failed") // RED skeleton
+	if !a.busy.TryLock() {
+		return Result{}, ErrBusy
+	}
+	defer a.busy.Unlock()
+	if _, err := a.stageSquare(ctx, g); err != nil {
+		return Result{}, err
+	}
+	log.Printf("copy square: staged and copied")
+	return Result{Copied: true, Message: "Copied square GIF — press ⌘V to paste"}, nil
+}
+
+// stageSquare is stage for the square crop: download (capped), crop in memory, stage the square
+// file, put it on the pasteboard, then sweep everything else, including the downloaded original.
+func (a *ActionService) stageSquare(ctx context.Context, g provider.Gif) (string, error) {
+	if g.IsClip { // a Clip is an MP4 (D-15)
+		return "", actionErr("not_allowed")
+	}
+	orig, err := a.Staging.FetchMax(ctx, g, SquareMaxBytes)
+	if err != nil {
+		log.Printf("square %s: %v", g.Provider, err)
+		if errors.Is(err, staging.ErrTooLarge) {
+			return "", actionErr("crop_too_large")
+		}
+		return "", stageErr(err)
+	}
+	b, err := cropSquare(orig)
+	if err != nil {
+		log.Printf("square %s: crop: %v", g.Provider, err)
+		return "", actionErr("crop_failed")
+	}
+	path, err := a.Staging.WriteDerived(g, "square", b)
+	if err != nil {
+		log.Printf("square %s: %v", g.Provider, err)
+		return "", stageErr(err)
+	}
+	if err := a.Platform.CopyFile(path); err != nil {
+		log.Printf("square %s: pasteboard: %v", g.Provider, err)
+		return "", actionErr("copy_failed")
+	}
+	a.gen.Add(1)
+	if err := a.Staging.Sweep(path); err != nil {
+		log.Printf("staging sweep: %v", err)
+	}
+	return path, nil
+}
+
+// cropSquare decodes the staged GIF at path and returns its square crop, encoded.
+func cropSquare(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	g, err := gif.DecodeAll(f)
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	if err := gif.EncodeAll(&buf, imaging.Square(g)); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }

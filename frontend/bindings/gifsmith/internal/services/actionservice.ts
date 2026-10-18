@@ -22,6 +22,14 @@ export function Copy(g: provider$0.Gif): $CancellablePromise<$models.Result> {
 }
 
 /**
+ * CopySquare puts a center-cropped square copy of the GIF on the clipboard as a file (D-16).
+ * The panel stays open: the frontend shows the confirmation, then hides it.
+ */
+export function CopySquare(g: provider$0.Gif): $CancellablePromise<$models.Result> {
+    return $Call.ByID(4162051114, g);
+}
+
+/**
  * CopyText puts text Go builds from g on the clipboard as a plain string. kind: link | markdown | page.
  * The webview never composes the text: it only names the kind.
  */

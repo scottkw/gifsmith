@@ -23,6 +23,8 @@ var actionText = map[string]string{
 	"copy_failed":       "could not write to the clipboard",
 	"folder_unwritable": "the download folder is not writable",
 	"nothing_to_show":   "there is no download to show",
+	"crop_failed":       "could not crop this GIF",
+	"crop_too_large":    "the GIF is too large to crop",
 }
 
 func (e *ActionError) Error() string {

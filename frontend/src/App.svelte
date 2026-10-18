@@ -6,6 +6,7 @@
     cancel,
     checkClips,
     copy,
+    copySquare,
     copyText,
     download,
     openPage,
@@ -481,6 +482,9 @@
         return;
       case 'download':
         downloadItem();
+        return;
+      case 'copySquare':
+        act(copySquare, false);
         return;
     }
   }

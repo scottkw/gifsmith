@@ -42,6 +42,8 @@ const ROWS: Row[] = [
   { id: 'copyPage', label: 'Copy Page Link', hint: '', keys: '', group: 2, applies: hasPage },
   { id: 'open', label: 'Open in Browser', hint: '⌘O', keys: 'Meta+O', group: 3, applies: hasPage },
   { id: 'download', label: media('Download'), hint: '⌘S', keys: 'Meta+S', group: 3 },
+  // A Clip is an MP4: no square crop (D-15).
+  { id: 'copySquare', label: 'Copy Square GIF', hint: '', keys: '', group: 4, applies: (c) => !c.gif.isClip },
 ];
 
 // Rows that do not apply are omitted, never greyed (D-03).
