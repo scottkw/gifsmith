@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,6 +22,7 @@ import (
 	"gifsmith/internal/platform"
 	"gifsmith/internal/provider"
 	"gifsmith/internal/provider/fakeapi"
+	"gifsmith/internal/provider/finergifs"
 	"gifsmith/internal/provider/giphy"
 	"gifsmith/internal/provider/klipy"
 	"gifsmith/internal/search"
@@ -67,9 +71,10 @@ func newSettings(t *testing.T, base string) settingsFixture {
 	}
 	clipsClient := &giphy.Client{BaseURL: base + "/giphy", Key: keys.Func(provider.GIPHY), HTTP: hc, Clips: true, Params: params}
 	svc := search.New(map[provider.ID]provider.Provider{
-		provider.GIPHY: &giphy.Client{BaseURL: base + "/giphy", Key: keys.Func(provider.GIPHY), HTTP: hc, Params: params},
-		provider.Clips: clipsClient,
-		provider.Klipy: &klipy.Client{BaseURL: base + "/klipy", Key: keys.Func(provider.Klipy), HTTP: hc, Params: params},
+		provider.GIPHY:     &giphy.Client{BaseURL: base + "/giphy", Key: keys.Func(provider.GIPHY), HTTP: hc, Params: params},
+		provider.Clips:     clipsClient,
+		provider.Klipy:     &klipy.Client{BaseURL: base + "/klipy", Key: keys.Func(provider.Klipy), HTTP: hc, Params: params},
+		provider.FinerGifs: &finergifs.Client{BaseURL: base + "/finer", MediaBase: base + "/media", HTTP: hc, Params: params},
 	}, nil)
 	var probes atomic.Int32
 	clips := &search.Clips{
@@ -84,7 +89,7 @@ func newSettings(t *testing.T, base string) settingsFixture {
 	events := []string{}
 	data := []any{}
 	dir := t.TempDir()
-	s = &SettingsService{Keys: keys, Store: settings.OpenStore(dir), Svc: svc, NewClient: newClient, Emit: func(n string, d ...any) {
+	s = &SettingsService{Keys: keys, Store: settings.OpenStore(dir), Platform: &platform.Fake{}, Svc: svc, NewClient: newClient, Emit: func(n string, d ...any) {
 		mu.Lock()
 		defer mu.Unlock()
 		events = append(events, n)
@@ -945,5 +950,120 @@ func TestParamsDefaultRating(t *testing.T) {
 	}
 	if s := f.svc.Snapshot(context.Background()); s.GiphyRating != "pg-13" {
 		t.Errorf("Snapshot.GiphyRating = %q, want pg-13 (resolved)", s.GiphyRating)
+	}
+}
+
+func TestSetPrefPageSize(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	if err := f.svc.SaveKey(ctx, "giphy", "uat-key-123"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.SaveKey(ctx, "klipy", "uat-key-123"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.gifs.Search(ctx, "finergifs", "dwight", ""); err != nil {
+		t.Fatal(err)
+	}
+	snap, err := f.svc.SetPref(ctx, "pageSize", "36")
+	if err != nil || snap.PageSize != 36 || f.svc.Params().PageSize != 36 {
+		t.Fatalf("SetPref(pageSize, 36) = %+v, %v", snap, err)
+	}
+	for _, c := range []struct {
+		p    string
+		call func() (provider.Page, error)
+	}{
+		{"giphy", func() (provider.Page, error) { return f.gifs.Trending(ctx, "giphy", "") }},
+		{"klipy", func() (provider.Page, error) { return f.gifs.Trending(ctx, "klipy", "") }},
+		{"finergifs", func() (provider.Page, error) { return f.gifs.Search(ctx, "finergifs", "dwight", "") }},
+	} {
+		before := f.hits.Load()
+		pg, err := c.call()
+		if err != nil || f.hits.Load()-before != 1 || len(pg.Items) != 36 {
+			t.Errorf("%s after pageSize 36: %d items, %d requests, %v; want 36 fresh items", c.p, len(pg.Items), f.hits.Load()-before, err)
+		}
+	}
+	for _, v := range []string{"25", "0", "23", "49", "50", "abc", "", "036"} {
+		_, err := f.svc.SetPref(ctx, "pageSize", v)
+		wantSettingsErr(t, err, "invalid_value")
+	}
+	for _, v := range []string{"24", "48"} {
+		if snap, err := f.svc.SetPref(ctx, "pageSize", v); err != nil || strconv.Itoa(snap.PageSize) != v {
+			t.Errorf("SetPref(pageSize, %s) = %+v, %v", v, snap, err)
+		}
+	}
+}
+
+func TestSetPrefLangCountry(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	for _, p := range []string{"giphy", "klipy"} {
+		if err := f.svc.SaveKey(ctx, p, "uat-key-123"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cached := func(p string) bool {
+		before := f.hits.Load()
+		_, _ = f.gifs.Trending(ctx, p, "")
+		return f.hits.Load() == before
+	}
+	if snap, err := f.svc.SetPref(ctx, "giphyLang", "de"); err != nil || snap.GiphyLang != "de" || f.svc.Params().Lang != "de" {
+		t.Fatalf("SetPref(giphyLang, de) = %+v, %v", snap, err)
+	}
+	if cached("giphy") || !cached("klipy") {
+		t.Error("giphyLang must flush GIPHY only")
+	}
+	if snap, err := f.svc.SetPref(ctx, "klipyCountry", "de"); err != nil || snap.KlipyCountry != "de" || f.svc.Params().Country != "de" {
+		t.Fatalf("SetPref(klipyCountry, de) = %+v, %v", snap, err)
+	}
+	if !cached("giphy") || cached("klipy") {
+		t.Error("klipyCountry must flush Klipy only")
+	}
+	pg, err := f.gifs.Search(ctx, "giphy", "cat", "")
+	if err != nil || !strings.HasPrefix(pg.Items[0].Title, "[lang=de] ") {
+		t.Errorf("GIPHY search title %q, %v; want the lang=de tag", pg.Items[0].Title, err)
+	}
+	for _, tc := range [][2]string{{"giphyLang", "xx"}, {"giphyLang", "DE"}, {"klipyCountry", "zz"}, {"klipyCountry", "US"}} {
+		_, err := f.svc.SetPref(ctx, tc[0], tc[1])
+		wantSettingsErr(t, err, "invalid_value")
+	}
+	for _, name := range []string{"giphyLang", "klipyCountry"} {
+		if snap, err := f.svc.SetPref(ctx, name, ""); err != nil || snap.GiphyLang+snap.KlipyCountry != map[string]string{"giphyLang": "de", "klipyCountry": ""}[name] {
+			t.Errorf("SetPref(%s, \"\") = %+v, %v; want Match System", name, snap, err)
+		}
+	}
+}
+
+func TestParamsSystemLocale(t *testing.T) {
+	f := newSettings(t, "")
+	fake := &platform.Fake{}
+	f.svc.Platform = fake
+	for _, tc := range []struct{ lang, region, wantLang, wantCountry string }{
+		{"pt-BR", "BR", "pt", "br"},
+		{"zh-Hant-TW", "TW", "zh-TW", "tw"},
+		{"zh-Hans-CN", "CN", "zh-CN", "cn"},
+		{"zh-HK", "HK", "zh-TW", "hk"},
+		{"nb-NO", "NO", "no", "no"},
+		{"fil-PH", "PH", "tl", "ph"},
+		{"iw-IL", "IL", "he", "il"},
+		{"de-DE", "DE", "de", "de"},
+		{"xx-YY", "ZZ", "en", "us"},
+		{"", "", "en", "us"},
+	} {
+		fake.Lang, fake.Region = tc.lang, tc.region
+		p := f.svc.Params()
+		if p.Lang != tc.wantLang || p.Country != tc.wantCountry {
+			t.Errorf("system %q/%q: Params lang %q country %q; want %q %q", tc.lang, tc.region, p.Lang, p.Country, tc.wantLang, tc.wantCountry)
+		}
+	}
+	fake.Lang, fake.Region = "de-DE", "DE"
+	c := f.svc.Choices(context.Background())
+	if strings.Join(c.Ratings, " ") != "g pg pg-13 r" || fmt.Sprint(c.PageSizes) != "[24 36 48]" ||
+		!slices.Equal(c.Languages, giphy.Languages) || !slices.Equal(c.Countries, klipy.Countries) ||
+		c.SystemLanguage != "de" || c.SystemCountry != "de" {
+		t.Errorf("Choices = %+v", c)
+	}
+	if s := f.svc.Snapshot(context.Background()); s.PageSize != 24 || s.GiphyLang != "" || s.KlipyCountry != "" {
+		t.Errorf("Snapshot = %+v, want pageSize 24 and Match System", s)
 	}
 }

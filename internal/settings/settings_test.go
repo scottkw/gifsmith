@@ -320,3 +320,26 @@ func TestWriteJSONAtomicFailureKeepsPrevious(t *testing.T) {
 		t.Errorf("dir holds %d entries, want list.json and busy.json only (no temp files)", len(ents))
 	}
 }
+
+func TestStoreNormalizeSearchPrefs(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(`{"giphyRating":"x","pageSize":30,"giphyLang":"xx","klipyCountry":"zz"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := OpenStore(dir).Get()
+	if got.GiphyRating != "" || got.PageSize != 0 || got.GiphyLang != "" || got.KlipyCountry != "" {
+		t.Errorf("Get = %+v, want every search pref reset", got)
+	}
+	for _, f := range []string{"giphyRating", "pageSize", "giphyLang", "klipyCountry"} {
+		if !strings.Contains(buf.String(), "reset "+f) {
+			t.Errorf("log %q does not name %s", buf.String(), f)
+		}
+	}
+	ok := Prefs{GiphyRating: "r", PageSize: 48, GiphyLang: "zh-TW", KlipyCountry: "de"}
+	if p := ok; len(p.Normalize()) != 0 || p != ok {
+		t.Errorf("valid prefs %+v were reset", ok)
+	}
+}

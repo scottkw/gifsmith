@@ -103,8 +103,24 @@ type Autostarter interface {
 type Snapshot struct {
 	Theme         string `json:"theme"`
 	LaunchAtLogin bool   `json:"launchAtLogin"`
-	GiphyRating   string `json:"giphyRating"` // resolved: never ""
+	GiphyRating   string `json:"giphyRating"`  // resolved: never ""
+	PageSize      int    `json:"pageSize"`     // resolved: never 0
+	GiphyLang     string `json:"giphyLang"`    // "" = Match System
+	KlipyCountry  string `json:"klipyCountry"` // "" = Match System
 }
+
+// Choices are the allowed Search-pane values, with what Match System resolves to now.
+type Choices struct {
+	Ratings        []string `json:"ratings"`
+	PageSizes      []int    `json:"pageSizes"`
+	Languages      []string `json:"languages"`
+	Countries      []string `json:"countries"`
+	SystemLanguage string   `json:"systemLanguage"`
+	SystemCountry  string   `json:"systemCountry"`
+}
+
+// Choices lists the Search-pane options; the webview names them.
+func (s *SettingsService) Choices(ctx context.Context) Choices { return Choices{} }
 
 // Params are the provider parameters for the next request: the defaults overlaid with the
 // stored choices. Clients call it on every request.
