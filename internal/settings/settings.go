@@ -121,8 +121,9 @@ func (k *Keys) Func(p provider.ID) func() (string, bool) {
 
 // Prefs is everything in settings.json. Never add a secret here.
 type Prefs struct {
-	LastProvider string `json:"lastProvider"`
-	Theme        string `json:"theme,omitempty"` // "" = system | "light" | "dark"
+	LastProvider  string `json:"lastProvider"`
+	Theme         string `json:"theme,omitempty"` // "" = system | "light" | "dark"
+	LaunchAtLogin bool   `json:"launchAtLogin,omitempty"`
 }
 
 // Normalize resets invalid values to their declared defaults and returns the reset field names.

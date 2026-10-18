@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"gifsmith/internal/platform"
 	"gifsmith/internal/provider"
 	"gifsmith/internal/provider/fakeapi"
 	"gifsmith/internal/provider/giphy"
@@ -90,7 +91,9 @@ func newSettings(t *testing.T, base string) settingsFixture {
 		} else {
 			data = append(data, nil)
 		}
-	}, Clips: clips}
+	}, Clips: clips, Autostart: &fakeAutostart{}, Executable: func() (string, error) {
+		return "/Applications/Gifsmith.app/Contents/MacOS/gifsmith", nil
+	}}
 	return settingsFixture{svc: s, gifs: &GifService{Svc: svc, Keys: keys, Clips: clips}, store: store, hits: &hits, events: &events, data: &data, dir: dir, clips: clips, probes: &probes}
 }
 
@@ -549,6 +552,155 @@ func TestMarshalSettingsError(t *testing.T) {
 	}
 	if MarshalError(errors.New("plain")) != nil {
 		t.Error("MarshalError(plain error) is not nil")
+	}
+}
+
+// fakeAutostart is the in-memory login item: Enable/Disable flip enabled unless told to fail.
+type fakeAutostart struct {
+	mu                    sync.Mutex
+	enabled               bool
+	enableErr, disableErr error
+	enables, disables     int
+}
+
+func (a *fakeAutostart) Enable() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.enables++
+	if a.enableErr != nil {
+		return a.enableErr
+	}
+	a.enabled = true
+	return nil
+}
+
+func (a *fakeAutostart) Disable() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.disables++
+	if a.disableErr != nil {
+		return a.disableErr
+	}
+	a.enabled = false
+	return nil
+}
+
+func (a *fakeAutostart) IsEnabled() (bool, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.enabled, nil
+}
+
+func TestSetLaunchAtLogin(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	as := f.svc.Autostart.(*fakeAutostart)
+	snap, err := f.svc.SetLaunchAtLogin(ctx, true)
+	if err != nil || !snap.LaunchAtLogin || as.enables != 1 || !f.svc.Store.Get().LaunchAtLogin {
+		t.Fatalf("on: snap %+v, err %v, enables %d, pref %v", snap, err, as.enables, f.svc.Store.Get().LaunchAtLogin)
+	}
+	if got := *f.events; len(got) != 1 || got[0] != "settings:changed" {
+		t.Errorf("events = %v, want [settings:changed]", got)
+	}
+	if got := f.svc.Snapshot(ctx); !got.LaunchAtLogin {
+		t.Errorf("Snapshot = %+v, want launchAtLogin from the OS (true)", got)
+	}
+	// Idempotent: on again succeeds and the pref stays on.
+	if snap, err := f.svc.SetLaunchAtLogin(ctx, true); err != nil || !snap.LaunchAtLogin || !f.svc.Store.Get().LaunchAtLogin {
+		t.Errorf("on twice: %+v, %v", snap, err)
+	}
+	snap, err = f.svc.SetLaunchAtLogin(ctx, false)
+	if err != nil || snap.LaunchAtLogin || as.disables != 1 || f.svc.Store.Get().LaunchAtLogin {
+		t.Errorf("off: snap %+v, err %v, disables %d", snap, err, as.disables)
+	}
+}
+
+// The checkbox shows the OS truth: a user who switched Gifsmith off in System Settings sees it off.
+func TestSnapshotLaunchAtLoginIsOSState(t *testing.T) {
+	f := newSettings(t, "")
+	if _, err := f.svc.Store.Update(func(p *settings.Prefs) error { p.LaunchAtLogin = true; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if f.svc.Snapshot(context.Background()).LaunchAtLogin {
+		t.Error("Snapshot reports the pref, want the OS state (off)")
+	}
+}
+
+func TestSetLaunchAtLoginNotInApplications(t *testing.T) {
+	logs := captureLog(t)
+	for _, exe := range []string{
+		"/private/var/folders/x/AppTranslocation/abc/d/Gifsmith.app/Contents/MacOS/gifsmith",
+		"/Volumes/Gifsmith/Gifsmith.app/Contents/MacOS/gifsmith",
+	} {
+		f := newSettings(t, "")
+		f.svc.Executable = func() (string, error) { return exe, nil }
+		_, err := f.svc.SetLaunchAtLogin(context.Background(), true)
+		wantSettingsErr(t, err, "not_in_applications")
+		if as := f.svc.Autostart.(*fakeAutostart); as.enables != 0 || f.svc.Store.Get().LaunchAtLogin || len(*f.events) != 0 {
+			t.Errorf("%s: enables %d, pref %v, events %v; want nothing changed", exe, as.enables, f.svc.Store.Get().LaunchAtLogin, *f.events)
+		}
+	}
+	if strings.Contains(logs.String(), "/Volumes/") || strings.Contains(logs.String(), "AppTranslocation/abc") {
+		t.Errorf("log carries the path: %q", logs.String())
+	}
+}
+
+func TestSetLaunchAtLoginFailures(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	as := f.svc.Autostart.(*fakeAutostart)
+	as.enableErr = errors.New("smappservice: /Applications/Gifsmith.app denied")
+	_, err := f.svc.SetLaunchAtLogin(ctx, true)
+	wantSettingsErr(t, err, "autostart_failed")
+	if f.svc.Store.Get().LaunchAtLogin || len(*f.events) != 0 {
+		t.Errorf("failed Enable: pref %v, events %v; want unchanged", f.svc.Store.Get().LaunchAtLogin, *f.events)
+	}
+	as.disableErr = errors.New("boom")
+	_, err = f.svc.SetLaunchAtLogin(ctx, false)
+	wantSettingsErr(t, err, "autostart_failed")
+}
+
+func TestApplyStartup(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		pref, enabled bool
+		wantEnables   int
+	}{
+		{"pref on, OS off", true, false, 1},
+		{"pref on, OS on", true, true, 0},
+		{"pref off, OS on", false, true, 0}, // never disables on launch
+		{"pref off, OS off", false, false, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newSettings(t, "")
+			as := f.svc.Autostart.(*fakeAutostart)
+			as.enabled = tc.enabled
+			if _, err := f.svc.Store.Update(func(p *settings.Prefs) error { p.LaunchAtLogin = tc.pref; return nil }); err != nil {
+				t.Fatal(err)
+			}
+			f.svc.ApplyStartup()
+			if as.enables != tc.wantEnables || as.disables != 0 {
+				t.Errorf("enables %d, disables %d; want %d, 0", as.enables, as.disables, tc.wantEnables)
+			}
+		})
+	}
+}
+
+func TestAccessibilityStatus(t *testing.T) {
+	f := newSettings(t, "")
+	fake := &platform.Fake{}
+	f.svc.Platform = fake
+	if f.svc.AccessibilityStatus(context.Background()) {
+		t.Error("AccessibilityStatus = true with an untrusted Fake")
+	}
+	fake.Trusted = true
+	if !f.svc.AccessibilityStatus(context.Background()) {
+		t.Error("AccessibilityStatus = false with a trusted Fake")
+	}
+	for _, c := range fake.Calls {
+		if c != "AccessibilityTrusted:false" {
+			t.Errorf("call %q, want only AccessibilityTrusted:false (never prompts)", c)
+		}
 	}
 }
 

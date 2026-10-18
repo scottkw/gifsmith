@@ -234,6 +234,19 @@ func TestStoreWriteFailureKeepsPrefs(t *testing.T) {
 	}
 }
 
+func TestStoreLaunchAtLoginRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := OpenStore(dir).Update(func(p *Prefs) error { p.LaunchAtLogin = true; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if m := readPrefsFile(t, dir); m["launchAtLogin"] != true {
+		t.Errorf("settings.json = %v, want launchAtLogin true", m)
+	}
+	if !OpenStore(dir).Get().LaunchAtLogin {
+		t.Error("reopened store lost launchAtLogin")
+	}
+}
+
 func TestStoreConcurrentUpdates(t *testing.T) {
 	dir := t.TempDir()
 	s := OpenStore(dir)

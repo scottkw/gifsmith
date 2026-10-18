@@ -28,6 +28,8 @@ type SettingsService struct {
 	Emit       func(name string, data ...any)
 	Clips      *search.Clips
 	ApplyTheme func(theme string) // native appearance + window backgrounds; nil in tests
+	Autostart  Autostarter
+	Executable func() (string, error) // os.Executable; injectable for the not-in-Applications check
 
 	mu sync.Mutex // serializes SaveKey end to end: a verify never interleaves with another save's write
 }
@@ -89,9 +91,17 @@ func (s *SettingsService) SaveKey(ctx context.Context, p, key string) error {
 	return nil
 }
 
+// Autostarter is the login item (*application.AutostartManager in the app, a fake in the UAT build).
+type Autostarter interface {
+	Enable() error
+	Disable() error
+	IsEnabled() (bool, error)
+}
+
 // Snapshot is the settings the webviews render. Never a key.
 type Snapshot struct {
-	Theme string `json:"theme"`
+	Theme         string `json:"theme"`
+	LaunchAtLogin bool   `json:"launchAtLogin"`
 }
 
 func (s *SettingsService) Snapshot(ctx context.Context) Snapshot { return snapshotOf(s.Store.Get()) }
@@ -161,3 +171,11 @@ func (s *SettingsService) SetLastProvider(ctx context.Context, p string) error {
 	}
 	return nil
 }
+
+func (s *SettingsService) SetLaunchAtLogin(ctx context.Context, on bool) (Snapshot, error) {
+	return Snapshot{}, nil // RED skeleton
+}
+
+func (s *SettingsService) ApplyStartup() {} // RED skeleton
+
+func (s *SettingsService) AccessibilityStatus(ctx context.Context) bool { return false } // RED skeleton
