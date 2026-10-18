@@ -118,3 +118,13 @@ export function actionErrorText(kind: string, g: Gif, action: 'copy' | 'download
 export function libraryErrorText(list: 'favorites' | 'recents'): string {
   return `Couldn't save your ${list === 'favorites' ? 'Favorites' : 'Recents'}. Try again.`;
 }
+
+// Keys pane (UI-SPEC K-T1..K-T4): the result of Test; null = the test passed.
+export function testKeyMessage(e: ProviderErr | null, providerLabel: string, now: number): string {
+  return '';
+}
+
+// Keys pane K-A, K-D, K-F.
+export const keySavedText = (providerLabel: string) => '';
+export const keyRemovedText = (providerLabel: string) => '';
+export const keyRemoveFailedText = () => '';

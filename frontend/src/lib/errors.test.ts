@@ -1,6 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { actionErrorText, libraryErrorText, errorState, pagingMessage, providerName, keyMessage, revokedMessage } from './errors.ts';
+import {
+  actionErrorText,
+  libraryErrorText,
+  errorState,
+  pagingMessage,
+  providerName,
+  keyMessage,
+  revokedMessage,
+  testKeyMessage,
+  keySavedText,
+  keyRemovedText,
+  keyRemoveFailedText,
+} from './errors.ts';
 
 const NOW = Date.UTC(2026, 9, 17, 19, 0, 0);
 const SWITCH = 'Other providers still work: ⌘1–⌘4.';
@@ -199,4 +211,36 @@ test('square crop errors show F6 and F7', () => {
 test('library write failures show F5 for the list that changed', () => {
   assert.equal(libraryErrorText('favorites'), "Couldn't save your Favorites. Try again.");
   assert.equal(libraryErrorText('recents'), "Couldn't save your Recents. Try again.");
+});
+
+test('testKeyMessage: passed (K-T1) and rejected (K-T2)', () => {
+  assert.equal(testKeyMessage(null, 'GIPHY', NOW), 'GIPHY accepted the key.');
+  assert.equal(
+    testKeyMessage({ kind: 'key_rejected', provider: 'klipy', status: 404 }, 'Klipy', NOW),
+    'Klipy rejected the saved key. It may have been revoked. Change it to continue.',
+  );
+});
+
+test('testKeyMessage: rate limited (K-T3)', () => {
+  const rl = (retryAfterSec?: number) => testKeyMessage({ kind: 'rate_limited', provider: 'giphy', retryAfterSec }, 'GIPHY', NOW);
+  const base = "GIPHY's request limit was hit while testing the key. Try again ";
+  assert.equal(rl(30), base + 'in less than a minute.');
+  assert.equal(rl(600), base + 'in 10 minutes.');
+  assert.equal(rl(61), base + 'in 2 minutes.');
+  assert.equal(rl(), base + 'later this hour.');
+});
+
+test('testKeyMessage: network, timeout and http (K-T4)', () => {
+  for (const kind of ['network', 'timeout', 'http']) {
+    assert.equal(
+      testKeyMessage({ kind, provider: 'giphy', status: 503 }, 'GIPHY', NOW),
+      "Couldn't reach GIPHY to test the key. Check your connection, then try again.",
+    );
+  }
+});
+
+test('Keys pane save, remove and remove-failed texts (K-A, K-D, K-F)', () => {
+  assert.equal(keySavedText('Klipy'), 'Saved. Klipy is ready.');
+  assert.equal(keyRemovedText('GIPHY'), 'Removed. Add a key to use GIPHY again.');
+  assert.equal(keyRemoveFailedText(), "Couldn't remove the key from the macOS Keychain. Try again.");
 });
