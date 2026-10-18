@@ -1108,6 +1108,37 @@ func TestCopySquareDecodeBudget(t *testing.T) {
 	}
 }
 
+// CR-01 (iteration 2): an extension that framePixels and gif.DecodeAll walk differently would hide
+// every following frame from the budget. Each prefix is valid to Go, and its bytes read as a
+// terminator plus trailer to a naive sub-block walk.
+func TestCopySquareDecodeBudgetExtensions(t *testing.T) {
+	n := SquareMaxPixels/(SquareMaxSide*SquareMaxSide) + 4
+	bomb := bombGIF(t, n)
+	for name, ext := range map[string][]byte{
+		"plain text":        append([]byte{0x21, 0x01, 0x00, 0x3B}, append(make([]byte, 11), 0x00)...),   // Go reads 13 raw bytes
+		"empty application": append([]byte{0x21, 0xFF, 0x00, 0x3B}, append(make([]byte, 0x3B), 0x00)...), // size 0, then sub-blocks
+		"unknown extension": {0x21, 0x02, 0x00, 0x3B},                                                    // Go fails the decode
+	} {
+		body := append(append(append([]byte{}, bomb[:13]...), ext...), bomb[13:]...)
+		px, err := framePixels(bytes.NewReader(body))
+		if name == "unknown extension" {
+			if err == nil {
+				t.Errorf("%s: framePixels = %d, want an error", name, px)
+			}
+		} else if err != nil || px != int64(n)*SquareMaxSide*SquareMaxSide {
+			t.Errorf("%s: framePixels = %d, %v; want %d frames of 4096x4096", name, px, err, n)
+		}
+		f := &platform.Fake{}
+		s, g := rawService(t, f, bytes.NewReader(body))
+		if _, err := s.CopySquare(context.Background(), g); actionKind(err) != "crop_failed" {
+			t.Errorf("%s: err = %v, want kind crop_failed", name, err)
+		}
+		if len(f.Calls) != 0 {
+			t.Errorf("%s: calls = %q, want none", name, f.Calls)
+		}
+	}
+}
+
 func TestPasteSquareTrusted(t *testing.T) {
 	f := &platform.Fake{Trusted: true, Frontmost: prevApp}
 	s, fx := newPasteService(t, f)
