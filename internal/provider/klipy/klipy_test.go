@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -251,7 +252,7 @@ func TestRequest(t *testing.T) {
 	if !strings.HasPrefix(uri, "/api/v1/abc%3Bdef12/gifs/search?") {
 		t.Errorf("search URI = %s, want the path-escaped key", uri)
 	}
-	for _, want := range []string{"q=hi+there", "per_page=24", "content_filter=medium", "page=1"} {
+	for _, want := range []string{"q=hi+there", "per_page=24", "content_filter=medium", "page=1", "locale=us"} {
 		if !strings.Contains(uri, want) {
 			t.Errorf("search URI %s lacks %s", uri, want)
 		}
@@ -263,10 +264,8 @@ func TestRequest(t *testing.T) {
 	if !strings.HasPrefix(uri, "/api/v1/abc%3Bdef12/gifs/trending?") || strings.Contains(uri, "q=") {
 		t.Errorf("trending URI = %s", uri)
 	}
-	for _, banned := range []string{"customer_id", "locale"} {
-		if strings.Contains(uri, banned) {
-			t.Errorf("trending URI %s sends %s", uri, banned)
-		}
+	if strings.Contains(uri, "customer_id") || !strings.Contains(uri, "locale=us") {
+		t.Errorf("trending URI %s: want locale=us and no customer_id", uri)
 	}
 }
 
@@ -433,5 +432,38 @@ func TestPageSizeClamp(t *testing.T) {
 		if !strings.Contains(last(), "per_page="+strconv.Itoa(tc.want)+"&") && !strings.HasSuffix(last(), "per_page="+strconv.Itoa(tc.want)) {
 			t.Errorf("PageSize %d: request %s, want per_page=%d", tc.n, last(), tc.want)
 		}
+	}
+}
+
+func TestLocaleCountry(t *testing.T) {
+	c, _, last := stubClient(t, 200, body(1, false, item("a", "https://s/sm.gif", "", "https://s/hd.gif")))
+	c.Params = func() provider.Params { p := provider.DefaultParams(); p.Country = "de"; return p }
+	for _, call := range []func() error{
+		func() error { _, err := c.Search(context.Background(), "katze", ""); return err },
+		func() error { _, err := c.Trending(context.Background(), ""); return err },
+	} {
+		if err := call(); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(last(), "locale=de") {
+			t.Errorf("request %s, want locale=de", last())
+		}
+	}
+}
+
+func TestCountries(t *testing.T) {
+	if len(Countries) < 200 {
+		t.Fatalf("%d countries, want the full ISO list", len(Countries))
+	}
+	if !slices.IsSorted(Countries) || len(slices.Compact(slices.Clone(Countries))) != len(Countries) {
+		t.Error("Countries not sorted and unique")
+	}
+	for _, c := range Countries {
+		if len(c) != 2 || c[0] < 'a' || c[0] > 'z' || c[1] < 'a' || c[1] > 'z' {
+			t.Errorf("bad code %q", c)
+		}
+	}
+	if !slices.Contains(Countries, "us") || !slices.Contains(Countries, "de") {
+		t.Error("us or de missing")
 	}
 }
