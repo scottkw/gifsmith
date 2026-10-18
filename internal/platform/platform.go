@@ -40,4 +40,6 @@ type Platform interface {
 	OpenAccessibilitySettings() error
 	// PasteShortcut posts one ⌘V (key down + key up) to the frontmost app.
 	PasteShortcut() error
+	// RevealFile selects path in a Finder window (callers pass only files they saved).
+	RevealFile(path string) error
 }

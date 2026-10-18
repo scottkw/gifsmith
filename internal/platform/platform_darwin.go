@@ -160,3 +160,6 @@ func releasePasteboard(name string) {
 	defer C.free(unsafe.Pointer(cn))
 	C.gsReleasePasteboard(cn)
 }
+
+// RevealFile is a RED skeleton.
+func (darwin) RevealFile(path string) error { return ErrUnsupported }

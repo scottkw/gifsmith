@@ -16,6 +16,7 @@ type Fake struct {
 	Trusted   bool
 	Frontmost App
 	PasteErr  error
+	RevealErr error
 	// FrontmostErr makes FrontmostApp fail (nil frontmostApplication during app switches or at the lock screen).
 	FrontmostErr error
 	// ActivateSetsFrontmost makes ActivateApp succeed; otherwise it is declined (Frontmost unchanged).
@@ -74,6 +75,11 @@ func (f *Fake) AccessibilityTrusted(prompt bool) bool {
 func (f *Fake) OpenAccessibilitySettings() error {
 	f.Note("OpenAccessibilitySettings")
 	return nil
+}
+
+func (f *Fake) RevealFile(path string) error {
+	f.Note("RevealFile:" + path)
+	return f.RevealErr
 }
 
 func (f *Fake) PasteShortcut() error {

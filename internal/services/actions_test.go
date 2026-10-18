@@ -857,3 +857,66 @@ func TestDownloadRefusesWhileBusy(t *testing.T) {
 		t.Errorf("busy download wrote %d entries, made %d requests", len(ents), fx.hits.Load())
 	}
 }
+
+// D-22: Show in Finder reveals only the file Go saved last; JS never sends a path.
+func TestShowDownloadRevealsLastDownload(t *testing.T) {
+	f := &platform.Fake{}
+	s, fx, dl := downloadService(t, f)
+	if _, err := s.Download(context.Background(), fx.gif); err != nil {
+		t.Fatal(err)
+	}
+	r, err := s.Download(context.Background(), fx.gif)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ShowDownload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"RevealFile:" + filepath.Join(dl, r.Name)}; !slices.Equal(f.Calls, want) {
+		t.Errorf("calls = %q, want %q", f.Calls, want)
+	}
+}
+
+func TestShowDownloadNothingToShow(t *testing.T) {
+	f := &platform.Fake{}
+	s, fx, _ := downloadService(t, f)
+	if err := s.ShowDownload(context.Background()); actionKind(err) != "nothing_to_show" {
+		t.Errorf("err = %v, want kind nothing_to_show", err)
+	}
+	g := fx.gif
+	g.DownloadURL = strings.Replace(g.DownloadURL, "office-1", "broken-1", 1)
+	_, _ = s.Download(context.Background(), g) // a failed download leaves nothing to show either
+	if err := s.ShowDownload(context.Background()); actionKind(err) != "nothing_to_show" {
+		t.Errorf("after a failed download: err = %v, want kind nothing_to_show", err)
+	}
+	if len(f.Calls) != 0 {
+		t.Errorf("calls = %q, want none", f.Calls)
+	}
+}
+
+func TestShowDownloadRevealError(t *testing.T) {
+	f := &platform.Fake{RevealErr: errors.New("finder said no")}
+	s, fx, _ := downloadService(t, f)
+	if _, err := s.Download(context.Background(), fx.gif); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ShowDownload(context.Background()); actionKind(err) != "open_failed" {
+		t.Errorf("err = %v, want kind open_failed", err)
+	}
+}
+
+func TestShowDownloadRefusesWhileBusy(t *testing.T) {
+	f := &platform.Fake{}
+	s, fx, _ := downloadService(t, f)
+	if _, err := s.Download(context.Background(), fx.gif); err != nil {
+		t.Fatal(err)
+	}
+	s.busy.Lock()
+	defer s.busy.Unlock()
+	if err := s.ShowDownload(context.Background()); !errors.Is(err, ErrBusy) {
+		t.Errorf("err = %v, want ErrBusy", err)
+	}
+	if len(f.Calls) != 0 {
+		t.Errorf("calls = %q, want none", f.Calls)
+	}
+}

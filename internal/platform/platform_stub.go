@@ -18,3 +18,4 @@ func (stub) ActivateApp(int) error            { return ErrUnsupported }
 func (stub) AccessibilityTrusted(bool) bool   { return false }
 func (stub) OpenAccessibilitySettings() error { return ErrUnsupported }
 func (stub) PasteShortcut() error             { return ErrUnsupported }
+func (stub) RevealFile(string) error          { return ErrUnsupported }

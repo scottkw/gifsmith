@@ -379,3 +379,6 @@ func (a *ActionService) Download(ctx context.Context, g provider.Gif) (DownloadR
 	log.Printf("download %s: saved", g.Provider)
 	return DownloadResult{Name: filepath.Base(path), Folder: filepath.Base(dir)}, nil
 }
+
+// ShowDownload is a RED skeleton.
+func (a *ActionService) ShowDownload(ctx context.Context) error { return nil }
