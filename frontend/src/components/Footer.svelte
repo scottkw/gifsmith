@@ -51,7 +51,7 @@
     {/if}
   </span>
   {#if needsAccessibility}
-    <button onclick={onenable}>Enable Automatic Paste…</button>
+    <button class="secondary" onclick={onenable}>Enable Automatic Paste…</button>
   {:else if hints === 'details'}
     <!-- Details: "↵ Copy   ⌘K Actions   Esc Back" -->
     <span class="hints"><b>↵</b> Copy&nbsp;&nbsp;&nbsp;<b>⌘K</b> Actions&nbsp;&nbsp;&nbsp;<b>Esc</b> Back</span>
@@ -142,5 +142,16 @@
   }
   button {
     font: var(--label);
+  }
+  /* P2: secondary compact button. */
+  .secondary {
+    height: 24px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 6px;
+    background: var(--surface-active);
+    color: var(--text);
+    font: 600 12px/16px var(--font);
+    cursor: pointer;
   }
 </style>

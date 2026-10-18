@@ -148,4 +148,7 @@
     color: var(--accent);
     cursor: pointer;
   }
+  .link:hover {
+    text-decoration: underline;
+  }
 </style>

@@ -75,7 +75,7 @@
     background: var(--surface-active);
     color: var(--text);
   }
-  button.off {
+  button.off:not(.active) {
     color: var(--text-tertiary);
   }
   .divider {

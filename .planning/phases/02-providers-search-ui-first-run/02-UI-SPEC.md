@@ -135,7 +135,7 @@ Two themes driven by `prefers-color-scheme`. Values are CSS custom properties in
 
 **Accent reserved for (exhaustive):**
 1. Selected-tile ring (2px outline)
-2. Primary button fill (via `--accent-fill`): "Save Key" (S1), "Add GIPHY Key" (C1), and "Open GIPHY Dashboard ↗" (C2, an `<a>` styled as a primary button)
+2. Primary button fill (via `--accent-fill`): "Save Key" (S1), "Add GIPHY Key" (C1), and "Email clips@giphy.com ↗" (C2, an `<a>` styled as a primary button; amended in 03-07, shipped 02-06 copy)
 3. Text links (`--accent` text, underline on hover): "Get a free key ↗" (S1) and the inline "Try Again" link in the end row (S12a / E6)
 4. `:focus-visible` ring on buttons, links, and the key field (2px outline, 2px offset)
 5. Search input and key field caret (`caret-color`)
@@ -229,7 +229,7 @@ Exactly one state renders in the 364px content area. State messages are centered
 - Grid states (S3, S4, S5, S6, S9a, S12a): the selected tile and its 2px accent ring.
 - No grid to select from, either because the query is empty and the provider has no trending list (S8) or because the first page is still loading (S2): the search input (22px Display text, accent caret), since typing is the next action.
 - Setup card (S1, S1a, S1b, S13): the setup card, specifically the key field and the `Save Key` primary button (the only accent-filled element on screen).
-- Message states (S7, S9, S10, S11, S12, C1, C2): the 18/600 heading, followed by the state's single button (`Try Again`, `Add GIPHY Key`, or `Open GIPHY Dashboard ↗`).
+- Message states (S7, S9, S10, S11, S12, C1, C2): the 18/600 heading, followed by the state's single button (`Try Again`, `Add GIPHY Key`, or `Email clips@giphy.com ↗`).
 
 | ID | State | Trigger | Visual |
 |----|-------|---------|--------|
@@ -252,7 +252,7 @@ Exactly one state renders in the 364px content area. State messages are centered
 | S12a | Error while paging | Network, timeout, or provider error on page 2+ | Results stay. The 48px end row shows `Couldn't load more.` (12px `--text-secondary`), a 4px gap, then a `Try Again` text link (12px, `--accent`, accent list item 3) |
 | S13 | Saved key rejected | 401/403 during search with a stored key | S1 setup card for that provider, with row K6 pre-filled in the inline message slot (`--destructive`). Saving a new key overwrites the Keychain entry **[default: avoids a dead end before Phase 4 Settings]** |
 | C1 | Clips: no GIPHY key | Clips chosen, no GIPHY key | State message, rows C1, primary `Add GIPHY Key` (switches to GIPHY, which shows S1) |
-| C2 | Clips: key lacks access | Clips probe failed for a valid key | State message, rows C2. Primary `Open GIPHY Dashboard ↗` is an `<a>` styled as a primary button (`--accent-fill`, white text). Secondary: `Back to GIPHY` |
+| C2 | Clips: key lacks access | Clips probe failed for a valid key | State message, rows C2. Primary `Email clips@giphy.com ↗` (a pre-addressed `mailto:`) is an `<a>` styled as a primary button (`--accent-fill`, white text). Secondary: `Back to GIPHY` |
 
 Every error state is scoped to its own provider tab. Switching tabs shows the other provider's own state, so one failing provider never blocks the rest. Raw response bodies, URLs, and keys never render. Only the provider name and, for S12, the HTTP status code appear.
 
@@ -316,7 +316,7 @@ The link opens the default browser, which takes focus, so the panel hides (HideO
 | ID | Heading | Body | Buttons |
 |----|---------|------|---------|
 | C1 | `Clips use your GIPHY key` | `Add a GIPHY key first. Gifsmith checks it for Clips access automatically.` | Primary `Add GIPHY Key` |
-| C2 | `Clips aren't enabled for your key` | `Your GIPHY key works for GIFs, but GIPHY has to approve it for Clips. Request Clips access in the GIPHY developer dashboard, then reopen Gifsmith.` | Primary `Open GIPHY Dashboard ↗` (→ `https://developers.giphy.com/dashboard/`), Secondary `Back to GIPHY` |
+| C2 | `Clips aren't enabled for your key` | `Your GIPHY key works for GIFs, but GIPHY has to approve it for Clips. Email clips@giphy.com to request access, then reopen Gifsmith.` | Primary `Email clips@giphy.com ↗` (→ `mailto:clips@giphy.com?subject=GIPHY%20Clips%20API%20access%20request`), Secondary `Back to GIPHY` |
 | — | Clips slot tooltip (`title`) | `Clips need a GIPHY key approved for Clips` | — |
 
 **Status.** `Copying…` · `Copied — press ⌘V to paste` · Phase 1 paste and Accessibility strings unchanged · button `Enable Automatic Paste…`.

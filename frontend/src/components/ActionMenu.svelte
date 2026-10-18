@@ -136,6 +136,10 @@
     font: var(--body);
     caret-color: var(--accent);
   }
+  /* The filter always holds focus while the menu is open: no shared ring (P1). */
+  input:focus-visible {
+    outline: 0;
+  }
   input::placeholder {
     color: var(--text-secondary);
   }

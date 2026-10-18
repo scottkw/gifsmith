@@ -206,7 +206,11 @@
 
   const byId = (list: ProviderStatus[]) => Object.fromEntries(list.map((p) => [p.id, p]));
   async function refreshProviders() {
+    const before = clipsState;
     statuses = byId(await providers());
+    // IN-04: Clips just became enabled, so an error stored before (e.g. GIPHY offline at boot) is stale.
+    // Only on enabled: clearing on 'unknown' would re-probe after every failed probe.
+    if (clipsEnabled && clipsState !== before && states.clips.status === 'error') setResults('clips', null, null);
     // The Clips probe settled while Clips is on screen: its grid, or one re-probe for an unknown result.
     if (active === 'clips' && clipsEnabled) show('clips');
     else if (active === 'clips' && clipsState === 'unknown' && states.clips.status !== 'error') recheckClips();
@@ -1108,6 +1112,14 @@
     color: var(--text);
     font: var(--display);
     caret-color: var(--accent);
+  }
+  /* Opts out of the shared focus ring: the combobox always holds focus (P1). */
+  input:focus-visible {
+    outline: 0;
+  }
+  /* P7: stale query text behind a setup card reads as inactive. */
+  input:disabled {
+    color: var(--text-tertiary);
   }
   input::placeholder {
     color: var(--text-secondary);
