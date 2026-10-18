@@ -1139,6 +1139,26 @@ func TestCopySquareDecodeBudgetExtensions(t *testing.T) {
 	}
 }
 
+// CR-01 (iteration 3): Go keeps ~4 KB per frame (a cloned palette when a frame is transparent)
+// whatever its size, so a file of empty 0x0 transparent frames must still exhaust the budget.
+func TestCopySquareDecodeBudgetEmptyFrames(t *testing.T) {
+	head := []byte("GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff") // 1x1, 2-colour global table
+	unit := []byte{0x21, 0xF9, 0x04, 0x01, 0, 0, 0, 0, 0x2C, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x02, 0x00}
+	n := int(SquareMaxPixels/frameOverhead) + 10
+	body := append(append(append([]byte{}, head...), bytes.Repeat(unit, n)...), 0x3B)
+	if len(body) > SquareMaxBytes {
+		t.Fatalf("file is %d bytes, want under the %d byte cap", len(body), SquareMaxBytes)
+	}
+	f := &platform.Fake{}
+	s, g := rawService(t, f, bytes.NewReader(body))
+	if _, err := s.CopySquare(context.Background(), g); actionKind(err) != "crop_failed" {
+		t.Errorf("err = %v, want kind crop_failed", err)
+	}
+	if len(f.Calls) != 0 {
+		t.Errorf("calls = %q, want none", f.Calls)
+	}
+}
+
 func TestPasteSquareTrusted(t *testing.T) {
 	f := &platform.Fake{Trusted: true, Frontmost: prevApp}
 	s, fx := newPasteService(t, f)
