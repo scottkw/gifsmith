@@ -90,6 +90,10 @@ func (s *Service) Invalidate(p provider.ID) {
 	s.gen[budget(p)]++
 }
 
+// Flush drops the cached pages of every provider on p's budget because a provider parameter
+// changed (rating, page size, language, country). The 429 block stays: the key did not change.
+func (s *Service) Flush(p provider.ID) {}
+
 // Guard runs an uncached call (the Clips probe) inside p's 429 budget: refused
 // while blocked, and a 429 it returns blocks the budget like any other request.
 func (s *Service) Guard(p provider.ID, call func() error) error {

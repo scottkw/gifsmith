@@ -53,6 +53,8 @@ func newSettings(t *testing.T, base string) settingsFixture {
 		base = srv.URL
 	}
 	hc := &http.Client{Timeout: 2 * time.Second}
+	var s *SettingsService // set below; clients read its Params per request, as in main.go
+	params := func() provider.Params { return s.Params() }
 	store := settings.NewMemoryStore()
 	keys := settings.NewKeys(store)
 	keys.Load()
@@ -61,11 +63,11 @@ func newSettings(t *testing.T, base string) settingsFixture {
 		if p == provider.Klipy {
 			return &klipy.Client{BaseURL: base + "/klipy", Key: k, HTTP: hc}
 		}
-		return &giphy.Client{BaseURL: base + "/giphy", Key: k, HTTP: hc}
+		return &giphy.Client{BaseURL: base + "/giphy", Key: k, HTTP: hc, Params: params}
 	}
-	clipsClient := &giphy.Client{BaseURL: base + "/giphy", Key: keys.Func(provider.GIPHY), HTTP: hc, Clips: true}
+	clipsClient := &giphy.Client{BaseURL: base + "/giphy", Key: keys.Func(provider.GIPHY), HTTP: hc, Clips: true, Params: params}
 	svc := search.New(map[provider.ID]provider.Provider{
-		provider.GIPHY: &giphy.Client{BaseURL: base + "/giphy", Key: keys.Func(provider.GIPHY), HTTP: hc},
+		provider.GIPHY: &giphy.Client{BaseURL: base + "/giphy", Key: keys.Func(provider.GIPHY), HTTP: hc, Params: params},
 		provider.Clips: clipsClient,
 		provider.Klipy: &klipy.Client{BaseURL: base + "/klipy", Key: keys.Func(provider.Klipy), HTTP: hc},
 	}, nil)
@@ -82,7 +84,7 @@ func newSettings(t *testing.T, base string) settingsFixture {
 	events := []string{}
 	data := []any{}
 	dir := t.TempDir()
-	s := &SettingsService{Keys: keys, Store: settings.OpenStore(dir), Svc: svc, NewClient: newClient, Emit: func(n string, d ...any) {
+	s = &SettingsService{Keys: keys, Store: settings.OpenStore(dir), Svc: svc, NewClient: newClient, Emit: func(n string, d ...any) {
 		mu.Lock()
 		defer mu.Unlock()
 		events = append(events, n)
@@ -869,5 +871,79 @@ func TestCheckClipsUnknown(t *testing.T) {
 	f.clips.Reset()
 	if s, err := f.gifs.CheckClips(ctx); s != "enabled" || err != nil || f.probes.Load() != 2 {
 		t.Errorf("CheckClips retry = %q, %v, probes %d; want enabled, nil, 2", s, err, f.probes.Load())
+	}
+}
+
+// SRCH-09 tracer: a rating change is stored, flushes GIPHY's cached pages and reaches the next request.
+func TestSetPrefGiphyRating(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	if err := f.svc.SaveKey(ctx, "giphy", "uat-key-123"); err != nil { // seeds GIPHY trending
+		t.Fatal(err)
+	}
+	*f.events = (*f.events)[:0]
+	*f.data = (*f.data)[:0]
+	snap, err := f.svc.SetPref(ctx, "giphyRating", "g")
+	if err != nil || snap.GiphyRating != "g" {
+		t.Fatalf("SetPref(giphyRating, g) = %+v, %v", snap, err)
+	}
+	if got := f.svc.Store.Get().GiphyRating; got != "g" {
+		t.Errorf("stored rating = %q, want g", got)
+	}
+	if got := *f.events; len(got) != 1 || got[0] != "settings:changed" {
+		t.Fatalf("events = %v, want [settings:changed]", got)
+	}
+	if got, ok := (*f.data)[0].(Snapshot); !ok || got.GiphyRating != "g" {
+		t.Errorf("payload = %#v, want giphyRating g", (*f.data)[0])
+	}
+	if p := f.svc.Params(); p.Rating != "g" {
+		t.Errorf("Params().Rating = %q, want g", p.Rating)
+	}
+	before := f.hits.Load()
+	p, err := f.gifs.Trending(ctx, "giphy", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := f.hits.Load() - before; n != 1 {
+		t.Errorf("Trending after a rating change made %d requests, want 1 (cache flushed)", n)
+	}
+	if !strings.HasPrefix(p.Items[0].Title, "[rating=g] ") {
+		t.Errorf("first title %q: the request did not carry rating=g", p.Items[0].Title)
+	}
+	// The same value again: no write, no flush, no event.
+	if err := os.Remove(filepath.Join(f.dir, "settings.json")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.SetPref(ctx, "giphyRating", "g"); err != nil {
+		t.Fatal(err)
+	}
+	before = f.hits.Load()
+	_, _ = f.gifs.Trending(ctx, "giphy", "")
+	if n := f.hits.Load() - before; n != 0 || len(*f.events) != 1 {
+		t.Errorf("unchanged rating: %d requests, events %v; want cached, no event", n, *f.events)
+	}
+	if _, err := os.Stat(filepath.Join(f.dir, "settings.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("an unchanged rating was written (stat err %v)", err)
+	}
+}
+
+func TestSetPrefGiphyRatingInvalid(t *testing.T) {
+	f := newSettings(t, "")
+	for _, v := range []string{"", "nc-17", "PG"} {
+		_, err := f.svc.SetPref(context.Background(), "giphyRating", v)
+		wantSettingsErr(t, err, "invalid_value")
+	}
+	if len(*f.events) != 0 {
+		t.Errorf("events = %v, want none", *f.events)
+	}
+}
+
+func TestParamsDefaultRating(t *testing.T) {
+	f := newSettings(t, "")
+	if p := f.svc.Params(); p.Rating != "pg-13" || p.PageSize != 24 {
+		t.Errorf("Params() = %+v, want rating pg-13 and page size 24", p)
+	}
+	if s := f.svc.Snapshot(context.Background()); s.GiphyRating != "pg-13" {
+		t.Errorf("Snapshot.GiphyRating = %q, want pg-13 (resolved)", s.GiphyRating)
 	}
 }

@@ -24,6 +24,8 @@ type Client struct {
 	Key     func() (string, bool)
 	HTTP    *http.Client
 	Clips   bool // GIPHY Clips endpoints: provider ID clips, DownloadURL is the clip's MP4 (clipRendition)
+	// Params is read on every request (page size, rating, language); nil = provider.DefaultParams().
+	Params func() provider.Params
 }
 
 // flexInt accepts "200", 200, "" and null: GIPHY sends some numerics as strings.

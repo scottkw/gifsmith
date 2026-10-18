@@ -124,6 +124,7 @@ type Prefs struct {
 	LastProvider  string `json:"lastProvider"`
 	Theme         string `json:"theme,omitempty"` // "" = system | "light" | "dark"
 	LaunchAtLogin bool   `json:"launchAtLogin,omitempty"`
+	GiphyRating   string `json:"giphyRating,omitempty"` // "" = pg-13
 }
 
 // Normalize resets invalid values to their declared defaults and returns the reset field names.

@@ -564,3 +564,27 @@ func TestClipsRendition(t *testing.T) {
 		}
 	}
 }
+
+// Rating comes from Params on every request; nil Params sends the declared defaults.
+func TestParamsRating(t *testing.T) {
+	c, _, last := stubClient(t, 200, nil, page(1, 1))
+	c.Params = func() provider.Params { p := provider.DefaultParams(); p.Rating = "g"; return p }
+	for _, call := range []func() error{
+		func() error { _, err := c.Search(context.Background(), "cat", ""); return err },
+		func() error { _, err := c.Trending(context.Background(), ""); return err },
+	} {
+		if err := call(); err != nil {
+			t.Fatal(err)
+		}
+		if got := last().Query().Get("rating"); got != "g" {
+			t.Errorf("%s: rating = %q, want g", last().Path, got)
+		}
+	}
+	c.Params = nil
+	if _, err := c.Trending(context.Background(), ""); err != nil {
+		t.Fatal(err)
+	}
+	if v := last().Query(); v.Get("rating") != "pg-13" || v.Get("limit") != "24" {
+		t.Errorf("nil Params: rating %q limit %q, want pg-13 24", v.Get("rating"), v.Get("limit"))
+	}
+}

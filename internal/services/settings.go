@@ -102,7 +102,12 @@ type Autostarter interface {
 type Snapshot struct {
 	Theme         string `json:"theme"`
 	LaunchAtLogin bool   `json:"launchAtLogin"`
+	GiphyRating   string `json:"giphyRating"` // resolved: never ""
 }
+
+// Params are the provider parameters for the next request: the defaults overlaid with the
+// stored choices. Clients call it on every request.
+func (s *SettingsService) Params() provider.Params { return provider.DefaultParams() }
 
 func (s *SettingsService) Snapshot(ctx context.Context) Snapshot { return s.snapshotOf(s.Store.Get()) }
 

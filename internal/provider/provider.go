@@ -58,6 +58,29 @@ func ClampID(s string) string {
 // PageSize is the requested page size (6 rows of 4); clients clamp it to vendor limits.
 const PageSize = 24
 
+// DefaultPageSize is the page size when the user has not chosen one.
+const DefaultPageSize = 24
+
+// Params are the user's per-request provider settings (Settings → Search). Clients read them
+// on every request, so a change applies to the next call.
+type Params struct {
+	PageSize int    // one of PageSizes; clients clamp to vendor limits
+	Rating   string // GIPHY and Clips only; one of Ratings
+	Lang     string // GIPHY language code, search only
+	Country  string // Klipy locale, lowercase ISO 3166-1 alpha-2
+}
+
+// PageSizes and Ratings are the allowed choices, in display order.
+var (
+	PageSizes = []int{24, 36, 48}
+	Ratings   = []string{"g", "pg", "pg-13", "r"}
+)
+
+// DefaultParams are the values a fresh install sends.
+func DefaultParams() Params {
+	return Params{PageSize: DefaultPageSize, Rating: "pg-13", Lang: "en", Country: "us"}
+}
+
 type Gif struct {
 	Provider    ID     `json:"provider"`
 	ID          string `json:"id"` // GIPHY id, Klipy slug, Finer fileid
