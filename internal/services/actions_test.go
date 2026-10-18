@@ -1120,3 +1120,95 @@ func TestPasteSquareKlipyGrace(t *testing.T) {
 		t.Error("Klipy square dir still there after the grace timer ran")
 	}
 }
+
+// recentsRecorder is ActionService.Recents for tests: it records provider:id per Touch.
+type recentsRecorder struct {
+	keys []string
+	err  error
+}
+
+func (r *recentsRecorder) Touch(g provider.Gif) error {
+	r.keys = append(r.keys, string(g.Provider)+":"+g.ID)
+	return r.err
+}
+
+// Every successful copy or paste lands in Recents once, including copy-only paste fallbacks (D-07).
+func TestRecentsRecordedOnEverySuccessfulCopy(t *testing.T) {
+	ctx := context.Background()
+	for name, run := range map[string]func(s *ActionService, g provider.Gif) (Result, error){
+		"Copy":           func(s *ActionService, g provider.Gif) (Result, error) { return s.Copy(ctx, g) },
+		"Paste":          func(s *ActionService, g provider.Gif) (Result, error) { return s.Paste(ctx, g) },
+		"CopyText link":  func(s *ActionService, g provider.Gif) (Result, error) { return s.CopyText(ctx, g, "link") },
+		"CopyText md":    func(s *ActionService, g provider.Gif) (Result, error) { return s.CopyText(ctx, g, "markdown") },
+		"PasteText link": func(s *ActionService, g provider.Gif) (Result, error) { return s.PasteText(ctx, g, "link") },
+		"PasteText md":   func(s *ActionService, g provider.Gif) (Result, error) { return s.PasteText(ctx, g, "markdown") },
+		"CopySquare": func(s *ActionService, g provider.Gif) (Result, error) {
+			return s.CopySquare(ctx, squareOf(g, "wide-1"))
+		},
+		"PasteSquare": func(s *ActionService, g provider.Gif) (Result, error) {
+			return s.PasteSquare(ctx, squareOf(g, "wide-1"))
+		},
+	} {
+		f := &platform.Fake{} // untrusted: pastes fall back to copy only, which still counts
+		s, fx := newPasteService(t, f)
+		rec := &recentsRecorder{}
+		s.Recents = rec
+		r, err := run(s, fx.gif)
+		if err != nil || !r.Copied {
+			t.Fatalf("%s: %+v, %v", name, r, err)
+		}
+		if len(rec.keys) != 1 {
+			t.Errorf("%s: %d Touch calls, want 1", name, len(rec.keys))
+		}
+	}
+	// A trusted paste that posted ⌘V records too.
+	f := &platform.Fake{Trusted: true, Frontmost: prevApp}
+	s := vendorService(f)
+	rec := &recentsRecorder{}
+	s.Recents = rec
+	if r, err := s.PasteText(ctx, giphyGif, "link"); err != nil || !r.Pasted || len(rec.keys) != 1 || rec.keys[0] != "giphy:a" {
+		t.Errorf("trusted PasteText: %+v, %v, touches %q", r, err, rec.keys)
+	}
+}
+
+// Page links, downloads, failures and busy refusals never touch Recents.
+func TestRecentsNotRecorded(t *testing.T) {
+	ctx := context.Background()
+	f := &platform.Fake{}
+	s := vendorService(f)
+	rec := &recentsRecorder{}
+	s.Recents = rec
+	if _, err := s.CopyText(ctx, giphyGif, "page"); err != nil {
+		t.Fatal(err)
+	}
+	ds, fx, _ := downloadService(t, &platform.Fake{})
+	ds.Recents = rec
+	if _, err := ds.Download(ctx, fx.gif); err != nil {
+		t.Fatal(err)
+	}
+	broken := fx.gif
+	broken.DownloadURL = strings.Replace(broken.DownloadURL, "office-1", "broken-1", 1)
+	if _, err := ds.Copy(ctx, broken); err == nil {
+		t.Fatal("copy of broken media succeeded")
+	}
+	ds.busy.Lock()
+	if _, err := ds.Copy(ctx, fx.gif); !errors.Is(err, ErrBusy) {
+		t.Fatalf("busy copy: %v", err)
+	}
+	ds.busy.Unlock()
+	if len(rec.keys) != 0 {
+		t.Errorf("touches %q, want none", rec.keys)
+	}
+}
+
+// A Recents write failure is logged; the action still reports its result.
+func TestRecentsErrorDoesNotFailAction(t *testing.T) {
+	f := &platform.Fake{}
+	s, fx := newService(t, f)
+	rec := &recentsRecorder{err: errors.New("disk full")}
+	s.Recents = rec
+	r, err := s.Copy(context.Background(), fx.gif)
+	if err != nil || !r.Copied || len(rec.keys) != 1 {
+		t.Errorf("copy with failing Recents: %+v, %v, touches %q", r, err, rec.keys)
+	}
+}

@@ -46,6 +46,8 @@ type ActionService struct {
 	After    func(time.Duration, func()) // nil means time.AfterFunc
 	// DownloadsDir is the download destination (desktop ~/Downloads; Phase 4's picker replaces it).
 	DownloadsDir func() string
+	// Recents records every successful copy or paste (D-07); nil records nothing.
+	Recents interface{ Touch(provider.Gif) error }
 	busy         sync.Mutex    // one action at a time: no racing pasteboard writes, no double ⌘V
 	gen          atomic.Uint64 // bumped on every clipboard write; a Klipy timer deletes only if unchanged
 	lastDownload string        // the file Show in Finder reveals; guarded by busy

@@ -168,3 +168,6 @@ func SavePrefs(dir string, p Prefs) error {
 	}
 	return err
 }
+
+// WriteJSONAtomic is a skeleton (RED).
+func WriteJSONAtomic(dir, name string, v any) error { return nil }
