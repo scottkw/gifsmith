@@ -50,10 +50,10 @@
 
 ### Library
 
-- [ ] **LIBR-01**: User can add/remove a GIF to Favorites
-- [ ] **LIBR-02**: Every successful copy/paste records the GIF in Recents (most recent first, capped)
-- [ ] **LIBR-03**: User can browse Favorites and Recents, grouped by provider (never blended), and remove items from Recents
-- [ ] **LIBR-04**: Favorites and Recents render from saved metadata without API calls (work offline/rate-limited)
+- [x] **LIBR-01**: User can add/remove a GIF to Favorites
+- [x] **LIBR-02**: Every successful copy/paste records the GIF in Recents (most recent first, capped)
+- [x] **LIBR-03**: User can browse Favorites and Recents, grouped by provider (never blended), and remove items from Recents
+- [x] **LIBR-04**: Favorites and Recents render from saved metadata without API calls (work offline/rate-limited)
 - [ ] **LIBR-05**: User can open a details view for a GIF (title, size, dimensions, tags, source links)
 
 ### Settings
@@ -134,10 +134,10 @@
 | ACTN-09 | Phase 3 | Pending |
 | ACTN-10 | Phase 3 | Pending |
 | ACTN-11 | Phase 3 | Complete |
-| LIBR-01 | Phase 3 | Pending |
-| LIBR-02 | Phase 3 | Pending |
-| LIBR-03 | Phase 3 | Pending |
-| LIBR-04 | Phase 3 | Pending |
+| LIBR-01 | Phase 3 | Complete |
+| LIBR-02 | Phase 3 | Complete |
+| LIBR-03 | Phase 3 | Complete |
+| LIBR-04 | Phase 3 | Complete |
 | LIBR-05 | Phase 3 | Pending |
 | SETT-01 | Phase 4 | Pending |
 | SETT-02 | Phase 4 | Pending |
