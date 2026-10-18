@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
@@ -145,7 +146,27 @@ func (s *Store) Sweep(keep string) error {
 	if err != nil || strings.HasPrefix(rel, "..") {
 		return ErrNotAllowed
 	}
-	keepDir := strings.SplitN(filepath.ToSlash(rel), "/", 2)[0]
+	return s.removeExcept(strings.SplitN(filepath.ToSlash(rel), "/", 2)[0])
+}
+
+// Clear removes every entry in Dir (at launch, at quit, after a text copy); a missing Dir is fine.
+func (s *Store) Clear() error {
+	if err := s.removeExcept(""); !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
+// Remove deletes one staged entry of Dir; Dir itself and anything outside it are refused.
+func (s *Store) Remove(dir string) error {
+	rel, err := filepath.Rel(s.Dir, dir)
+	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+		return ErrNotAllowed
+	}
+	return os.RemoveAll(filepath.Join(s.Dir, rel))
+}
+
+func (s *Store) removeExcept(keepDir string) error {
 	ents, err := os.ReadDir(s.Dir)
 	if err != nil {
 		return err
@@ -158,12 +179,6 @@ func (s *Store) Sweep(keep string) error {
 	}
 	return errors.Join(errs...)
 }
-
-// Clear removes every entry in Dir. Skeleton (03-03 RED).
-func (s *Store) Clear() error { return nil }
-
-// Remove deletes one staged directory. Skeleton (03-03 RED).
-func (s *Store) Remove(dir string) error { return nil }
 
 // VendorAllow admits only https URLs on the provider's own media hosts (default port).
 func VendorAllow(p provider.ID, u *url.URL) bool {

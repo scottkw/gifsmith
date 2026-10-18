@@ -105,6 +105,11 @@ func main() {
 	actions.Previous = sh.Previous
 	panel.HideFunc = sh.Hide
 
+	// Staging holds only the clipboard's file; nothing from an earlier run is kept (D-17).
+	// ActionService.ServiceShutdown clears it again at quit.
+	if err := stage.Clear(); err != nil {
+		log.Printf("staging clear: %v", err)
+	}
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}

@@ -7,8 +7,10 @@ import (
 	"errors"
 	"log"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"gifsmith/internal/platform"
@@ -37,24 +39,26 @@ type ActionService struct {
 	Sleep    func(time.Duration)         // nil means time.Sleep
 	After    func(time.Duration, func()) // nil means time.AfterFunc
 	busy     sync.Mutex                  // one action at a time: no racing pasteboard writes, no double ⌘V
+	gen      atomic.Uint64               // bumped on every clipboard write; a Klipy timer deletes only if unchanged
 }
 
-// stage downloads g and puts its file URL on the pasteboard. Older staged files
-// are swept only after that succeeds: until then the clipboard may point at one.
-func (a *ActionService) stage(ctx context.Context, g provider.Gif) error {
+// stage downloads g, puts its file URL on the pasteboard and returns the staged path. Older
+// staged files are swept only after that succeeds: until then the clipboard may point at one.
+func (a *ActionService) stage(ctx context.Context, g provider.Gif) (string, error) {
 	path, err := a.Staging.Fetch(ctx, g)
 	if err != nil {
 		log.Printf("stage %s: %v", g.Provider, err)
-		return stageErr(err)
+		return "", stageErr(err)
 	}
 	if err := a.Platform.CopyFile(path); err != nil {
 		log.Printf("stage %s: pasteboard: %v", g.Provider, err)
-		return actionErr("copy_failed")
+		return "", actionErr("copy_failed")
 	}
+	a.gen.Add(1)
 	if err := a.Staging.Sweep(path); err != nil {
 		log.Printf("staging sweep: %v", err)
 	}
-	return nil
+	return path, nil
 }
 
 // stageErr maps the staging sentinels to action kinds (they never carry a URL either).
@@ -77,7 +81,7 @@ func (a *ActionService) Copy(ctx context.Context, g provider.Gif) (Result, error
 		return Result{}, ErrBusy
 	}
 	defer a.busy.Unlock()
-	if err := a.stage(ctx, g); err != nil {
+	if _, err := a.stage(ctx, g); err != nil {
 		return Result{}, err
 	}
 	log.Printf("copy: staged and copied")
@@ -98,7 +102,35 @@ func (a *ActionService) Paste(ctx context.Context, g provider.Gif) (Result, erro
 	if g.IsClip {
 		msg = "Pasted MP4"
 	}
-	return a.paste(func() error { return a.stage(ctx, g) }, msg)
+	var path string
+	r, err := a.paste(func() (err error) { path, err = a.stage(ctx, g); return err }, msg)
+	if r.Pasted && g.Provider == provider.Klipy {
+		a.expire(path)
+	}
+	return r, err
+}
+
+// expire deletes a pasted Klipy file KlipyPasteGrace after ⌘V (D-19: Klipy media is not retained),
+// unless the clipboard was written since: a newer copy of the same GIF reuses the same directory.
+// The caller holds busy, so gen is this paste's generation.
+func (a *ActionService) expire(path string) {
+	dir, gen := filepath.Dir(path), a.gen.Load()
+	after := a.After
+	if after == nil {
+		after = func(d time.Duration, f func()) { time.AfterFunc(d, f) }
+	}
+	after(KlipyPasteGrace, func() {
+		// busy keeps a copy from re-staging dir between the check and the removal.
+		// shortcut: a keypress landing in the microseconds this holds busy is refused as busy; fine at this rate.
+		a.busy.Lock()
+		defer a.busy.Unlock()
+		if a.gen.Load() != gen {
+			return
+		}
+		if err := a.Staging.Remove(dir); err != nil {
+			log.Printf("klipy grace delete: %v", err)
+		}
+	})
 }
 
 // paste runs put (which fills the clipboard), then hides the panel and posts one ⌘V to the
@@ -187,6 +219,11 @@ func (a *ActionService) putText(g provider.Gif, kind string) error {
 	if err := a.Platform.CopyText(text); err != nil {
 		log.Printf("copy text %s %s: %v", g.Provider, kind, err)
 		return actionErr("copy_failed")
+	}
+	a.gen.Add(1)
+	// The clipboard no longer points at a staged file, so none is kept (D-17).
+	if err := a.Staging.Clear(); err != nil {
+		log.Printf("staging clear: %v", err)
 	}
 	log.Printf("copy text: %s %s", g.Provider, kind)
 	return nil
@@ -300,5 +337,9 @@ func (a *ActionService) RequestAccessibility(ctx context.Context) (bool, error) 
 	return false, a.Platform.OpenAccessibilitySettings()
 }
 
-// ServiceShutdown is a skeleton (03-03 RED).
-func (a *ActionService) ServiceShutdown() error { return nil }
+// ServiceShutdown is the Wails service hook run on Quit, ⌘Q and SIGINT/SIGTERM: staging holds only
+// the clipboard's file, and it does not outlive the app (D-17). It runs on the main thread inside
+// Wails cleanup, so no busy lock and no onMain: an action still running must not block quitting.
+func (a *ActionService) ServiceShutdown() error {
+	return a.Staging.Clear()
+}
