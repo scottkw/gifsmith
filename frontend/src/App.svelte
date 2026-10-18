@@ -275,7 +275,7 @@
       if (seq === libSeq) applyLibrary(snap, want);
     } catch {
       // Go never fails Load (unreadable files are named in the snapshot); a dead bridge shows the load error.
-      if (seq === libSeq && !library) library = { favorites: [], recents: [], searches: {}, unreadable: ['favorites', 'recents'] };
+      if (seq === libSeq && !library) library = { favorites: [], recents: [], searches: {}, unreadable: ['favorites', 'recents'], canUndo: false };
     } finally {
       clearTimeout(slow);
       if (seq === libSeq) libSlow = false;
@@ -738,9 +738,10 @@
     if (!g || !library) return;
     const k = keyOf(g);
     const on = !favKeys.has(k) && libTab !== 'favorites';
-    if (!(await mutate(() => setFavorite(g, on), 'favorites', on ? k : undefined))) return;
+    const lib = await mutate(() => setFavorite(g, on), 'favorites', on ? k : undefined);
+    if (!lib) return;
     if (on) setStatus('Added to Favorites', 'success', null, FAVORITE_TOAST_MS);
-    else undoToast('Removed from Favorites', 'favorites', k);
+    else if (lib.canUndo) undoToast('Removed from Favorites', 'favorites', k); // false: Go held no such favorite (WR-03)
   }
 
   // ⌘⌫ on a library tab: Remove from Recents, or unfavorite on the Favorites tab. No confirmation.
@@ -748,11 +749,11 @@
     const g = items[selected];
     if (!g || !libTab) return;
     if (libTab === 'favorites') return toggleFavorite();
-    if (await mutate(() => removeRecent(g), 'recents')) undoToast('Removed from Recents', 'recents', keyOf(g));
+    if ((await mutate(() => removeRecent(g), 'recents'))?.canUndo) undoToast('Removed from Recents', 'recents', keyOf(g));
   }
 
   async function clearAll() {
-    if (await mutate(clearRecents, 'recents')) undoToast('Cleared Recents', 'recents', '');
+    if ((await mutate(clearRecents, 'recents'))?.canUndo) undoToast('Cleared Recents', 'recents', '');
   }
 
   // T8–T10: Undo restores the latest removal and reselects it ('' = the first item, after Clear Recents).
@@ -761,14 +762,16 @@
     setStatus(text, '', { label: 'Undo', hint: '⌘Z', run }, UNDO_TOAST_MS);
   }
 
-  // Runs one library change and applies its fresh lists; on failure F5 shows and the lists stay as they were.
-  async function mutate(call: () => Promise<Library>, list: LibraryId, want?: string): Promise<boolean> {
+  // Runs one library change, applies its fresh lists and returns them; on failure F5 shows, the
+  // lists stay as they were and it returns null.
+  async function mutate(call: () => Promise<Library>, list: LibraryId, want?: string): Promise<Library | null> {
     try {
-      applyLibrary(await call(), want);
-      return true;
+      const lib = await call();
+      applyLibrary(lib, want);
+      return lib;
     } catch {
       setStatus(libraryErrorText(list), 'error');
-      return false;
+      return null;
     }
   }
 

@@ -48,6 +48,9 @@ type Snapshot struct {
 	Recents    []Entry             `json:"recents"`
 	Searches   map[string][]string `json:"searches"`
 	Unreadable []string            `json:"unreadable"`
+	// CanUndo is whether Undo has a removal to restore; a removal that removed nothing leaves it
+	// false, so the UI offers no Undo for it (WR-03).
+	CanUndo bool `json:"canUndo"`
 }
 
 // listFile is favorites.json and recents.json, newest first.
@@ -221,6 +224,7 @@ func (s *Store) Snapshot() Snapshot {
 	} else {
 		snap.Searches = maps.Clone(m)
 	}
+	snap.CanUndo = s.undo != nil
 	return snap
 }
 
@@ -330,9 +334,11 @@ func (l *list) index(k string) []int {
 }
 
 // remove deletes the entries at idx (ascending) from l and makes them the Undo slot, replacing
-// any earlier removal. The slot changes only after the write succeeded.
+// any earlier removal. The slot changes only after the write succeeded. Removing nothing empties
+// the slot: an Undo offered for it must not restore an earlier, unrelated removal (WR-03).
 func (s *Store) remove(l *list, idx []int) error {
 	if len(idx) == 0 {
+		s.undo = nil
 		return nil
 	}
 	items := slices.Clone(l.items)

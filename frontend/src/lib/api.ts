@@ -93,12 +93,13 @@ export const hide = () => PanelService.Hide();
 
 // Favorites, Recents and recent searches: local files only, never a provider request (D-09).
 // Go never sends null lists; the generated types allow it, so normalize once here.
-export type Library = { favorites: Entry[]; recents: Entry[]; searches: Record<string, string[]>; unreadable: string[] };
+export type Library = { favorites: Entry[]; recents: Entry[]; searches: Record<string, string[]>; unreadable: string[]; canUndo: boolean };
 const library = (s: Snapshot): Library => ({
   favorites: s.favorites ?? [],
   recents: s.recents ?? [],
   searches: (s.searches ?? {}) as Record<string, string[]>,
   unreadable: s.unreadable ?? [],
+  canUndo: s.canUndo,
 });
 export const loadLibrary = async () => library(await LibraryService.Load());
 // Each mutation resolves to the fresh lists; failures reject with cause.kind library_read |

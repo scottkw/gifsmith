@@ -265,6 +265,43 @@ func TestUndoRestoresPosition(t *testing.T) {
 	}
 }
 
+// WR-03: a removal that removes nothing empties the Undo slot and reports CanUndo false, so the UI
+// shows no Undo toast and a later Undo cannot bring back an earlier, unrelated removal.
+func TestNoOpRemovalClearsUndo(t *testing.T) {
+	for name, noop := range map[string]func(*Store) error{
+		"unfavorite missing": func(s *Store) error { return s.SetFavorite(gifN(provider.GIPHY, "zz"), false) },
+		"remove missing":     func(s *Store) error { return s.RemoveRecent(provider.GIPHY, "zz") },
+		"clear empty": func(s *Store) error {
+			if err := s.ClearRecents(); err != nil {
+				return err
+			}
+			return s.ClearRecents()
+		},
+	} {
+		s := newStore(t)
+		touchAll(t, s, "b", "a")
+		if err := s.SetFavorite(gifN(provider.GIPHY, "f"), true); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.SetFavorite(gifN(provider.GIPHY, "f"), false); err != nil || !s.Snapshot().CanUndo {
+			t.Fatalf("%s: a real removal: %v, CanUndo %v; want true", name, err, s.Snapshot().CanUndo)
+		}
+		if err := noop(s); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		before := s.Snapshot()
+		if before.CanUndo {
+			t.Errorf("%s: CanUndo after a no-op removal, want false", name)
+		}
+		if err := s.Undo(); err != nil {
+			t.Fatal(err)
+		}
+		if after := s.Snapshot(); ids(after.Favorites) != ids(before.Favorites) || ids(after.Recents) != ids(before.Recents) {
+			t.Errorf("%s: Undo restored an earlier removal: favorites %q, recents %q", name, ids(after.Favorites), ids(after.Recents))
+		}
+	}
+}
+
 func TestUndoSkipsKeysPresentAgain(t *testing.T) {
 	s := newStore(t)
 	touchAll(t, s, "c", "b", "a")

@@ -23,4 +23,10 @@ export interface Snapshot {
     "recents": Entry[] | null;
     "searches": { [_ in string]?: string[] | null } | null;
     "unreadable": string[] | null;
+
+    /**
+     * CanUndo is whether Undo has a removal to restore; a removal that removed nothing leaves it
+     * false, so the UI offers no Undo for it (WR-03).
+     */
+    "canUndo": boolean;
 }
