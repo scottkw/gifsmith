@@ -113,3 +113,9 @@ test('routeKey maps Cmd+I (no Shift) to details', () => {
   assert.equal(key('i'), 'none');
   assert.equal(key('i', { metaKey: true, shiftKey: true }), 'none');
 });
+
+test('routeKey maps Cmd+, to settings, not plain or shifted comma', () => {
+  assert.equal(key(',', { metaKey: true }), 'settings');
+  assert.equal(key(','), 'none');
+  assert.equal(key(',', { metaKey: true, shiftKey: true }), 'none');
+});
