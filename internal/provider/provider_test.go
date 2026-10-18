@@ -66,3 +66,12 @@ func TestClamp(t *testing.T) {
 		t.Errorf("ClampID(at limit) = %d bytes, want %d", len(got), MaxIDBytes)
 	}
 }
+
+func TestDefaultParams(t *testing.T) {
+	if got, want := DefaultParams(), (Params{PageSize: 24, Rating: "pg-13", Lang: "en", Country: "us"}); got != want {
+		t.Errorf("DefaultParams() = %+v, want %+v", got, want)
+	}
+	if fmt.Sprint(PageSizes) != "[24 36 48]" || strings.Join(Ratings, " ") != "g pg pg-13 r" {
+		t.Errorf("PageSizes %v, Ratings %v", PageSizes, Ratings)
+	}
+}

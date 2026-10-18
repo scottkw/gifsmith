@@ -588,3 +588,38 @@ func TestParamsRating(t *testing.T) {
 		t.Errorf("nil Params: rating %q limit %q, want pg-13 24", v.Get("rating"), v.Get("limit"))
 	}
 }
+
+func sized(n int) func() provider.Params {
+	return func() provider.Params { p := provider.DefaultParams(); p.PageSize = n; return p }
+}
+
+func TestPageSizeLimit(t *testing.T) {
+	for _, n := range []int{36, 48} {
+		c, _, last := stubClient(t, 200, nil, page(1, 1))
+		c.Params = sized(n)
+		if _, err := c.Search(context.Background(), "cat", ""); err != nil {
+			t.Fatal(err)
+		}
+		if got := last().Query().Get("limit"); got != strconv.Itoa(n) {
+			t.Errorf("PageSize %d: limit = %s", n, got)
+		}
+	}
+}
+
+// "More results" follows the size actually requested, never the old 24 constant.
+func TestPageSizeMore(t *testing.T) {
+	for _, tc := range []struct {
+		n    int
+		want string
+	}{{36, "36"}, {30, ""}} {
+		c, _, _ := stubClient(t, 200, nil, page(tc.n, -1))
+		c.Params = sized(36)
+		p, err := c.Search(context.Background(), "cat", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.Next != tc.want {
+			t.Errorf("%d-item page at size 36: Next %q, want %q", tc.n, p.Next, tc.want)
+		}
+	}
+}

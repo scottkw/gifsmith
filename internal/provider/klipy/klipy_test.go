@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -419,5 +420,18 @@ func TestDimensionsFollowDownload(t *testing.T) {
 	}
 	if g := p.Items[0]; g.DownloadURL != "https://s/md.gif" || g.Width != 200 || g.Height != 150 || g.Size != 0 || g.PageURL != "" {
 		t.Errorf("md item = %+v, want md dims, unknown size, no page URL", g)
+	}
+}
+
+func TestPageSizeClamp(t *testing.T) {
+	for _, tc := range []struct{ n, want int }{{48, 48}, {4, 8}, {60, 50}} {
+		c, _, last := stubClient(t, 200, body(1, false, item("a", "https://s/sm.gif", "", "https://s/hd.gif")))
+		c.Params = func() provider.Params { p := provider.DefaultParams(); p.PageSize = tc.n; return p }
+		if _, err := c.Trending(context.Background(), ""); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(last(), "per_page="+strconv.Itoa(tc.want)+"&") && !strings.HasSuffix(last(), "per_page="+strconv.Itoa(tc.want)) {
+			t.Errorf("PageSize %d: request %s, want per_page=%d", tc.n, last(), tc.want)
+		}
 	}
 }

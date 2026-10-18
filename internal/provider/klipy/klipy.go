@@ -21,6 +21,8 @@ type Client struct {
 	BaseURL string // https://api.klipy.com
 	Key     func() (string, bool)
 	HTTP    *http.Client
+	// Params is read on every request (page size, country); nil = provider.DefaultParams().
+	Params func() provider.Params
 }
 
 // Dimensions and size are display-only, so decoded loosely.

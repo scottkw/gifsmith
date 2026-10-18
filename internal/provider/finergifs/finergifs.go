@@ -19,6 +19,8 @@ type Client struct {
 	BaseURL   string // https://api.thefinergifs.club
 	MediaBase string // https://media.thefinergifs.club
 	HTTP      *http.Client
+	// Params is read on every request (page size); nil = provider.DefaultParams().
+	Params func() provider.Params
 }
 
 type response struct {

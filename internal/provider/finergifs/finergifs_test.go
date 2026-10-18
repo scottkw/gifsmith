@@ -189,3 +189,29 @@ func TestTrendingMakesNoRequest(t *testing.T) {
 		t.Errorf("Trending made %d requests, want 0", n)
 	}
 }
+
+func TestPageSizeMore(t *testing.T) {
+	c, _ := newClient(t, fakeapi.Options{})
+	c.Params = func() provider.Params { p := provider.DefaultParams(); p.PageSize = 36; return p }
+	p, err := c.Search(context.Background(), "dwight", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Items) != 36 || p.Next != "36" {
+		t.Errorf("size 36: %d items, Next %q; want 36, \"36\"", len(p.Items), p.Next)
+	}
+	var b strings.Builder
+	b.WriteString(`{"results":[`)
+	for i := range 36 {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		fmt.Fprintf(&b, `{"fields":{"name":"n%d","text":"t%d","fileid":"f%d"}}`, i, i, i)
+	}
+	b.WriteString(`]}`)
+	c2, _ := bodyClient(t, b.String())
+	c2.Params = c.Params
+	if p, err := c2.Search(context.Background(), "x", ""); err != nil || p.Next != "36" {
+		t.Errorf("36 items without hits at size 36: Next %q, %v; want \"36\"", p.Next, err)
+	}
+}
