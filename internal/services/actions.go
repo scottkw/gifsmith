@@ -554,9 +554,36 @@ func framePixels(r io.Reader) (int64, error) {
 			return 0, err
 		}
 		switch b {
-		case 0x21: // extension: a label byte, then data sub-blocks
-			if _, err := br.ReadByte(); err != nil {
+		case 0x21: // extension: walked exactly as image/gif's readExtension, so the two agree on its end
+			label, err := br.ReadByte()
+			if err != nil {
 				return 0, err
+			}
+			switch label {
+			case 0x01: // Plain Text: 13 raw bytes, then sub-blocks
+				if _, err := br.Discard(13); err != nil {
+					return 0, err
+				}
+			case 0xF9: // Graphic Control: exactly 6 bytes, no sub-blocks
+				var gc [6]byte
+				if _, err := io.ReadFull(br, gc[:]); err != nil {
+					return 0, err
+				}
+				if gc[0] != 4 || gc[5] != 0 {
+					return 0, fmt.Errorf("gif: bad graphic control extension")
+				}
+				continue
+			case 0xFE: // Comment: sub-blocks only
+			case 0xFF: // Application: a size byte and that many bytes (even 0), then sub-blocks
+				n, err := br.ReadByte()
+				if err != nil {
+					return 0, err
+				}
+				if _, err := br.Discard(int(n)); err != nil {
+					return 0, err
+				}
+			default:
+				return 0, fmt.Errorf("gif: unknown extension 0x%02x", label)
 			}
 		case 0x2C: // image descriptor: x, y, w, h (uint16 LE), flags; then a local table, LZW code size, sub-blocks
 			var d [9]byte
