@@ -5,16 +5,16 @@ milestone_name: Gifsmith MVP
 current_phase: 3
 current_phase_name: Action Pipeline & Library
 status: executing
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-10-18T00:24:55.572Z"
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-10-18T00:38:09.083Z"
 last_activity: 2026-10-17
 last_activity_desc: Phase 3 execution started
-state_head: 4a3002a7a140cd05ed2d446da5e1118cf742eb65
+state_head: 8b65d416772180fbc13aa8a087a4c4d6f3974aa6
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 18
-  completed_plans: 11
+  completed_plans: 12
 ---
 
 # Project State
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-17)
 ## Current Position
 
 Phase: 3 (Action Pipeline & Library) — EXECUTING
-Plan: 2 of 8
+Plan: 3 of 8
 Status: Ready to execute
 Last activity: 2026-10-17 — Phase 3 execution started
 
@@ -69,6 +69,7 @@ Progress: [█████░░░░░] 50% (2/4 phases; 10/10 planned plans 
 | Phase 02 P05 | 12min | 2 tasks | 22 files |
 | Phase 02 P06 | 23min | 3 tasks | 22 files |
 | Phase 03 P01 | 14min | 3 tasks | 34 files |
+| Phase 3 P02 | 11min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,8 @@ Recent decisions affecting current work:
 - [Phase 03]: staging.PageAllow is the single page-URL rule (GIPHY/Clips, https giphy.com), used by the GIPHY mapper and ActionService
 - [Phase 03]: Display-only vendor numbers decode through httpx.LooseInt (never fail a page)
 - [Phase 03]: The -tags server UAT build wires platform.Fake (Trusted false); desktop wires platform.New()
+- [Phase 3]: 03-02: every action (menu row or shortcut) runs through App runAction; later plans add ROWS entries only
+- [Phase 3]: 03-02: any mousedown outside the action menu closes it; rows highlight on mousemove so a menu opening under the pointer keeps row 1
 
 ### Pending Todos
 
@@ -150,6 +153,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-18T00:24:55.450Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-10-18T00:38:08.955Z
+Stopped at: Completed 03-02-PLAN.md
 Resume file: None
