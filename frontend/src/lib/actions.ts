@@ -23,13 +23,16 @@ export type ActionRow = { id: ActionId; label: string; hint: string; keys: strin
 type Row = Omit<ActionRow, 'label' | 'destructive'> & {
   label: string | ((ctx: ActionCtx) => string);
   applies?: (ctx: ActionCtx) => boolean;
-  destructive?: boolean;
+  destructive?: boolean | ((ctx: ActionCtx) => boolean);
 };
 
 const media = (verb: string) => (c: ActionCtx) => `${verb} ${c.gif.isClip ? 'MP4' : 'GIF'}`;
 const hasPage = (c: ActionCtx) => !!c.gif.pageUrl;
 // A Clip's link and Markdown use its GIF rendition; without one there is nothing to link.
 const linkable = (c: ActionCtx) => !c.gif.isClip || !!c.gif.gifUrl;
+// Every item on the Favorites tab is a favorite.
+const fav = (c: ActionCtx) => c.favorited || c.tab === 'favorites';
+const onRecents = (c: ActionCtx) => c.tab === 'recents';
 
 // Locked order (D-02). Later plans add rows here once their handlers exist; the menu never changes.
 const ROWS: Row[] = [
@@ -45,6 +48,9 @@ const ROWS: Row[] = [
   // A Clip is an MP4: no square crop (D-15).
   { id: 'copySquare', label: 'Copy Square GIF', hint: '', keys: '', group: 4, applies: (c) => !c.gif.isClip },
   { id: 'pasteSquare', label: 'Paste Square GIF', hint: '', keys: '', group: 4, applies: (c) => !c.gif.isClip },
+  { id: 'favorite', label: (c) => (fav(c) ? 'Remove from Favorites' : 'Add to Favorites'), destructive: fav, hint: '⌘⇧F', keys: 'Meta+Shift+F', group: 5 },
+  { id: 'removeRecent', label: 'Remove from Recents', destructive: true, hint: '⌘⌫', keys: 'Meta+Backspace', group: 6, applies: onRecents },
+  { id: 'clearRecents', label: 'Clear Recents', destructive: true, hint: '', keys: '', group: 6, applies: onRecents },
 ];
 
 // Rows that do not apply are omitted, never greyed (D-03).
@@ -55,7 +61,7 @@ export function buildActions(ctx: ActionCtx): ActionRow[] {
     hint: r.hint,
     keys: r.keys,
     group: r.group,
-    destructive: r.destructive ?? false,
+    destructive: typeof r.destructive === 'function' ? r.destructive(ctx) : (r.destructive ?? false),
   }));
 }
 

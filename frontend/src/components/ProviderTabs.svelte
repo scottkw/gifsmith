@@ -37,7 +37,11 @@
   <span class="divider" aria-hidden="true"></span>
   {#each LIBRARY_TABS as t (t.id)}
     <button role="tab" tabindex="-1" aria-selected={t.id === lib} class:active={t.id === lib} onclick={() => onlib(t.id)}>
-      {t.label}<span class="hint">{t.shortcut}</span>
+      {#if t.star}
+        <svg class="star" viewBox="0 0 16 16" aria-hidden="true"
+          ><path d="M8 1.5l1.9 4.1 4.5.5-3.4 3 1 4.4L8 11.3l-4 2.2 1-4.4-3.4-3 4.5-.5z" /></svg
+        >
+      {/if}{t.label}<span class="hint">{t.shortcut}</span>
     </button>
   {/each}
 </div>
@@ -80,6 +84,16 @@
     height: 16px;
     margin: 0 4px;
     background: var(--hairline);
+  }
+  /* The label's 8px gap is the pill's flex gap; the star sits 4px before its label. */
+  .star {
+    width: 12px;
+    height: 12px;
+    margin-right: -4px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.25;
+    stroke-linejoin: round;
   }
   .hint {
     font: var(--label);

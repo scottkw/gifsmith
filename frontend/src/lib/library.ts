@@ -1,7 +1,7 @@
 // Favorites and Recents grids: provider sections in slot order, never blended (D-05, D-06).
 // Pure functions, no Svelte or DOM imports, so node --test can load them.
 import type { Gif } from './api';
-import { COLS } from './grid.ts';
+import { COLS, type Direction } from './grid.ts';
 import { SLOTS, type SlotId } from './providers.ts';
 
 // start is the flat index of the section's first item (the selection index runs through all sections).
@@ -42,7 +42,27 @@ export function rows(secs: Section[]): Row[] {
   return out;
 }
 
-// skeleton (RED)
-export function moveSectioned(index: number, _dir: 'left' | 'right' | 'up' | 'down', _sizes: number[]): number {
-  return index;
+// Library-tab grid movement (UI-SPEC): ← → step through the flat order across sections; ↑ ↓ move
+// by row inside a section (Phase 2 rule); ↓ from a section's last row goes to the same column of
+// the next section's first row, ↑ from a first row to the previous section's last row, clamped.
+// sizes are the item counts per section (none is 0).
+export function moveSectioned(index: number, dir: Direction, sizes: number[]): number {
+  const total = sizes.reduce((a, b) => a + b, 0);
+  if (total <= 0) return 0;
+  if (dir === 'left') return Math.max(0, index - 1);
+  if (dir === 'right') return Math.min(total - 1, index + 1);
+  let s = 0;
+  let start = 0;
+  while (index >= start + sizes[s]) start += sizes[s++];
+  const off = index - start;
+  const col = off % COLS;
+  const n = sizes[s];
+  if (dir === 'down') {
+    if (Math.floor(off / COLS) < Math.floor((n - 1) / COLS)) return start + Math.min(off + COLS, n - 1);
+    return s + 1 < sizes.length ? start + n + Math.min(col, sizes[s + 1] - 1) : index;
+  }
+  if (off >= COLS) return index - COLS;
+  if (s === 0) return index;
+  const pn = sizes[s - 1];
+  return start - pn + Math.min(Math.floor((pn - 1) / COLS) * COLS + col, pn - 1);
 }

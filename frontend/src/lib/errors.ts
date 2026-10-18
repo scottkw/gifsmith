@@ -114,7 +114,7 @@ export function actionErrorText(kind: string, g: Gif, action: 'copy' | 'download
   return "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";
 }
 
-// skeleton (RED)
-export function libraryErrorText(_list: 'favorites' | 'recents'): string {
-  return '';
+// F5: a library write failed (favorite, remove, Clear Recents, Undo); the list keeps its pre-change state.
+export function libraryErrorText(list: 'favorites' | 'recents'): string {
+  return `Couldn't save your ${list === 'favorites' ? 'Favorites' : 'Recents'}. Try again.`;
 }

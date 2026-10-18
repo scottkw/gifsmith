@@ -5,6 +5,7 @@
     actionError,
     cancel,
     checkClips,
+    clearRecents,
     copy,
     copySquare,
     copyText,
@@ -20,11 +21,14 @@
     pasteText,
     providerError,
     providers,
+    removeRecent,
     requestAccessibility,
     search,
+    setFavorite,
     setLastProvider,
     showDownload,
     trending,
+    undoLibrary,
     type Gif,
     type Library,
     type Page,
@@ -33,10 +37,10 @@
     type Result,
     type TextKind,
   } from './lib/api';
-  import { actionErrorText, errorState, pagingMessage, providerName, revokedMessage } from './lib/errors';
+  import { actionErrorText, errorState, libraryErrorText, pagingMessage, providerName, revokedMessage } from './lib/errors';
   import { buildActions, type ActionId, type ActionRow } from './lib/actions';
   import { COLS, move, nearEnd, routeKey } from './lib/grid';
-  import { flatItems, sections } from './lib/library';
+  import { flatItems, moveSectioned, sections } from './lib/library';
   import { placeMenu } from './lib/popover';
   import { CLIPS_ACCESS_MAILTO, LIBRARY_TABS, SLOTS, libraryTab, slotById, type LibraryId, type SlotId } from './lib/providers';
   import ActionMenu from './components/ActionMenu.svelte';
@@ -53,6 +57,8 @@
   const DOWNLOAD_TOAST_MS = 5000;
   const CROP_BUSY_MS = 300; // a square crop shows its busy state only if it is still running then (D-16)
   const LIBRARY_SKELETON_MS = 300; // a library read slower than this shows the S2 skeleton
+  const FAVORITE_TOAST_MS = 2000;
+  const UNDO_TOAST_MS = 5000;
   const AX_FAILED = "Couldn't ask macOS for Accessibility access. Try again.";
 
   type Status = 'idle' | 'loading' | 'refreshing' | 'ready' | 'empty' | 'error';
@@ -291,9 +297,12 @@
   }
 
   // A transient status (copy result, error) clears on the next keystroke or selection change.
+  // An Undo toast stays for its 5 s: the removal itself moved the selection (D-08).
   function clearTransient() {
-    if (!copying) setStatus('');
+    if (!copying && !undoVisible()) setStatus('');
   }
+
+  const undoVisible = () => toastAction?.label === 'Undo';
 
   function select(i: number) {
     if (i !== selected) clearTransient();
@@ -452,9 +461,13 @@
 
   // Every routed key is preventDefault-ed: arrows must not move the caret, and an Esc the page
   // lets through would reach the native panel's cancelOperation.
+  // ⌘⌫ and ⌘Z are the exception: they are captured only when they act (a library item is selected;
+  // an Undo toast is visible), so otherwise they stay native editing and undo in the input (Pitfall 10).
   function onKeydown(e: KeyboardEvent) {
     const a = routeKey(e);
     if (a === 'none') return;
+    if (a === 'remove' && !(libTab && items[selected])) return;
+    if (a === 'undo' && !undoVisible()) return;
     e.preventDefault();
     switch (a) {
       case 'left':
@@ -462,14 +475,28 @@
       case 'up':
       case 'down':
         if (!items.length) return;
+        if (libTab) {
+          select(moveSectioned(selected, a, libSections.map((s) => s.items.length)));
+          return;
+        }
         select(move(selected, a, items.length));
-        if (!libTab && nearEnd(selected, items.length)) loadMore();
+        if (nearEnd(selected, items.length)) loadMore();
+        return;
+      case 'favorite':
+        runAction('favorite');
+        return;
+      case 'remove':
+        runAction('removeRecent'); // on the Favorites tab this unfavorites
+        return;
+      case 'undo':
+        runToastAction();
         return;
       case 'copy':
       case 'paste':
         // ↵ with nothing selected runs a visible Try Again.
         if (selected < 0) {
-          if (a === 'copy' && !libTab && errView?.tryAgain) retry();
+          if (a === 'copy' && libTab && library?.unreadable.includes(libTab)) refreshLibrary();
+          else if (a === 'copy' && !libTab && errView?.tryAgain) retry();
           return;
         }
         runAction(a);
@@ -566,6 +593,55 @@
       case 'pasteSquare':
         act(pasteSquare, true, true);
         return;
+      case 'favorite':
+        toggleFavorite();
+        return;
+      case 'removeRecent':
+        removeSelected();
+        return;
+      case 'clearRecents':
+        clearAll();
+        return;
+    }
+  }
+
+  // ⌘⇧F / the menu row, on any grid: add (2 s toast) or remove (5 s Undo toast). The panel stays open.
+  async function toggleFavorite() {
+    const g = items[selected];
+    if (!g || !library) return;
+    const k = keyOf(g);
+    const on = !favKeys.has(k) && libTab !== 'favorites';
+    if (!(await mutate(() => setFavorite(g, on), 'favorites', on ? k : undefined))) return;
+    if (on) setStatus('Added to Favorites', 'success', null, FAVORITE_TOAST_MS);
+    else undoToast('Removed from Favorites', 'favorites', k);
+  }
+
+  // ⌘⌫ on a library tab: Remove from Recents, or unfavorite on the Favorites tab. No confirmation.
+  async function removeSelected() {
+    const g = items[selected];
+    if (!g || !libTab) return;
+    if (libTab === 'favorites') return toggleFavorite();
+    if (await mutate(() => removeRecent(g), 'recents')) undoToast('Removed from Recents', 'recents', keyOf(g));
+  }
+
+  async function clearAll() {
+    if (await mutate(clearRecents, 'recents')) undoToast('Cleared Recents', 'recents', '');
+  }
+
+  // T8–T10: Undo restores the latest removal and reselects it ('' = the first item, after Clear Recents).
+  function undoToast(text: string, list: LibraryId, k: string) {
+    const run = () => void mutate(undoLibrary, list, k);
+    setStatus(text, '', { label: 'Undo', hint: '⌘Z', run }, UNDO_TOAST_MS);
+  }
+
+  // Runs one library change and applies its fresh lists; on failure F5 shows and the lists stay as they were.
+  async function mutate(call: () => Promise<Library>, list: LibraryId, want?: string): Promise<boolean> {
+    try {
+      applyLibrary(await call(), want);
+      return true;
+    } catch {
+      setStatus(libraryErrorText(list), 'error');
+      return false;
     }
   }
 
@@ -713,8 +789,23 @@
             {/each}
           </div>
         {/if}
+      {:else if library.unreadable.includes(libTab)}
+        <StateMessage
+          icon
+          heading="Couldn't load {libName}"
+          body="Gifsmith couldn't read its saved list. Try again, or quit and reopen Gifsmith."
+          button="Try Again"
+          onbutton={() => refreshLibrary()}
+        />
+      {:else if !library[libTab].length && libTab === 'favorites'}
+        <StateMessage
+          heading="No favorites yet"
+          body="Press ⌘⇧F on any GIF to save it here. Favorites open instantly, even offline or when a provider's request limit is reached."
+        />
       {:else if !library[libTab].length}
         <StateMessage heading="No recent GIFs" body="GIFs you copy or paste show up here, newest first." />
+      {:else if !libItems.length}
+        <StateMessage heading="No matches" body="Nothing in {libName} matches “{query.trim()}”. Press Esc to clear the search." />
       {:else}
         <!-- Remounted when the row layout changes: the virtualizer reads row sizes only on a count change. -->
         {#key `${libTab}:${libSections.map((s) => s.items.length).join(',')}`}
@@ -787,6 +878,7 @@
           items={cur.items}
           {selected}
           {overlay}
+          favorites={favKeys}
           paging={cur.paging}
           pagingNote={pageView?.note}
           pagingRetry={pageView?.state?.tryAgain ?? true}

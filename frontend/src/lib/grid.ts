@@ -20,6 +20,9 @@ export type KeyAction =
   | 'slot4'
   | 'slot5'
   | 'slot6'
+  | 'favorite'
+  | 'remove'
+  | 'undo'
   | 'none';
 
 // ← → wrap across rows and clamp at the ends; ↑ on the first row stays; ↓ with no tile directly
@@ -69,6 +72,11 @@ export function routeKey(e: {
   if (e.metaKey && !e.shiftKey && e.key.toLowerCase() === 's') return 'download';
   // Always captured: App ignores it unless the download toast is visible, so ⌘R never reloads the webview.
   if (e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'r') return 'reveal';
+  if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 'f') return 'favorite';
+  // App captures ⌘⌫ and ⌘Z only when they act (a library item, a visible Undo toast); otherwise
+  // they stay native text editing and undo in the search input.
+  if (e.metaKey && e.key === 'Backspace') return 'remove';
+  if (e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'z') return 'undo';
   // ⌘1–⌘4 providers, ⌘5 Favorites, ⌘6 Recents.
   if (e.metaKey && ['1', '2', '3', '4', '5', '6'].includes(e.key)) return `slot${e.key}` as KeyAction;
   return ARROWS[e.key] ?? 'none';

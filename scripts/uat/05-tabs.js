@@ -36,6 +36,7 @@ const want = [
   ["Clips", "⌘2"],
   ["Klipy", "⌘3"],
   ["Finer Gifs", "⌘4"],
+  ["Favorites", "⌘5"],
   ["Recents", "⌘6"],
 ];
 if (tabs.length !== want.length) fail(`${tabs.length} tabs`);

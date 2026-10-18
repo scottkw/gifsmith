@@ -9,6 +9,7 @@
     items,
     selected,
     overlay,
+    favorites = new Set<string>(),
     paging,
     pagingNote = "Couldn't load more.",
     pagingRetry = true,
@@ -20,6 +21,7 @@
     items: Gif[];
     selected: number;
     overlay: boolean; // busy overlay on the selected tile
+    favorites?: Set<string>; // provider:id keys that get the star badge
     paging: Paging;
     pagingNote?: string; // E6, or E2 while a 429 window is open (S9a)
     pagingRetry?: boolean; // false while the provider is still blocked
@@ -74,7 +76,15 @@
           <div class="tiles">
             {#each items.slice(row.index * COLS, row.index * COLS + COLS) as g, c (c)}
               {@const i = row.index * COLS + c}
-              <Tile gif={g} index={i} selected={i === selected} {overlay} {onselect} {oncopy} />
+              <Tile
+                gif={g}
+                index={i}
+                selected={i === selected}
+                {overlay}
+                favorite={favorites.has(`${g.provider}:${g.id}`)}
+                {onselect}
+                {oncopy}
+              />
             {/each}
           </div>
         {:else if extra === 'loading'}

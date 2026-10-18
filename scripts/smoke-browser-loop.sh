@@ -8,6 +8,8 @@
 #   scripts/smoke-browser-loop.sh --uat <file.js> start both, run the dev-browser script headless, need "UAT OK"
 #
 # FAKE_FINER=down (and FAKE_CLIPS, from plan 02-06) pass through to the fixture server.
+# UAT_SEED_FAVORITES='<bytes>' seeds bin/uat-config/favorites.json (e.g. a corrupt file); a --uat
+# run then also fails if the app changed that file (an unreadable library file is never overwritten).
 set -euo pipefail
 
 MODE=smoke
@@ -45,6 +47,10 @@ CGO_ENABLED=0 go build -tags server -o bin/gifsmith-server .
 # The server build downloads into bin/uat-downloads, never ~/Downloads; Download never creates it.
 rm -rf bin/uat-config bin/uat-cache bin/uat-downloads
 mkdir -p bin/uat-downloads
+if [ -n "${UAT_SEED_FAVORITES:-}" ]; then
+  mkdir -p bin/uat-config
+  printf '%s' "$UAT_SEED_FAVORITES" >bin/uat-config/favorites.json
+fi
 
 PIDS=()
 BODY=$(mktemp)
@@ -88,6 +94,10 @@ if [ "$MODE" = uat ]; then
   OUT=$(dev-browser --headless --browser gifsmith-uat --timeout 120 run "$UAT_SCRIPT" 2>&1) || true
   echo "$OUT"
   grep -q "UAT OK" <<<"$OUT" || { echo "UAT FAIL: $UAT_SCRIPT" >&2; exit 1; }
+  if [ -n "${UAT_SEED_FAVORITES:-}" ] && [ "$(cat bin/uat-config/favorites.json)" != "$UAT_SEED_FAVORITES" ]; then
+    echo "UAT FAIL: the seeded favorites.json was changed" >&2
+    exit 1
+  fi
   exit 0
 fi
 
