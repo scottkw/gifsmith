@@ -26,6 +26,7 @@ var (
 	ErrNotAllowed = errors.New("this GIF's address is not allowed")
 	ErrDownload   = errors.New("the GIF download failed")
 	ErrNotGIF     = errors.New("the download is not a GIF")
+	ErrNotMP4     = errors.New("the download is not an MP4")
 	ErrTooLarge   = errors.New("the GIF is too large to copy")
 )
 

@@ -95,6 +95,51 @@ func TestFetchNotGIF(t *testing.T) {
 	}
 }
 
+func clip(base, name, title string) provider.Gif {
+	return provider.Gif{Provider: provider.Clips, ID: name, Title: title, IsClip: true, DownloadURL: base + "/media/" + name + ".mp4"}
+}
+
+// D-15: a Clip is staged as <slug>.mp4 after the ftyp check.
+func TestFetchStagesMP4(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	p, err := s.Fetch(context.Background(), clip(base, "clip-1-720p", "GIPHY clip 1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rel, _ := filepath.Rel(s.Dir, p)
+	if ok, _ := regexp.MatchString(`^[0-9a-f]{16}/giphy-clip-1\.mp4$`, filepath.ToSlash(rel)); !ok {
+		t.Errorf("staged at %q, want <16 hex>/giphy-clip-1.mp4 under Dir", rel)
+	}
+	if b, err := os.ReadFile(p); err != nil || len(b) < 8 || string(b[4:8]) != "ftyp" {
+		t.Errorf("staged bytes %q (err %v), want an ftyp box", b, err)
+	}
+}
+
+func TestFetchNotMP4(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	for _, g := range []provider.Gif{
+		clip(base, "html-clip", "x"), // HTML page with 200
+		{Provider: provider.Clips, ID: "g", Title: "x", IsClip: true, DownloadURL: base + "/media/office-1.gif"}, // a real GIF
+	} {
+		_, err := s.Fetch(context.Background(), g)
+		if !errors.Is(err, ErrNotMP4) {
+			t.Errorf("%s: err = %v, want ErrNotMP4", g.DownloadURL, err)
+		}
+		if e := entries(t, s.Dir); len(e) != 0 {
+			t.Errorf("Dir not empty after a rejected download: %q", e)
+		}
+	}
+	// A GIF item served an MP4 is still not a GIF.
+	if _, err := s.Fetch(context.Background(), gif(base, "office-1", "x")); err != nil {
+		t.Fatalf("GIF fetch: %v", err)
+	}
+	g := gif(base, "clip-1", "x")
+	g.DownloadURL = base + "/media/clip-1.mp4"
+	if _, err := s.Fetch(context.Background(), g); !errors.Is(err, ErrNotGIF) {
+		t.Errorf("GIF item with MP4 bytes: err = %v, want ErrNotGIF", err)
+	}
+}
+
 func TestFetchHTTPError(t *testing.T) {
 	s, base, _ := newStore(t, http.NotFoundHandler())
 	_, err := s.Fetch(context.Background(), gif(base, "x", "x"))

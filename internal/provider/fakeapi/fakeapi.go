@@ -12,6 +12,7 @@ import (
 	"image/color"
 	"image/gif"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -84,7 +85,7 @@ func finerSearch(w http.ResponseWriter, r *http.Request, o Options) {
 }
 
 // giphyGifs serves /v1/gifs/{search,trending} and, with clips, /v1/clips/{search,trending}
-// (clips_grid_picker-shaped: fixed_width plus video assets, no original GIF). Scenario
+// (clips_grid_picker-shaped: fixed_width, original GIF and 720p/480p/360p MP4 video assets). Scenario
 // words are read from q and the key, so trending (no q) can be driven by a key such as "ratelimit-key".
 func giphyGifs(w http.ResponseWriter, r *http.Request, o Options, clips bool) {
 	kind := r.PathValue("kind")
@@ -145,7 +146,7 @@ func giphyGifs(w http.ResponseWriter, r *http.Request, o Options, clips bool) {
 			data = append(data, item{Type: "video", ID: id, Slug: "clip-" + id, Title: "GIPHY clip " + strconv.Itoa(n), URL: "https://giphy.com/clips/clip-" + id, Images: map[string]rendition{
 				"fixed_width": {URL: media + id + "-200w.gif", Width: "200", Height: "112", Size: "1234"},
 				"original":    {URL: media + id + ".gif", Width: "480", Height: "270", Size: "4321"},
-			}, Video: map[string]any{"assets": map[string]rendition{"360p": {URL: media + id + "-360p.mp4", Width: "640", Height: "360"}}}})
+			}, Video: map[string]any{"assets": clipAssets(media+id, hasWord(words, "no720"))}})
 			continue
 		}
 		id := "giphy-" + strconv.Itoa(n)
@@ -236,6 +237,19 @@ func klipyGifs(w http.ResponseWriter, r *http.Request, o Options) {
 	}})
 }
 
+// clipAssets are a clip's MP4 renditions (no size, like the real wire format); no720 drops 720p.
+func clipAssets(base string, no720 bool) map[string]map[string]string {
+	a := map[string]map[string]string{
+		"720p": {"url": base + "-720p.mp4", "width": "1280", "height": "720"},
+		"480p": {"url": base + "-480p.mp4", "width": "854", "height": "480"},
+		"360p": {"url": base + "-360p.mp4", "width": "640", "height": "360"},
+	}
+	if no720 {
+		delete(a, "720p")
+	}
+	return a
+}
+
 func hasWord(q, word string) bool { return strings.Contains(strings.ToLower(q), word) }
 
 // Scenario answers the vendor-neutral scenario words found in the query
@@ -282,11 +296,16 @@ func Scenario(w http.ResponseWriter, r *http.Request, q string, firstPage bool, 
 	return false
 }
 
-// media serves a tiny 2-frame animated GIF whose colour is derived from the file name.
-// Names starting "broken" answer 500; names starting "html" answer an HTML page with 200.
+// mp4 is the smallest file the MP4 magic check accepts: one ftyp box (isom, minor 0x200, isom mp41).
+var mp4 = []byte("\x00\x00\x00\x18ftypisom\x00\x00\x02\x00isommp41")
+
+// media serves a tiny 2-frame animated GIF whose colour is derived from the file name, or for
+// .mp4 names the ftyp fixture. Names starting "broken" answer 500; "html" an HTML page with 200.
 func media(w http.ResponseWriter, r *http.Request) {
-	name, ok := strings.CutSuffix(r.PathValue("file"), ".gif")
-	if !ok || name == "" {
+	file := r.PathValue("file")
+	ext := path.Ext(file)
+	name := strings.TrimSuffix(file, ext)
+	if (ext != ".gif" && ext != ".mp4") || name == "" {
 		http.NotFound(w, r)
 		return
 	}
@@ -297,6 +316,11 @@ func media(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(name, "html") {
 		w.Header().Set("Content-Type", "text/html")
 		_, _ = fmt.Fprint(w, "<html>error</html>")
+		return
+	}
+	if ext == ".mp4" {
+		w.Header().Set("Content-Type", "video/mp4")
+		_, _ = w.Write(mp4)
 		return
 	}
 	h := fnv.New32a()

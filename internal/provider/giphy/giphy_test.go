@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -341,7 +342,7 @@ func clipsBody(withPreview bool) string {
 	if !withPreview {
 		fw = ""
 	}
-	return `{"data":[{"id":"c1","slug":"clip-c1","title":"A clip","type":"video","images":{` + fw + `"fixed_height":{"url":"https://m/fh.gif"}},"video":{"assets":{"360p":{"url":"https://m/c1.mp4"}}}}],"pagination":{"total_count":1,"count":1,"offset":0}}`
+	return `{"data":[{"id":"c1","slug":"clip-c1","title":"A clip","type":"video","images":{` + fw + `"fixed_height":{"url":"https://m/fh.gif"}},"video":{"assets":{"360p":{"url":"https://m/c1.mp4","width":"640","height":360}}}}],"pagination":{"total_count":1,"count":1,"offset":0}}`
 }
 
 func TestClipsMode(t *testing.T) {
@@ -358,7 +359,8 @@ func TestClipsMode(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", tc.path, err)
 		}
-		want := provider.Gif{Provider: provider.Clips, ID: "c1", Title: "A clip", PreviewURL: "https://media.giphy.com/c1/200w.gif", IsClip: true}
+		want := provider.Gif{Provider: provider.Clips, ID: "c1", Title: "A clip", PreviewURL: "https://media.giphy.com/c1/200w.gif", IsClip: true,
+			DownloadURL: "https://m/c1.mp4", Width: 640, Height: 360}
 		if len(p.Items) != 1 || !reflect.DeepEqual(p.Items[0], want) {
 			t.Errorf("%s: items = %+v, want [%+v]", tc.path, p.Items, want)
 		}
@@ -425,7 +427,7 @@ func TestProbeClips(t *testing.T) {
 // one maps a single GIPHY item built from extra top-level fields and extra renditions.
 func one(t *testing.T, clips bool, fields, images string) provider.Gif {
 	t.Helper()
-	body := `{"data":[{"id":"a","slug":"s","title":"t"` + fields + `,"images":{"fixed_width":{"url":"https://media.giphy.com/a/200w.gif"},"original":{"url":"https://media.giphy.com/a/giphy.gif"` + images + `}}}],"pagination":{"total_count":1}}`
+	body := `{"data":[{"id":"a","slug":"s","title":"t"` + fields + `,"images":{"fixed_width":{"url":"https://media.giphy.com/a/200w.gif"},"original":{"url":"https://media.giphy.com/a/giphy.gif"` + images + `}},"video":{"assets":{"720p":{"url":"https://media.giphy.com/a/720p.mp4"}}}}],"pagination":{"total_count":1}}`
 	c, _, _ := stubClient(t, 200, nil, body)
 	c.Clips = clips
 	p, err := c.Search(context.Background(), "cat", "")
@@ -494,13 +496,58 @@ func TestMediumURL(t *testing.T) {
 
 // D-18: a Clip's link and Markdown use its GIF rendition, never the MP4.
 func TestClipsGifURL(t *testing.T) {
-	if g := one(t, true, "", ""); g.GifURL != "https://media.giphy.com/a/giphy.gif" || g.DownloadURL != "" {
-		t.Errorf("clip = %+v, want GifURL from original and no DownloadURL", g)
+	if g := one(t, true, "", ""); g.GifURL != "https://media.giphy.com/a/giphy.gif" || g.DownloadURL != "https://media.giphy.com/a/720p.mp4" {
+		t.Errorf("clip = %+v, want GifURL from original and the MP4 as DownloadURL", g)
+	}
+	if g := one(t, false, "", ""); g.DownloadURL != "https://media.giphy.com/a/giphy.gif" || g.GifURL != "" {
+		t.Errorf("GIF = %+v, want DownloadURL from original and no GifURL (video assets ignored)", g)
 	}
 	c, _, _ := stubClient(t, 200, nil, clipsBody(true)) // no original rendition
 	c.Clips = true
 	p, err := c.Search(context.Background(), "cat", "")
 	if err != nil || len(p.Items) != 1 || p.Items[0].GifURL != "" {
 		t.Errorf("clip without original: %+v, %v; want mapped with GifURL \"\"", p.Items, err)
+	}
+}
+
+// D-24: a Clip copies its 720p MP4, else the nearest of 480p, 1080p, 360p; never 4k or source.
+func TestClipsRendition(t *testing.T) {
+	asset := func(k string) string {
+		return `"` + k + `":{"url":"https://media.giphy.com/c/` + k + `.mp4","width":"` + strings.TrimSuffix(k, "p") + `0","height":"` + strings.TrimSuffix(k, "p") + `"}`
+	}
+	for _, tc := range []struct {
+		assets []string
+		want   string // "" = the page fails
+	}{
+		{[]string{"360p", "480p", "720p", "1080p", "4k"}, "720p"},
+		{[]string{"360p", "480p"}, "480p"},
+		{[]string{"360p", "1080p"}, "1080p"},
+		{[]string{"360p"}, "360p"},
+		{[]string{"4k", "source"}, ""},
+		{nil, ""},
+	} {
+		parts := make([]string, len(tc.assets))
+		for i, k := range tc.assets {
+			parts[i] = asset(k)
+		}
+		body := `{"data":[{"id":"c","slug":"s","title":"t","images":{"fixed_width":{"url":"https://media.giphy.com/c/200w.gif"}},"video":{"assets":{` + strings.Join(parts, ",") + `}}}],"pagination":{"total_count":1}}`
+		c, _, _ := stubClient(t, 200, nil, body)
+		c.Clips = true
+		p, err := c.Search(context.Background(), "cat", "")
+		if tc.want == "" {
+			var pe *provider.Error
+			if !errors.As(err, &pe) || pe.Kind != provider.HTTP || pe.Provider != provider.Clips || len(p.Items) != 0 {
+				t.Errorf("%v: %+v, %v; want a clips http error, never a shorter page", tc.assets, p.Items, err)
+			}
+			continue
+		}
+		if err != nil || len(p.Items) != 1 {
+			t.Fatalf("%v: %+v, %v", tc.assets, p.Items, err)
+		}
+		g := p.Items[0]
+		h, _ := strconv.Atoi(strings.TrimSuffix(tc.want, "p"))
+		if g.DownloadURL != "https://media.giphy.com/c/"+tc.want+".mp4" || g.Height != h || g.Width != h*10 || g.Size != 0 {
+			t.Errorf("%v: got %s %dx%d size %d, want %s", tc.assets, g.DownloadURL, g.Width, g.Height, g.Size, tc.want)
+		}
 	}
 }

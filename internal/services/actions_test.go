@@ -102,19 +102,57 @@ func TestCopyErrorKeepsPanelOpen(t *testing.T) {
 	}
 }
 
-func TestCopyClipRefused(t *testing.T) {
+// clipOf turns the fixture item into a Clip whose download is the fixture's 720p MP4 (D-15).
+func clipOf(g provider.Gif, name string) provider.Gif {
+	base, _, _ := strings.Cut(g.DownloadURL, "/media/")
+	return provider.Gif{Provider: provider.Clips, ID: name, Title: "GIPHY clip 1", IsClip: true, DownloadURL: base + "/media/" + name + ".mp4"}
+}
+
+func TestCopyClipMP4(t *testing.T) {
 	f := &platform.Fake{}
 	s, fx := newService(t, f)
-	g := fx.gif
-	g.IsClip = true
-	if _, err := s.Copy(context.Background(), g); !errors.Is(err, ErrClipsCopy) {
-		t.Errorf("Copy err = %v, want ErrClipsCopy", err)
+	r, err := s.Copy(context.Background(), clipOf(fx.gif, "clip-1-720p"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, err := s.Paste(context.Background(), g); !errors.Is(err, ErrClipsCopy) {
-		t.Errorf("Paste err = %v, want ErrClipsCopy", err)
+	if !r.Copied || r.Message != "Copied MP4 — press ⌘V to paste" {
+		t.Errorf("result = %+v, want Copied with the T1m message", r)
 	}
-	if n := fx.hits.Load(); n != 0 || len(f.Calls) != 0 {
-		t.Errorf("Clips copy made %d downloads and calls %q, want none", n, f.Calls)
+	if len(f.Calls) != 1 || !strings.HasPrefix(f.Calls[0], "CopyFile:"+fx.dir) || !strings.HasSuffix(f.Calls[0], ".mp4") {
+		t.Errorf("calls = %q, want one CopyFile of a staged .mp4", f.Calls)
+	}
+}
+
+func TestPasteClipMP4(t *testing.T) {
+	f := &platform.Fake{Trusted: true, Frontmost: prevApp}
+	s, fx := newPasteService(t, f)
+	r, err := s.Paste(context.Background(), clipOf(fx.gif, "clip-1-720p"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.Pasted || r.Message != "Pasted MP4" {
+		t.Errorf("result = %+v, want Pasted with message Pasted MP4", r)
+	}
+	if !slices.Contains(f.Calls, "PasteShortcut") {
+		t.Errorf("calls = %q, want a ⌘V", f.Calls)
+	}
+}
+
+func TestCopyClipFailingMediaKinds(t *testing.T) {
+	for name, want := range map[string]string{"broken-clip": "download_failed", "html-clip": "not_media", "office-1": "not_media"} {
+		f := &platform.Fake{}
+		s, fx := newService(t, f)
+		g := clipOf(fx.gif, name)
+		if name == "office-1" { // a GIF where an MP4 belongs
+			g.DownloadURL = fx.gif.DownloadURL
+		}
+		_, err := s.Copy(context.Background(), g)
+		if actionKind(err) != want {
+			t.Errorf("%s: err = %v, want kind %s", name, err, want)
+		}
+		if len(f.Calls) != 0 {
+			t.Errorf("%s: calls = %q, want none", name, f.Calls)
+		}
 	}
 }
 

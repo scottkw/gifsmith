@@ -169,3 +169,9 @@ test('page errors show F8 and a missing link shows F1', () => {
   assert.equal(actionErrorText('open_failed', g), "Couldn't open the page in your browser.");
   assert.equal(actionErrorText('no_link', g), "Couldn't copy this GIF. The download failed. Try again or pick another GIF.");
 });
+
+test('Clips copy errors name the MP4 (F1 and F3 Clips variants)', () => {
+  const clip = { provider: 'clips', isClip: true } as Parameters<typeof actionErrorText>[1];
+  assert.equal(actionErrorText('download_failed', clip), "Couldn't copy this MP4. The download failed. Try again or pick another clip.");
+  assert.equal(actionErrorText('not_media', clip), "GIPHY Clips sent something that isn't an MP4. Nothing was saved. Try another GIF.");
+});
