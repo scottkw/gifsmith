@@ -179,14 +179,34 @@ func (k *Keys) Func(p provider.ID) func() (string, bool) {
 
 // Prefs is everything in settings.json. Never add a secret here.
 type Prefs struct {
-	LastProvider  string `json:"lastProvider"`
-	Theme         string `json:"theme,omitempty"` // "" = system | "light" | "dark"
-	LaunchAtLogin bool   `json:"launchAtLogin,omitempty"`
-	GiphyRating   string `json:"giphyRating,omitempty"`  // "" = pg-13
-	PageSize      int    `json:"pageSize,omitempty"`     // 0 = 24
-	GiphyLang     string `json:"giphyLang,omitempty"`    // "" = match system
-	KlipyCountry  string `json:"klipyCountry,omitempty"` // "" = match system
+	LastProvider  string  `json:"lastProvider"`
+	Theme         string  `json:"theme,omitempty"` // "" = system | "light" | "dark"
+	LaunchAtLogin bool    `json:"launchAtLogin,omitempty"`
+	GiphyRating   string  `json:"giphyRating,omitempty"`  // "" = pg-13
+	PageSize      int     `json:"pageSize,omitempty"`     // 0 = 24
+	GiphyLang     string  `json:"giphyLang,omitempty"`    // "" = match system
+	KlipyCountry  string  `json:"klipyCountry,omitempty"` // "" = match system
+	Hotkeys       Hotkeys `json:"hotkeys"`
 }
+
+// Hotkeys are the global shortcuts as canonical Wails accelerators ("Cmd+Ctrl+Option+G").
+type Hotkeys struct {
+	Open      string `json:"open,omitempty"`      // "" = DefaultOpenHotkey
+	Favorites string `json:"favorites,omitempty"` // "" = not set
+	Recents   string `json:"recents,omitempty"`   // "" = not set
+}
+
+// DefaultOpenHotkey is ⌃⌥⌘G in canonical form.
+const DefaultOpenHotkey = "Cmd+Ctrl+Option+G"
+
+var (
+	ErrHotkeyInvalid    = errors.New("not a shortcut Gifsmith can register")
+	ErrHotkeyNoModifier = errors.New("the shortcut has no Cmd, Option or Ctrl")
+	ErrHotkeySystem     = errors.New("the shortcut is a macOS shortcut")
+)
+
+// CanonicalHotkey validates accel and returns it in Wails' canonical form.
+func CanonicalHotkey(accel string) (string, error) { return "", nil }
 
 // Normalize resets invalid values to their declared defaults and returns the reset field names.
 func (p *Prefs) Normalize() []string {

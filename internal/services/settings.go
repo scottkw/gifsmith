@@ -35,6 +35,7 @@ type SettingsService struct {
 	ApplyTheme func(theme string) // native appearance + window backgrounds; nil in tests
 	Autostart  Autostarter
 	Executable func() (string, error) // os.Executable; injectable for the not-in-Applications check
+	Hotkeys    *Hotkeys
 
 	mu sync.Mutex // serializes SaveKey, TestKey and RemoveKey end to end: the Keychain ends in the last call's state
 }
@@ -202,12 +203,13 @@ type Autostarter interface {
 
 // Snapshot is the settings the webviews render. Never a key.
 type Snapshot struct {
-	Theme         string `json:"theme"`
-	LaunchAtLogin bool   `json:"launchAtLogin"`
-	GiphyRating   string `json:"giphyRating"`  // resolved: never ""
-	PageSize      int    `json:"pageSize"`     // resolved: never 0
-	GiphyLang     string `json:"giphyLang"`    // "" = Match System
-	KlipyCountry  string `json:"klipyCountry"` // "" = Match System
+	Theme         string           `json:"theme"`
+	LaunchAtLogin bool             `json:"launchAtLogin"`
+	GiphyRating   string           `json:"giphyRating"`  // resolved: never ""
+	PageSize      int              `json:"pageSize"`     // resolved: never 0
+	GiphyLang     string           `json:"giphyLang"`    // "" = Match System
+	KlipyCountry  string           `json:"klipyCountry"` // "" = Match System
+	Hotkeys       settings.Hotkeys `json:"hotkeys"`      // canonical; Open always set
 }
 
 // Choices are the allowed Search-pane values, with what Match System resolves to now.
@@ -456,4 +458,9 @@ func (s *SettingsService) ApplyStartup() {
 // AccessibilityStatus reports the Automatic paste grant without prompting.
 func (s *SettingsService) AccessibilityStatus(ctx context.Context) bool {
 	return s.Platform.AccessibilityTrusted(false)
+}
+
+// SetHotkey binds slot to accel ("" clears favorites/recents) and stores it.
+func (s *SettingsService) SetHotkey(ctx context.Context, slot, accel string) (Snapshot, error) {
+	return Snapshot{}, nil
 }

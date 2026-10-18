@@ -98,7 +98,7 @@ func newSettings(t *testing.T, base string) settingsFixture {
 		} else {
 			data = append(data, nil)
 		}
-	}, Clips: clips, Autostart: &fakeAutostart{}, Executable: func() (string, error) {
+	}, Clips: clips, Autostart: &fakeAutostart{}, Hotkeys: &Hotkeys{Reg: &fakeReg{}}, Executable: func() (string, error) {
 		return "/Applications/Gifsmith.app/Contents/MacOS/gifsmith", nil
 	}}
 	return settingsFixture{svc: s, gifs: &GifService{Svc: svc, Keys: keys, Clips: clips}, store: store, hits: &hits, events: &events, data: &data, dir: dir, clips: clips, probes: &probes}
