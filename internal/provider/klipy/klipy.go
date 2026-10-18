@@ -120,6 +120,7 @@ func (c *Client) get(ctx context.Context, kind string, v url.Values, cursor stri
 	prm := provider.ParamsOf(c.Params)
 	v.Set("per_page", strconv.Itoa(min(max(prm.PageSize, 8), 50))) // Klipy accepts 8..50
 	v.Set("content_filter", "medium")
+	v.Set("locale", prm.Country) // a request parameter only: Klipy results are never filtered here
 
 	var r response
 	u := c.BaseURL + "/api/v1/" + url.PathEscape(key) + "/gifs/" + kind + "?" + v.Encode()

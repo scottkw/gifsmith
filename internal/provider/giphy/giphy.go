@@ -97,7 +97,9 @@ func (c *Client) Search(ctx context.Context, q, cursor string) (provider.Page, e
 	if r := []rune(q); len(r) > maxQueryRunes {
 		q = string(r[:maxQueryRunes])
 	}
-	return c.get(ctx, c.path("search"), url.Values{"q": {q}}, cursor, searchOffsetCap)
+	// lang helps non-English search; GIPHY trending is not localized, so it is sent on search only.
+	v := url.Values{"q": {q}, "lang": {provider.ParamsOf(c.Params).Lang}}
+	return c.get(ctx, c.path("search"), v, cursor, searchOffsetCap)
 }
 
 func (c *Client) Trending(ctx context.Context, cursor string) (provider.Page, error) {

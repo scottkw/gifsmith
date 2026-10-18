@@ -152,6 +152,9 @@ func giphyGifs(w http.ResponseWriter, r *http.Request, o Options, clips bool) {
 	if r := q.Get("rating"); r != "" && r != "pg-13" {
 		tag = "[rating=" + r + "] "
 	}
+	if l := q.Get("lang"); kind == "search" && l != "" && l != "en" {
+		tag += "[lang=" + l + "] "
+	}
 	data := []item{}
 	for n := max(offset, 0) + 1; n <= total && len(data) < limit; n++ {
 		if clips {
@@ -227,6 +230,10 @@ func klipyGifs(w http.ResponseWriter, r *http.Request, o Options) {
 		File  map[string]map[string]gifFile `json:"file"`
 	}
 	media := "http://" + r.Host + "/media/"
+	tag := "" // a non-default locale shows in titles, so UAT can see what Go sent
+	if l := q.Get("locale"); l != "" && l != "us" {
+		tag = "[locale=" + l + "] "
+	}
 	data := []item{}
 	first := (page-1)*per + 1
 	for n := first; n <= total && n < first+per; n++ {
@@ -239,7 +246,7 @@ func klipyGifs(w http.ResponseWriter, r *http.Request, o Options) {
 		if n == 3 { // an object element the client must skip without failing the page
 			tags = []any{map[string]string{"name": "obj"}, "funny"}
 		}
-		data = append(data, item{ID: 8041071659142944 + int64(n), Slug: slug, Title: "Klipy moment " + strconv.Itoa(n), Type: "gif", Tags: tags, File: map[string]map[string]gifFile{
+		data = append(data, item{ID: 8041071659142944 + int64(n), Slug: slug, Title: tag + "Klipy moment " + strconv.Itoa(n), Type: "gif", Tags: tags, File: map[string]map[string]gifFile{
 			"sm": {"gif": {URL: media + name + "-sm.gif", Width: 220, Height: 220, Size: 1234}},
 			"md": {"gif": {URL: media + name + "-md.gif", Width: 320, Height: 320, Size: 3456}},
 			"hd": {"gif": {URL: media + name + "-hd.gif", Width: 498, Height: 498, Size: 5678}},
