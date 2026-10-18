@@ -95,7 +95,7 @@ func newHotkeys(t *testing.T, b settings.Hotkeys) hotkeyFixture {
 		Emit: func(n string, d ...any) {
 			mu.Lock()
 			defer mu.Unlock()
-			events = append(events, fmt.Sprint(append([]any{n}, d...)...))
+			events = append(events, strings.TrimSpace(fmt.Sprintln(append([]any{n}, d...)...)))
 		},
 		Now: func() time.Time { return now },
 	}
@@ -311,4 +311,109 @@ func TestMarshalHotkeyDuplicate(t *testing.T) {
 	if string(b) != `{"kind":"hotkey_duplicate","slot":"favorites"}` {
 		t.Errorf("MarshalError = %s", b)
 	}
+}
+
+func TestArmTestReportsWithinFiveSeconds(t *testing.T) {
+	f := newHotkeys(t, settings.Hotkeys{Favorites: "Cmd+Ctrl+Option+F"})
+	if err := f.h.ArmTest("favorites"); err != nil {
+		t.Fatal(err)
+	}
+	*f.now = f.now.Add(2 * time.Second)
+	f.reg.fire(t, "Cmd+Ctrl+Option+F")
+	if !reflect.DeepEqual(*f.events, []string{"hotkey:test favorites"}) || !reflect.DeepEqual(*f.fired, []string{"favorites"}) {
+		t.Fatalf("events %v, fired %v; want the test event, then the action", *f.events, *f.fired)
+	}
+	f.reg.fire(t, "Cmd+Ctrl+Option+F") // disarmed after one report
+	if err := f.h.ArmTest("favorites"); err != nil {
+		t.Fatal(err)
+	}
+	*f.now = f.now.Add(6 * time.Second)
+	f.reg.fire(t, "Cmd+Ctrl+Option+F")
+	if len(*f.events) != 1 || len(*f.fired) != 3 {
+		t.Errorf("events %v, fired %v; a late press reports nothing but still acts", *f.events, *f.fired)
+	}
+}
+
+func TestArmTestUnbound(t *testing.T) {
+	f := newHotkeys(t, settings.Hotkeys{})
+	wantSettingsErr(t, f.h.ArmTest("recents"), "hotkey_invalid")
+	wantSettingsErr(t, f.h.ArmTest("nope"), "hotkey_invalid")
+}
+
+func TestSuspendResumeIdempotent(t *testing.T) {
+	f := newHotkeys(t, settings.Hotkeys{Favorites: "Cmd+Ctrl+Option+F"})
+	f.h.Suspend()
+	f.h.Suspend()
+	f.h.Resume()
+	f.h.Resume()
+	want := []string{"unregister Cmd+Ctrl+Option+G", "unregister Cmd+Ctrl+Option+F", "register Cmd+Ctrl+Option+G", "register Cmd+Ctrl+Option+F"}
+	if c := f.reg.take(); !reflect.DeepEqual(c, want) {
+		t.Errorf("calls = %v, want %v", c, want)
+	}
+}
+
+func TestSuspendedComboIsCapturedNotFired(t *testing.T) {
+	f := newHotkeys(t, settings.Hotkeys{})
+	f.h.Suspend()
+	f.reg.mu.Lock()
+	_, live := f.reg.cbs[DefaultOpenHotkey]
+	f.reg.mu.Unlock()
+	if live {
+		t.Fatal("the Open hotkey is still registered while suspended")
+	}
+	f.h.Resume() // what the Settings window's hide / lost-focus hook does
+	f.reg.fire(t, DefaultOpenHotkey)
+}
+
+func TestSetHotkeyResumesFirst(t *testing.T) {
+	f, reg := settingsWithHotkeys(t)
+	ctx := context.Background()
+	f.svc.SuspendHotkeys(ctx)
+	reg.take()
+	if _, err := f.svc.SetHotkey(ctx, "favorites", "Cmd+Ctrl+Option+F"); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"register Cmd+Ctrl+Option+G", "register Cmd+Ctrl+Option+F"}
+	if c := reg.take(); !reflect.DeepEqual(c, want) {
+		t.Errorf("calls = %v, want %v", c, want)
+	}
+}
+
+func TestBindClear(t *testing.T) {
+	f := newHotkeys(t, settings.Hotkeys{Recents: "Cmd+Ctrl+Option+R"})
+	if err := f.h.Bind("recents", ""); err != nil {
+		t.Fatal(err)
+	}
+	if c := f.reg.take(); !reflect.DeepEqual(c, []string{"unregister Cmd+Ctrl+Option+R"}) {
+		t.Errorf("calls = %v", c)
+	}
+	if f.h.Bindings().Recents != "" {
+		t.Error("Recents still bound")
+	}
+	wantSettingsErr(t, f.h.Bind("open", ""), "hotkey_invalid")
+}
+
+func TestSetHotkeyOpenUpdatesTray(t *testing.T) {
+	f, _ := settingsWithHotkeys(t)
+	var got []string
+	f.svc.OnOpenHotkey = func(a string) { got = append(got, a) }
+	ctx := context.Background()
+	if _, err := f.svc.SetHotkey(ctx, "favorites", "Cmd+Ctrl+Option+F"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.SetHotkey(ctx, "open", "Cmd+Ctrl+Option+H"); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, []string{"Cmd+Ctrl+Option+H"}) {
+		t.Errorf("OnOpenHotkey calls = %v", got)
+	}
+}
+
+func TestTestHotkey(t *testing.T) {
+	f, _ := settingsWithHotkeys(t)
+	ctx := context.Background()
+	if err := f.svc.TestHotkey(ctx, "open"); err != nil {
+		t.Fatal(err)
+	}
+	wantSettingsErr(t, f.svc.TestHotkey(ctx, "favorites"), "hotkey_invalid")
 }
