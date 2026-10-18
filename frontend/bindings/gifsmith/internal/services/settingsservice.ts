@@ -13,6 +13,10 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as provider$0 from "../provider/models.js";
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
 /**
@@ -36,6 +40,14 @@ export function ApplyStartup(): $CancellablePromise<void> {
  */
 export function LastProvider(): $CancellablePromise<string> {
     return $Call.ByID(3058216590);
+}
+
+/**
+ * Params are the provider parameters for the next request: the defaults overlaid with the
+ * stored choices. Clients call it on every request.
+ */
+export function Params(): $CancellablePromise<provider$0.Params> {
+    return $Call.ByID(3753961165);
 }
 
 /**
@@ -63,6 +75,7 @@ export function SetLaunchAtLogin(on: boolean): $CancellablePromise<$models.Snaps
 /**
  * SetPref sets one allow-listed pref from the webview, validated here; an equal value is a no-op.
  * Each write emits settings:changed with the full Snapshot so the panel and Settings converge.
+ * A provider parameter also flushes the affected providers' cached pages (never their 429 block).
  */
 export function SetPref(name: string, value: string): $CancellablePromise<$models.Snapshot> {
     return $Call.ByID(3385564000, name, value);

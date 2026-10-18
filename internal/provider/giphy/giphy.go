@@ -81,6 +81,13 @@ func (c *Client) id() provider.ID {
 	return provider.GIPHY
 }
 
+func (c *Client) params() provider.Params {
+	if c.Params == nil {
+		return provider.DefaultParams()
+	}
+	return c.Params()
+}
+
 func (c *Client) bad(status int) error {
 	return &provider.Error{Kind: provider.HTTP, Provider: c.id(), Status: status}
 }
@@ -112,6 +119,7 @@ func (c *Client) ProbeClips(ctx context.Context) error {
 	if !ok || key == "" {
 		return &provider.Error{Kind: provider.KeyMissing, Provider: provider.Clips}
 	}
+	// A one-item yes/no probe: the user's rating does not change the answer, so it stays fixed.
 	v := url.Values{"api_key": {key}, "limit": {"1"}, "rating": {"pg-13"}}
 	var body any
 	_, err := httpx.GetJSON(ctx, c.HTTP, provider.Clips, c.BaseURL+"/v1/clips/trending?"+v.Encode(), &body)
@@ -168,10 +176,11 @@ func (c *Client) get(ctx context.Context, path string, v url.Values, cursor stri
 	if !ok || key == "" {
 		return provider.Page{}, &provider.Error{Kind: provider.KeyMissing, Provider: c.id()}
 	}
+	prm := c.params()
 	v.Set("api_key", key)
-	v.Set("limit", strconv.Itoa(provider.PageSize))
+	v.Set("limit", strconv.Itoa(min(prm.PageSize, 50)))
 	v.Set("offset", strconv.Itoa(offset))
-	v.Set("rating", "pg-13") // always sent: Clips search defaults to R
+	v.Set("rating", prm.Rating) // always sent: Clips search defaults to R
 	if c.Clips {
 		v.Set("bundle", "clips_grid_picker")
 	} else {

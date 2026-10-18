@@ -59,9 +59,11 @@ func main() {
 	panel := &services.PanelService{}
 	keys := settings.NewKeys(d.Secrets)
 	keys.Load()
-	clipsClient := &giphy.Client{BaseURL: d.GiphyBase, Key: keys.Func(provider.GIPHY), HTTP: d.HTTP, Clips: true}
+	var settingsSvc *services.SettingsService // set below, before any request; clients read Params per request
+	params := func() provider.Params { return settingsSvc.Params() }
+	clipsClient := &giphy.Client{BaseURL: d.GiphyBase, Key: keys.Func(provider.GIPHY), HTTP: d.HTTP, Clips: true, Params: params}
 	svc := search.New(map[provider.ID]provider.Provider{
-		provider.GIPHY:     &giphy.Client{BaseURL: d.GiphyBase, Key: keys.Func(provider.GIPHY), HTTP: d.HTTP},
+		provider.GIPHY:     &giphy.Client{BaseURL: d.GiphyBase, Key: keys.Func(provider.GIPHY), HTTP: d.HTTP, Params: params},
 		provider.Clips:     clipsClient,
 		provider.Klipy:     &klipy.Client{BaseURL: d.KlipyBase, Key: keys.Func(provider.Klipy), HTTP: d.HTTP},
 		provider.FinerGifs: &finergifs.Client{BaseURL: d.FinerBase, MediaBase: d.FinerMedia, HTTP: d.HTTP},
@@ -76,12 +78,12 @@ func main() {
 	}
 	store := settings.OpenStore(d.ConfigDir) // the only settings.json owner
 	gifs := &services.GifService{Svc: svc, Keys: keys, Clips: clips}
-	settingsSvc := &services.SettingsService{Keys: keys, Store: store, Platform: plat, Executable: os.Executable, Svc: svc, Clips: clips, NewClient: func(p provider.ID, key string) provider.Provider {
+	settingsSvc = &services.SettingsService{Keys: keys, Store: store, Platform: plat, Executable: os.Executable, Svc: svc, Clips: clips, NewClient: func(p provider.ID, key string) provider.Provider {
 		candidate := func() (string, bool) { return key, true }
 		if p == provider.Klipy {
 			return &klipy.Client{BaseURL: d.KlipyBase, Key: candidate, HTTP: d.HTTP}
 		}
-		return &giphy.Client{BaseURL: d.GiphyBase, Key: candidate, HTTP: d.HTTP}
+		return &giphy.Client{BaseURL: d.GiphyBase, Key: candidate, HTTP: d.HTTP, Params: params}
 	}}
 
 	var sh *shell.Shell // set below, before app.Run; a second launch arrives only after Run starts

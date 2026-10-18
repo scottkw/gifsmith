@@ -78,3 +78,29 @@ export interface Page {
      */
     "next": string;
 }
+
+/**
+ * Params are the user's per-request provider settings (Settings → Search). Clients read them
+ * on every request, so a change applies to the next call.
+ */
+export interface Params {
+    /**
+     * one of PageSizes; clients clamp to vendor limits
+     */
+    "PageSize": number;
+
+    /**
+     * GIPHY and Clips only; one of Ratings
+     */
+    "Rating": string;
+
+    /**
+     * GIPHY language code, search only
+     */
+    "Lang": string;
+
+    /**
+     * Klipy locale, lowercase ISO 3166-1 alpha-2
+     */
+    "Country": string;
+}

@@ -416,3 +416,18 @@ func TestFlushKeepsOtherProviders(t *testing.T) {
 		t.Errorf("calls giphy %d klipy %d; want 2 and 1", g.n(), k.n())
 	}
 }
+
+// A 429 that lands after a Flush still blocks the budget: only a key change voids it.
+func TestFlushInFlight429StillBlocks(t *testing.T) {
+	g := &gatedProv{started: make(chan struct{}), release: make(chan struct{}), err: &provider.Error{Kind: provider.RateLimited, Provider: provider.GIPHY}}
+	s := New(map[provider.ID]provider.Provider{provider.GIPHY: g}, nil)
+	done := make(chan struct{})
+	go func() { _, _ = s.Trending(ctx, provider.GIPHY, ""); close(done) }()
+	<-g.started
+	s.Flush(provider.GIPHY)
+	close(g.release)
+	<-done
+	if !s.Blocked(provider.GIPHY) {
+		t.Error("a 429 answered after Flush did not block the budget")
+	}
+}

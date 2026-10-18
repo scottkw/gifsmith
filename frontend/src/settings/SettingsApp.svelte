@@ -5,11 +5,15 @@
   import { onMount, tick, untrack } from 'svelte';
   import type { SettingsSnapshot } from '../lib/api';
   import GeneralPane from './GeneralPane.svelte';
+  import SearchPane from './SearchPane.svelte';
 
   let { initial }: { initial: SettingsSnapshot } = $props();
 
-  // UI-SPEC order; later plans add Keys, Hotkeys, Search, Downloads and About.
-  const PANES = [{ id: 'general', name: 'General', component: GeneralPane }];
+  // UI-SPEC order (General, Keys, Hotkeys, Search, Downloads, About); only built panes are listed.
+  const PANES = [
+    { id: 'general', name: 'General', component: GeneralPane },
+    { id: 'search', name: 'Search', component: SearchPane },
+  ];
 
   let active = $state(0);
   let snap = $state(untrack(() => initial)); // a pane mounts with the latest snapshot

@@ -7,5 +7,6 @@ export {
 
 export type {
     Gif,
-    Page
+    Page,
+    Params
 } from "./models.js";

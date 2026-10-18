@@ -147,11 +147,16 @@ func giphyGifs(w http.ResponseWriter, r *http.Request, o Options, clips bool) {
 	if hasWord(words, "hugesize") { // over the 15 MB square crop limit
 		originalSize = "16000000"
 	}
+	// Non-default request parameters show in titles, so UAT can see what Go sent.
+	tag := ""
+	if r := q.Get("rating"); r != "" && r != "pg-13" {
+		tag = "[rating=" + r + "] "
+	}
 	data := []item{}
 	for n := max(offset, 0) + 1; n <= total && len(data) < limit; n++ {
 		if clips {
 			id := "clip-" + strconv.Itoa(n)
-			data = append(data, item{Type: "video", ID: id, Slug: "clip-" + id, Title: "GIPHY clip " + strconv.Itoa(n), URL: "https://giphy.com/clips/clip-" + id, Images: map[string]rendition{
+			data = append(data, item{Type: "video", ID: id, Slug: "clip-" + id, Title: tag + "GIPHY clip " + strconv.Itoa(n), URL: "https://giphy.com/clips/clip-" + id, Images: map[string]rendition{
 				"fixed_width": {URL: media + id + "-200w.gif", Width: "200", Height: "112", Size: "1234"},
 				"original":    {URL: media + id + ".gif", Width: "480", Height: "270", Size: "4321"},
 			}, Video: map[string]any{"assets": clipAssets(media+id, hasWord(words, "no720"))}})
@@ -162,7 +167,7 @@ func giphyGifs(w http.ResponseWriter, r *http.Request, o Options, clips bool) {
 		if n%2 == 1 {
 			source = "https://example.org/source/" + id
 		}
-		data = append(data, item{Type: "gif", ID: id, Slug: "moment-" + id, Title: "GIPHY moment " + strconv.Itoa(n), URL: "https://giphy.com/gifs/moment-" + id, Source: source, Images: map[string]rendition{
+		data = append(data, item{Type: "gif", ID: id, Slug: "moment-" + id, Title: tag + "GIPHY moment " + strconv.Itoa(n), URL: "https://giphy.com/gifs/moment-" + id, Source: source, Images: map[string]rendition{
 			"fixed_width":  {URL: media + id + "-200w.gif", Width: "200", Height: "200", Size: "1234"},
 			"fixed_height": {URL: media + id + "-200h.gif", Width: "200", Height: "200", Size: "1234"},
 			"original":     {URL: media + id + ".gif", Width: "480", Height: "480", Size: originalSize},

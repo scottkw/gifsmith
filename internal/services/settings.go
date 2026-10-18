@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"slices"
 	"strings"
 	"sync"
 	"unicode"
@@ -107,7 +108,15 @@ type Snapshot struct {
 
 // Params are the provider parameters for the next request: the defaults overlaid with the
 // stored choices. Clients call it on every request.
-func (s *SettingsService) Params() provider.Params { return provider.DefaultParams() }
+func (s *SettingsService) Params() provider.Params { return s.paramsOf(s.Store.Get()) }
+
+func (s *SettingsService) paramsOf(p settings.Prefs) provider.Params {
+	prm := provider.DefaultParams()
+	if p.GiphyRating != "" {
+		prm.Rating = p.GiphyRating
+	}
+	return prm
+}
 
 func (s *SettingsService) Snapshot(ctx context.Context) Snapshot { return s.snapshotOf(s.Store.Get()) }
 
@@ -117,18 +126,27 @@ func (s *SettingsService) snapshotOf(p settings.Prefs) Snapshot {
 	if err != nil {
 		log.Printf("autostart: status failed")
 	}
-	return Snapshot{Theme: p.Theme, LaunchAtLogin: on && err == nil}
+	prm := s.paramsOf(p)
+	return Snapshot{Theme: p.Theme, LaunchAtLogin: on && err == nil, GiphyRating: prm.Rating}
 }
 
 var errUnchanged = errors.New("unchanged")
 
 // SetPref sets one allow-listed pref from the webview, validated here; an equal value is a no-op.
 // Each write emits settings:changed with the full Snapshot so the panel and Settings converge.
+// A provider parameter also flushes the affected providers' cached pages (never their 429 block).
 func (s *SettingsService) SetPref(ctx context.Context, name, value string) (Snapshot, error) {
 	var set func(*settings.Prefs)
+	var flush []provider.ID
 	switch name {
 	case "theme":
 		set = func(p *settings.Prefs) { p.Theme = value }
+	case "giphyRating":
+		if !slices.Contains(provider.Ratings, value) {
+			return s.Snapshot(ctx), errInvalidValue
+		}
+		set = func(p *settings.Prefs) { p.GiphyRating = defaultAsEmpty(value, provider.DefaultParams().Rating) }
+		flush = []provider.ID{provider.GIPHY} // Clips share GIPHY's budget, so their pages go too
 	default:
 		return s.Snapshot(ctx), errInvalidValue
 	}
@@ -155,11 +173,22 @@ func (s *SettingsService) SetPref(ctx context.Context, name, value string) (Snap
 	if name == "theme" && s.ApplyTheme != nil {
 		s.ApplyTheme(p.Theme)
 	}
+	for _, id := range flush {
+		s.Svc.Flush(id)
+	}
 	snap := s.snapshotOf(p)
 	if s.Emit != nil {
 		s.Emit("settings:changed", snap)
 	}
 	return snap, nil
+}
+
+// defaultAsEmpty stores the default as "", so choosing it when nothing is stored is a no-op.
+func defaultAsEmpty(v, def string) string {
+	if v == def {
+		return ""
+	}
+	return v
 }
 
 // LastProvider is the persisted provider id, or "" on first run or an unreadable file.
