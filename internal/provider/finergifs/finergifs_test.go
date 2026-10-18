@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"slices"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -106,7 +106,7 @@ func TestMapperFixture(t *testing.T) {
 		// The mapper keeps duplicates in returned order; dedupe policy lives in the search service.
 		{Provider: provider.FinerGifs, ID: "02x05-dwight-bears", Title: "Bears. Beets. Battlestar Galactica.", PreviewURL: m + "02x05-dwight-bears.gif", DownloadURL: m + "02x05-dwight-bears.gif"},
 	}
-	if !slices.Equal(p.Items, want) {
+	if !reflect.DeepEqual(p.Items, want) { // also: Finer items carry none of the optional metadata
 		t.Errorf("items =\n%+v\nwant\n%+v", p.Items, want)
 	}
 	if p.Next != "3" {

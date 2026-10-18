@@ -37,6 +37,18 @@ type Gif struct {
 	PreviewURL  string `json:"previewUrl"`  // grid only
 	DownloadURL string `json:"downloadUrl"` // copy only
 	IsClip      bool   `json:"isClip"`
+	// Optional metadata, filled only from fields the vendor response carries (absent = unknown).
+	// Width/Height/Size describe the file Copy puts on the clipboard.
+	Width  int      `json:"width,omitempty"`
+	Height int      `json:"height,omitempty"`
+	Size   int64    `json:"size,omitempty"` // bytes
+	Tags   []string `json:"tags,omitempty"`
+	// PageURL is the vendor's https page for the item; "" = no page actions (Klipy, Finer Gifs).
+	PageURL   string `json:"pageUrl,omitempty"`
+	SourceURL string `json:"sourceUrl,omitempty"` // https only; can point anywhere
+	MediumURL string `json:"mediumUrl,omitempty"` // Details preview; "" = use PreviewURL
+	// GifURL is the GIF rendition used for link and Markdown when DownloadURL is not a GIF (Clips).
+	GifURL string `json:"gifUrl,omitempty"`
 }
 
 type Page struct {

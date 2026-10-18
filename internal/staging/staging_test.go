@@ -259,3 +259,31 @@ func TestFetchRedirectAllowlist(t *testing.T) {
 		t.Errorf("redirect loop: %v, want ErrNotAllowed", err)
 	}
 }
+
+func TestPageAllow(t *testing.T) {
+	for _, tc := range []struct {
+		p    provider.ID
+		u    string
+		want bool
+	}{
+		{provider.GIPHY, "https://giphy.com/gifs/x", true},
+		{provider.Clips, "https://giphy.com/clips/x", true},
+		{provider.GIPHY, "https://media.giphy.com/x", true},
+		{provider.Klipy, "https://klipy.com/x", false},
+		{provider.Klipy, "https://giphy.com/gifs/x", false},
+		{provider.FinerGifs, "https://giphy.com/gifs/x", false},
+		{provider.GIPHY, "http://giphy.com/x", false},
+		{provider.GIPHY, "https://giphy.com:8443/x", false},
+		{provider.GIPHY, "https://evilgiphy.com/x", false},
+		{provider.GIPHY, "https://giphy.com.evil.example/x", false},
+		{provider.GIPHY, "file:///etc/passwd", false},
+	} {
+		u, err := url.Parse(tc.u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := PageAllow(tc.p, u); got != tc.want {
+			t.Errorf("PageAllow(%s, %s) = %v, want %v", tc.p, tc.u, got, tc.want)
+		}
+	}
+}

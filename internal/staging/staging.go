@@ -164,6 +164,10 @@ func VendorAllow(p provider.ID, u *url.URL) bool {
 	return false
 }
 
+// PageAllow admits only GIPHY and Clips page URLs: https, default port, giphy.com or a subdomain.
+// No other provider has a page URL (a Klipy page is never constructed).
+func PageAllow(p provider.ID, u *url.URL) bool { return false }
+
 // slug is the lowercase letters and digits of title with "-" for each run of anything else,
 // capped at 80 bytes on a rune boundary; "gif" when nothing is left.
 func slug(title string) string {
