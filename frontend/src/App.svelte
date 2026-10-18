@@ -23,7 +23,9 @@
     providerError,
     providers,
     removeRecent,
+    removeSearch,
     requestAccessibility,
+    saveSearch,
     search,
     setFavorite,
     setLastProvider,
@@ -43,12 +45,14 @@
   import { COLS, move, nearEnd, routeKey } from './lib/grid';
   import { flatItems, moveSectioned, sections } from './lib/library';
   import { placeInDetails, placeMenu } from './lib/popover';
+  import { CHIP_MAX, SAVE_IDLE_MS, chipsVisible, shouldSave } from './lib/searches';
   import { CLIPS_ACCESS_MAILTO, LIBRARY_TABS, SLOTS, libraryTab, slotById, type LibraryId, type SlotId } from './lib/providers';
   import ActionMenu from './components/ActionMenu.svelte';
   import DetailsPane from './components/DetailsPane.svelte';
   import LibraryGrid from './components/LibraryGrid.svelte';
   import Footer from './components/Footer.svelte';
   import ProviderTabs from './components/ProviderTabs.svelte';
+  import RecentSearches from './components/RecentSearches.svelte';
   import ResultGrid from './components/ResultGrid.svelte';
   import SetupCard from './components/SetupCard.svelte';
   import StateMessage from './components/StateMessage.svelte';
@@ -158,6 +162,23 @@
       statuses !== null &&
       (!statuses[active]?.configured || cur.err?.kind === 'key_rejected' || cur.err?.kind === 'key_missing'),
   );
+  // Recent-search chips (D-12): provider tab, empty box, no setup or Clips card. chip = keyboard selection.
+  const chips = $derived(
+    chipsVisible({
+      tab: libTab ?? 'provider',
+      query,
+      card: card || (active === 'clips' && !clipsEnabled),
+      searches: library?.searches[active],
+    })
+      ? library!.searches[active].slice(0, CHIP_MAX)
+      : [],
+  );
+  let chip = $state(-1);
+  const gridShown = $derived(!finerIdle && cur.items.length > 0);
+  // D-13/D-20 idle save: the time of the last keystroke and the last provider:query saved by it.
+  let lastKeyAt = 0;
+  let saveTimer: ReturnType<typeof setTimeout> | undefined;
+  let savedKey = '';
   const cardMessage = $derived(cur.err?.kind === 'key_rejected' ? revokedMessage(slot.keyLabel!) : '');
   let setup = $state<SetupCard>();
   // Error copy comes only from errors.ts rows, never from the caught error's text.
@@ -215,6 +236,7 @@
     Events.On('panel:show', () => {
       clearTimeout(hideTimer); // a copy just before this show must not hide the panel again (02 IN-07)
       menuOpen = detailsOpen = false; // never reopen on their own
+      chip = -1;
       now = Date.now();
       // A toast with an action (the download toast) outlives a hide inside its 5 s: a TCC prompt can hide the panel.
       if (!keepStatus && !toastAction) setStatus('');
@@ -326,12 +348,60 @@
     if ((e as InputEvent | undefined)?.isComposing) return;
     clearTransient();
     clearTimeout(timer);
+    chip = -1;
+    lastKeyAt = Date.now();
+    savedKey = '';
+    clearTimeout(saveTimer);
     if (libTab) {
       selected = libItems.length ? 0 : -1;
       return;
     }
     if (!wanted()) show(active); // trending or S8 at once, no debounce
-    else timer = setTimeout(() => load(active), DEBOUNCE_MS);
+    else {
+      timer = setTimeout(() => load(active), DEBOUNCE_MS);
+      saveTimer = setTimeout(() => maybeSave(active), SAVE_IDLE_MS + 10);
+    }
+  }
+
+  // Saves the current query for p once 1.5 s have passed since the last keystroke and its first page
+  // has landed with a result, whichever comes last (D-13, D-20). Library filters are never saved.
+  function maybeSave(p: SlotId) {
+    const s = states[p];
+    const q = wanted();
+    if (libTab || p !== active || !q || s.q !== q || s.status !== 'ready' || savedKey === `${p}:${q}`) return;
+    if (!shouldSave({ sinceKeyMs: Date.now() - lastKeyAt, firstPageItems: s.items.length, query: q })) return;
+    savedKey = `${p}:${q}`;
+    remember(p, q);
+  }
+
+  // Go applies the list rules (dedupe, cap); a failed save only means no chip.
+  function remember(p: SlotId, q: string) {
+    saveSearch(p, q).then(
+      () => refreshLibrary(),
+      () => {},
+    );
+  }
+
+  // ↵ on a chip: the query becomes the chip text and the search fires at once (no debounce).
+  function runChip(q: string) {
+    chip = -1;
+    query = q;
+    clearTransient();
+    load(active);
+    input.focus();
+  }
+
+  // ⌘⌫ on a chip: removed silently (no toast, no Undo, D-22); the selection stays in the row.
+  async function removeChip() {
+    const q = chips[chip];
+    try {
+      library = await removeSearch(active, q);
+    } catch {
+      return;
+    }
+    const n = Math.min(library.searches[active]?.length ?? 0, CHIP_MAX);
+    chip = Math.min(chip, n - 1);
+    if (chip < 0 && gridShown) selected = 0;
   }
 
   // Fetches p's first page for the current query: search, trending, or (Finer Gifs) nothing.
@@ -354,6 +424,7 @@
 
   function switchTo(p: SlotId) {
     menuOpen = detailsOpen = false;
+    chip = -1;
     if (p !== active || libTab) {
       if (p !== active) setLastProvider(p);
       active = p;
@@ -369,6 +440,7 @@
   // ⌘5 / ⌘6: the library renders from the saved snapshot; reloaded on every switch (D-09).
   function switchLib(id: LibraryId) {
     menuOpen = detailsOpen = false;
+    chip = -1;
     clearTimeout(timer); // a pending provider search must not fire for the filter text
     if (libTab !== id) {
       libTab = id;
@@ -409,6 +481,7 @@
       const page = await latest(`first:${p}`, call(''));
       if (!page) return; // cancelled or superseded: the newer call owns the state
       setResults(p, page, (cursor) => latest(`page:${p}`, call(cursor)));
+      maybeSave(p);
     } catch (e) {
       setResults(p, null, null);
       s.status = 'error';
@@ -474,6 +547,7 @@
     // A printable key closes Details and goes on to the input as usual.
     if (detail && a === 'none' && e.key.length === 1 && !e.metaKey && !e.ctrlKey) detailsOpen = false;
     if (a === 'none') return;
+    if (chip >= 0 && chipKey(a)) return e.preventDefault();
     if (a === 'remove' && !(libTab && items[selected])) return;
     if (a === 'undo' && !undoVisible()) return;
     e.preventDefault();
@@ -483,7 +557,14 @@
       case 'up':
       case 'down':
         // In Details ← → step through the grid's items (clamped) and the pane follows; ↑ ↓ do nothing.
-        if (!items.length || (detail && (a === 'up' || a === 'down'))) return;
+        if (detail && (a === 'up' || a === 'down')) return;
+        // ↑ from the grid's first row, or ↓ with no grid, selects the first chip.
+        if (chips.length && !detail && ((a === 'up' && gridShown && selected < COLS) || (a === 'down' && !gridShown))) {
+          chip = 0;
+          select(-1);
+          return;
+        }
+        if (!items.length) return;
         if (libTab) {
           select(moveSectioned(selected, a, libSections.map((s) => s.items.length)));
           return;
@@ -533,6 +614,34 @@
         return;
       // 'tab': bound, no effect; slot1–slot4: onMainKeydown.
     }
+  }
+
+  // Keys while a chip is selected; false = not a chip key (normal handling, e.g. Esc, ⌘1–⌘6).
+  function chipKey(a: string): boolean {
+    switch (a) {
+      case 'left':
+      case 'right':
+        chip = Math.max(0, Math.min(chips.length - 1, chip + (a === 'left' ? -1 : 1)));
+        return true;
+      case 'down':
+        // Back to the first tile; with no grid (S8 or a message state) nothing happens.
+        if (gridShown) {
+          chip = -1;
+          select(0);
+        }
+        return true;
+      case 'up':
+      case 'paste':
+      case 'actions':
+        return true;
+      case 'copy':
+        runChip(chips[chip]);
+        return true;
+      case 'remove':
+        removeChip();
+        return true;
+    }
+    return false;
   }
 
   // ⌘1–⌘6 from any field in the panel (search input or key field) switch provider or library tab.
@@ -682,6 +791,9 @@
     const g = items[selected];
     if (copying || !g) return;
     copying = true;
+    // Copying from a searched provider grid saves that search (D-13); trending and library filters never do.
+    const p = active;
+    const searched = libTab ? '' : states[p].q;
     const busy = () => {
       overlay = true;
       setStatus(crop ? 'Cropping…' : 'Copying…');
@@ -690,6 +802,7 @@
     if (!crop) busy();
     try {
       const r = await call(g);
+      if (searched) remember(p, searched);
       if (!pasteIt) {
         setStatus(r.message, 'success');
         scheduleHide();
@@ -790,7 +903,7 @@
       role="combobox"
       aria-expanded={items.length > 0}
       aria-controls="grid"
-      aria-activedescendant={selected >= 0 && !detail ? `tile-${selected}` : undefined}
+      aria-activedescendant={chip >= 0 ? `chip-${chip}` : selected >= 0 && !detail ? `tile-${selected}` : undefined}
     />
     {#if busy}
       <span class="spinner busy" role="status" aria-label="Loading"></span>
@@ -811,137 +924,142 @@
         />
       </div>
     {/if}
-    {#if libTab}
-      {#if !library}
-        {#if libSlow}
-          <div class="skeleton" aria-hidden="true">
-            {#each Array(8), i (i)}
-              <div></div>
-            {/each}
-          </div>
+    {#if chips.length}
+      <RecentSearches searches={chips} selected={chip} onrun={runChip} />
+    {/if}
+    <div class="view">
+      {#if libTab}
+        {#if !library}
+          {#if libSlow}
+            <div class="skeleton" aria-hidden="true">
+              {#each Array(8), i (i)}
+                <div></div>
+              {/each}
+            </div>
+          {/if}
+        {:else if library.unreadable.includes(libTab)}
+          <StateMessage
+            icon
+            heading="Couldn't load {libName}"
+            body="Gifsmith couldn't read its saved list. Try again, or quit and reopen Gifsmith."
+            button="Try Again"
+            onbutton={() => refreshLibrary()}
+          />
+        {:else if !library[libTab].length && libTab === 'favorites'}
+          <StateMessage
+            heading="No favorites yet"
+            body="Press ⌘⇧F on any GIF to save it here. Favorites open instantly, even offline or when a provider's request limit is reached."
+          />
+        {:else if !library[libTab].length}
+          <StateMessage heading="No recent GIFs" body="GIFs you copy or paste show up here, newest first." />
+        {:else if !libItems.length}
+          <StateMessage heading="No matches" body="Nothing in {libName} matches “{query.trim()}”. Press Esc to clear the search." />
+        {:else}
+          <!-- Remounted when the row layout changes: the virtualizer reads row sizes only on a count change. -->
+          {#key `${libTab}:${libSections.map((s) => s.items.length).join(',')}`}
+            <LibraryGrid
+              sections={libSections}
+              {selected}
+              {overlay}
+              favorites={favKeys}
+              badges={libTab !== 'favorites'}
+              onselect={select}
+              oncopy={(i) => {
+                select(i);
+                run('copy');
+              }}
+            />
+          {/key}
         {/if}
-      {:else if library.unreadable.includes(libTab)}
+      {:else if statuses === null}
+        <!-- waiting for Providers() -->
+      {:else if card}
+        {#key `${active}:${cardMessage}`}
+          <SetupCard bind:this={setup} {slot} initialMessage={cardMessage} onsaved={keySaved} ontryfiner={tryFiner} />
+        {/key}
+      {:else if active === 'clips' && !giphyKey}
         <StateMessage
-          icon
-          heading="Couldn't load {libName}"
-          body="Gifsmith couldn't read its saved list. Try again, or quit and reopen Gifsmith."
-          button="Try Again"
-          onbutton={() => refreshLibrary()}
+          heading="Clips use your GIPHY key"
+          body="Add a GIPHY key first. Gifsmith checks it for Clips access automatically."
+          button="Add GIPHY Key"
+          primary
+          onbutton={() => switchTo('giphy')}
         />
-      {:else if !library[libTab].length && libTab === 'favorites'}
+      {:else if active === 'clips' && (cur.err?.kind === 'key_rejected' || cur.err?.kind === 'key_missing')}
+        <!-- Clips have no key card of their own: errorState() has no row for key errors. -->
         <StateMessage
-          heading="No favorites yet"
-          body="Press ⌘⇧F on any GIF to save it here. Favorites open instantly, even offline or when a provider's request limit is reached."
+          heading="GIPHY rejected your saved key"
+          body="Clips use your GIPHY key. Paste a new key on the GIPHY tab to continue."
+          button="Go to GIPHY"
+          primary
+          onbutton={() => {
+            // GIPHY's own grid may still hold cached results for this key: carry the rejection over so its card shows.
+            setResults('giphy', null, null);
+            Object.assign(states.giphy, { status: 'error', err: { kind: 'key_rejected', provider: 'giphy' }, errAt: Date.now() });
+            switchTo('giphy');
+          }}
         />
-      {:else if !library[libTab].length}
-        <StateMessage heading="No recent GIFs" body="GIFs you copy or paste show up here, newest first." />
-      {:else if !libItems.length}
-        <StateMessage heading="No matches" body="Nothing in {libName} matches “{query.trim()}”. Press Esc to clear the search." />
-      {:else}
-        <!-- Remounted when the row layout changes: the virtualizer reads row sizes only on a count change. -->
-        {#key `${libTab}:${libSections.map((s) => s.items.length).join(',')}`}
-          <LibraryGrid
-            sections={libSections}
+      {:else if active === 'clips' && clipsState === 'disabled'}
+        <StateMessage
+          heading="Clips aren't enabled for your key"
+          body="Your GIPHY key works for GIFs, but GIPHY has to approve it for Clips. Email clips@giphy.com to request access, then reopen Gifsmith."
+          link="Email clips@giphy.com ↗"
+          href={CLIPS_ACCESS_MAILTO}
+          onlink={() => openExternal(CLIPS_ACCESS_MAILTO)}
+          button="Back to GIPHY"
+          onbutton={() => switchTo('giphy')}
+        />
+      {:else if active === 'clips' && !clipsEnabled && cur.status !== 'error'}
+        <div class="skeleton" aria-hidden="true">
+          {#each Array(8), i (i)}
+            <div></div>
+          {/each}
+        </div>
+      {:else if finerIdle}
+        <StateMessage
+          heading="Search The Office GIFs"
+          body="The Finer Gifs Club has no trending list. Type at least 2 characters to search."
+        />
+      {:else if cur.items.length}
+        {#key `${active}:${cur.seq}`}
+          <ResultGrid
+            items={cur.items}
             {selected}
             {overlay}
             favorites={favKeys}
-            badges={libTab !== 'favorites'}
+            paging={cur.paging}
+            pagingNote={pageView?.note}
+            pagingRetry={pageView?.state?.tryAgain ?? true}
             onselect={select}
             oncopy={(i) => {
               select(i);
               run('copy');
             }}
+            onneedmore={loadMore}
+            onretrypage={retryPage}
           />
         {/key}
-      {/if}
-    {:else if statuses === null}
-      <!-- waiting for Providers() -->
-    {:else if card}
-      {#key `${active}:${cardMessage}`}
-        <SetupCard bind:this={setup} {slot} initialMessage={cardMessage} onsaved={keySaved} ontryfiner={tryFiner} />
-      {/key}
-    {:else if active === 'clips' && !giphyKey}
-      <StateMessage
-        heading="Clips use your GIPHY key"
-        body="Add a GIPHY key first. Gifsmith checks it for Clips access automatically."
-        button="Add GIPHY Key"
-        primary
-        onbutton={() => switchTo('giphy')}
-      />
-    {:else if active === 'clips' && (cur.err?.kind === 'key_rejected' || cur.err?.kind === 'key_missing')}
-      <!-- Clips have no key card of their own: errorState() has no row for key errors. -->
-      <StateMessage
-        heading="GIPHY rejected your saved key"
-        body="Clips use your GIPHY key. Paste a new key on the GIPHY tab to continue."
-        button="Go to GIPHY"
-        primary
-        onbutton={() => {
-          // GIPHY's own grid may still hold cached results for this key: carry the rejection over so its card shows.
-          setResults('giphy', null, null);
-          Object.assign(states.giphy, { status: 'error', err: { kind: 'key_rejected', provider: 'giphy' }, errAt: Date.now() });
-          switchTo('giphy');
-        }}
-      />
-    {:else if active === 'clips' && clipsState === 'disabled'}
-      <StateMessage
-        heading="Clips aren't enabled for your key"
-        body="Your GIPHY key works for GIFs, but GIPHY has to approve it for Clips. Email clips@giphy.com to request access, then reopen Gifsmith."
-        link="Email clips@giphy.com ↗"
-        href={CLIPS_ACCESS_MAILTO}
-        onlink={() => openExternal(CLIPS_ACCESS_MAILTO)}
-        button="Back to GIPHY"
-        onbutton={() => switchTo('giphy')}
-      />
-    {:else if active === 'clips' && !clipsEnabled && cur.status !== 'error'}
-      <div class="skeleton" aria-hidden="true">
-        {#each Array(8), i (i)}
-          <div></div>
-        {/each}
-      </div>
-    {:else if finerIdle}
-      <StateMessage
-        heading="Search The Office GIFs"
-        body="The Finer Gifs Club has no trending list. Type at least 2 characters to search."
-      />
-    {:else if cur.items.length}
-      {#key `${active}:${cur.seq}`}
-        <ResultGrid
-          items={cur.items}
-          {selected}
-          {overlay}
-          favorites={favKeys}
-          paging={cur.paging}
-          pagingNote={pageView?.note}
-          pagingRetry={pageView?.state?.tryAgain ?? true}
-          onselect={select}
-          oncopy={(i) => {
-            select(i);
-            run('copy');
-          }}
-          onneedmore={loadMore}
-          onretrypage={retryPage}
+      {:else if cur.status === 'loading'}
+        <div class="skeleton" aria-hidden="true">
+          {#each Array(8), i (i)}
+            <div></div>
+          {/each}
+        </div>
+      {:else if cur.status === 'empty'}
+        <StateMessage
+          heading="No GIFs found"
+          body="Nothing on {providerName(active)} matches “{cur.q}”. Try different words, or switch providers with ⌘1–⌘4."
         />
-      {/key}
-    {:else if cur.status === 'loading'}
-      <div class="skeleton" aria-hidden="true">
-        {#each Array(8), i (i)}
-          <div></div>
-        {/each}
-      </div>
-    {:else if cur.status === 'empty'}
-      <StateMessage
-        heading="No GIFs found"
-        body="Nothing on {providerName(active)} matches “{cur.q}”. Try different words, or switch providers with ⌘1–⌘4."
-      />
-    {:else if errView}
-      <StateMessage
-        icon
-        heading={errView.heading}
-        body={errView.body}
-        button={errView.tryAgain ? 'Try Again' : ''}
-        onbutton={retry}
-      />
-    {/if}
+      {:else if errView}
+        <StateMessage
+          icon
+          heading={errView.heading}
+          body={errView.body}
+          button={errView.tryAgain ? 'Try Again' : ''}
+          onbutton={retry}
+        />
+      {/if}
+    </div>
   </section>
 
   {#if menuOpen}
@@ -1006,6 +1124,13 @@
   }
   .content {
     position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  /* The grid or state below the chip row: 364px, or 332px under chips. */
+  .view {
     flex: 1;
     min-height: 0;
   }
