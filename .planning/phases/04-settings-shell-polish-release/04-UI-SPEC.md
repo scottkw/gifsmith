@@ -1,7 +1,8 @@
 ---
 phase: "4"
 slug: "settings-shell-polish-release"
-status: draft
+status: approved
+reviewed_at: "2026-10-18"
 shadcn_initialized: false
 preset: none
 created: "2026-10-18"
@@ -627,12 +628,12 @@ Phase 4 adds no frontend dependency. The Settings window, recorder and key cards
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
-- [ ] Dimension 7 Inventory Provenance: PASS (not applicable, `Tool: none`, section omitted per template)
+- [x] Dimension 1 Copywriting: FLAG (single-word buttons `Test`/`Remove`/`Clear`/`Choose…`: give each an aria-label naming its row or provider)
+- [x] Dimension 2 Visuals: FLAG (focal point per pane: Keys = card status + primary button; Hotkeys = `Open Gifsmith` recorder; About = app icon + name)
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
+- [x] Dimension 7 Inventory Provenance: PASS (not applicable, `Tool: none`, section omitted per template)
 
 **Approval:** pending
