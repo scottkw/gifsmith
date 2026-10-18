@@ -26,6 +26,7 @@ var ErrNoKey = errors.New("no key stored")
 type SecretStore interface {
 	Get(account string) (string, error) // ErrNoKey when absent
 	Set(account, secret string) error
+	Delete(account string) error // nil when absent
 }
 
 // KeyringStore is the macOS Keychain via go-keyring (/usr/bin/security, secret on stdin).
@@ -49,6 +50,8 @@ func (s KeyringStore) Set(account, secret string) error {
 	}
 	return nil
 }
+
+func (s KeyringStore) Delete(account string) error { return nil }
 
 // MemoryStore is the SecretStore for tests and the -tags server UAT build.
 type MemoryStore struct {
@@ -74,6 +77,8 @@ func (s *MemoryStore) Set(account, secret string) error {
 	s.m[account] = secret
 	return nil
 }
+
+func (s *MemoryStore) Delete(account string) error { return nil }
 
 // Keys caches the stored keys: each Keychain read spawns /usr/bin/security, so read once at startup.
 type Keys struct {
@@ -116,6 +121,15 @@ func (k *Keys) Set(p provider.ID, key string) error {
 	k.mu.Unlock()
 	return nil
 }
+
+// Delete removes p's key from the store, then the cache; a store error leaves both unchanged.
+func (k *Keys) Delete(p provider.ID) error { return nil }
+
+// MarkRejected records that the vendor refused p's stored key (a failed Test or search).
+func (k *Keys) MarkRejected(p provider.ID) {}
+
+// Rejected reports whether p's stored key was refused since it was last set.
+func (k *Keys) Rejected(p provider.ID) bool { return false }
 
 // Func is a provider client's Key function; it sees later Sets.
 func (k *Keys) Func(p provider.ID) func() (string, bool) {

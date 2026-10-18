@@ -65,10 +65,11 @@ type SettingsError struct {
 }
 
 var settingsText = map[string]string{
-	"invalid_value":       "this setting value is not allowed",
-	"prefs_write_failed":  "the settings file could not be written",
-	"autostart_failed":    "could not change Open at login",
-	"not_in_applications": "Gifsmith is not in the Applications folder",
+	"invalid_value":          "this setting value is not allowed",
+	"prefs_write_failed":     "the settings file could not be written",
+	"autostart_failed":       "could not change Open at login",
+	"not_in_applications":    "Gifsmith is not in the Applications folder",
+	"keychain_delete_failed": "couldn't remove the key from the macOS Keychain",
 }
 
 func (e *SettingsError) Error() string {
@@ -83,4 +84,5 @@ var (
 	errPrefsWriteFailed  = &SettingsError{Kind: "prefs_write_failed"}
 	errAutostartFailed   = &SettingsError{Kind: "autostart_failed"}
 	errNotInApplications = &SettingsError{Kind: "not_in_applications"}
+	errKeychainDelete    = &SettingsError{Kind: "keychain_delete_failed"}
 )

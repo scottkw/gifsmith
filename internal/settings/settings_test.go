@@ -84,6 +84,7 @@ type failingStore struct{}
 
 func (failingStore) Get(string) (string, error) { return "", errors.New("boom") }
 func (failingStore) Set(string, string) error   { return errors.New("boom") }
+func (failingStore) Delete(string) error        { return errors.New("boom") }
 
 func TestKeysStoreFailures(t *testing.T) {
 	k := NewKeys(failingStore{})
@@ -341,5 +342,71 @@ func TestStoreNormalizeSearchPrefs(t *testing.T) {
 	ok := Prefs{GiphyRating: "r", PageSize: 48, GiphyLang: "zh-TW", KlipyCountry: "de"}
 	if p := ok; len(p.Normalize()) != 0 || p != ok {
 		t.Errorf("valid prefs %+v were reset", ok)
+	}
+}
+
+func TestMemoryStoreDelete(t *testing.T) {
+	s := NewMemoryStore()
+	_ = s.Set("giphy", "uat-key-123")
+	if err := s.Delete("giphy"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Get("giphy"); !errors.Is(err, ErrNoKey) {
+		t.Errorf("Get after Delete: %v, want ErrNoKey", err)
+	}
+	if err := s.Delete("giphy"); err != nil {
+		t.Errorf("Delete of an absent account = %v, want nil", err)
+	}
+}
+
+func TestKeyringStoreDelete(t *testing.T) {
+	keyring.MockInit() // in-memory provider: never touches the login Keychain
+	s := KeyringStore{Service: "gifsmith-test"}
+	if err := s.Set("giphy", "SECRETKEY123"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Delete("giphy"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Get("giphy"); !errors.Is(err, ErrNoKey) {
+		t.Errorf("Get after Delete: %v, want ErrNoKey", err)
+	}
+	if err := s.Delete("giphy"); err != nil {
+		t.Errorf("Delete of an absent item = %v, want nil (ErrNotFound maps to nil)", err)
+	}
+	keyring.MockInitWithError(errors.New("security: SECRETKEY123 exit status 45"))
+	err := s.Delete("giphy")
+	if err == nil || err.Error() != "keychain delete failed" {
+		t.Errorf("Delete on a failing Keychain = %v, want the fixed text", err)
+	}
+}
+
+func TestKeysDeleteAndRejected(t *testing.T) {
+	k := NewKeys(NewMemoryStore())
+	if err := k.Set(provider.GIPHY, "uat-key-123"); err != nil {
+		t.Fatal(err)
+	}
+	k.MarkRejected(provider.GIPHY)
+	if !k.Rejected(provider.GIPHY) || k.Rejected(provider.Klipy) {
+		t.Fatal("MarkRejected(giphy) not recorded for GIPHY only")
+	}
+	_ = k.Set(provider.GIPHY, "uat-key-456")
+	if k.Rejected(provider.GIPHY) {
+		t.Error("Set did not clear Rejected")
+	}
+	k.MarkRejected(provider.GIPHY)
+	if err := k.Delete(provider.GIPHY); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := k.Get(provider.GIPHY); ok || k.Rejected(provider.GIPHY) {
+		t.Error("Delete left the key or the rejected flag")
+	}
+	f := NewKeys(failingStore{})
+	f.m[provider.GIPHY] = "uat-key-123"
+	if err := f.Delete(provider.GIPHY); err == nil {
+		t.Fatal("Delete succeeded on a failing store")
+	}
+	if v, ok := f.Get(provider.GIPHY); !ok || v != "uat-key-123" {
+		t.Error("a failed store delete changed the cache")
 	}
 }

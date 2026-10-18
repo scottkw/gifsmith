@@ -96,6 +96,22 @@ func (s *SettingsService) SaveKey(ctx context.Context, p, key string) error {
 	return nil
 }
 
+// KeyStatus is one provider's key state for the Keys pane: never more than the last 4 characters.
+type KeyStatus struct {
+	Provider string `json:"provider"`
+	Status   string `json:"status"` // saved | not_set | rejected
+	Last4    string `json:"last4,omitempty"`
+}
+
+// KeyStatus reports GIPHY then Klipy.
+func (s *SettingsService) KeyStatus(ctx context.Context) []KeyStatus { return nil }
+
+// TestKey makes one uncached first-page trending call with the stored key, inside the 429 budget.
+func (s *SettingsService) TestKey(ctx context.Context, p string) error { return nil }
+
+// RemoveKey deletes the stored key from the Keychain and drops what was fetched with it.
+func (s *SettingsService) RemoveKey(ctx context.Context, p string) error { return nil }
+
 // Autostarter is the login item (*application.AutostartManager in the app, a fake in the UAT build).
 type Autostarter interface {
 	Enable() error

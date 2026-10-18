@@ -327,6 +327,7 @@ func TestSaveKeyNeverLogsOrReturnsKey(t *testing.T) {
 type keychainDown struct{ *settings.MemoryStore }
 
 func (keychainDown) Set(string, string) error { return errors.New("keychain write failed") }
+func (keychainDown) Delete(string) error      { return errors.New("keychain delete failed") }
 
 func TestSaveKeyKeychainFailure(t *testing.T) {
 	f := newSettings(t, "")
@@ -1065,5 +1066,171 @@ func TestParamsSystemLocale(t *testing.T) {
 	}
 	if s := f.svc.Snapshot(context.Background()); s.PageSize != 24 || s.GiphyLang != "" || s.KlipyCountry != "" {
 		t.Errorf("Snapshot = %+v, want pageSize 24 and Match System", s)
+	}
+}
+
+func TestKeyStatus(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	if err := f.svc.SaveKey(ctx, "giphy", "uat-key-123"); err != nil {
+		t.Fatal(err)
+	}
+	want := []KeyStatus{{"giphy", "saved", "-123"}, {"klipy", "not_set", ""}}
+	if got := f.svc.KeyStatus(ctx); !reflect.DeepEqual(got, want) {
+		t.Errorf("KeyStatus = %+v, want %+v", got, want)
+	}
+	f.svc.Keys.MarkRejected(provider.GIPHY)
+	if got := f.svc.KeyStatus(ctx); got[0] != (KeyStatus{"giphy", "rejected", "-123"}) {
+		t.Errorf("after MarkRejected: %+v", got[0])
+	}
+}
+
+func TestTestKeyUncached(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	if err := f.svc.SaveKey(ctx, "giphy", "uat-key-123"); err != nil {
+		t.Fatal(err)
+	}
+	f.svc.Keys.MarkRejected(provider.GIPHY)
+	before := f.hits.Load()
+	for range 2 {
+		if err := f.svc.TestKey(ctx, "giphy"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := f.hits.Load() - before; n != 2 {
+		t.Errorf("two Tests made %d requests, want 2 (never from the trending cache)", n)
+	}
+	if f.svc.Keys.Rejected(provider.GIPHY) {
+		t.Error("a passing Test did not clear Rejected")
+	}
+	before = f.hits.Load()
+	if _, err := f.gifs.Trending(ctx, "giphy", ""); err != nil || f.hits.Load() != before {
+		t.Errorf("Trending after Test: %v, %d requests; want the seeded page", err, f.hits.Load()-before)
+	}
+}
+
+func TestTestKeyRejected(t *testing.T) {
+	logs := captureLog(t)
+	f := newSettings(t, "")
+	if err := f.svc.Keys.Set(provider.GIPHY, "bad-key-123"); err != nil { // stored, then revoked at GIPHY
+		t.Fatal(err)
+	}
+	err := f.svc.TestKey(context.Background(), "giphy")
+	wantProviderErr(t, err, provider.KeyRejected, provider.GIPHY, 401)
+	if !f.svc.Keys.Rejected(provider.GIPHY) {
+		t.Error("key_rejected did not mark GIPHY rejected")
+	}
+	if got := *f.events; len(got) != 1 || got[0] != "providers:changed" {
+		t.Errorf("events = %v, want [providers:changed]", got)
+	}
+	if strings.Contains(logs.String(), "bad-key-123") || strings.Contains(logs.String(), "http") && strings.Contains(logs.String(), "api_key") {
+		t.Errorf("log leaks key material or a URL: %q", logs.String())
+	}
+}
+
+func TestTestKeyInsideBudget(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	if err := f.svc.Keys.Set(provider.GIPHY, "ratelimit-key-1"); err != nil { // fixture answers 429
+		t.Fatal(err)
+	}
+	err := f.svc.TestKey(ctx, "giphy")
+	wantProviderErr(t, err, provider.RateLimited, provider.GIPHY, 429)
+	before := f.hits.Load()
+	err = f.svc.TestKey(ctx, "giphy")
+	var pe *provider.Error
+	if !errors.As(err, &pe) || pe.Kind != provider.RateLimited || f.hits.Load() != before {
+		t.Errorf("Test while blocked: %v, %d requests; want rate_limited and no request", err, f.hits.Load()-before)
+	}
+}
+
+func TestTestKeyRefusals(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	if err := f.svc.TestKey(ctx, "finergifs"); !errors.Is(err, errNoKeyProvider) {
+		t.Errorf("finergifs: %v, want errNoKeyProvider", err)
+	}
+	if err := f.svc.TestKey(ctx, "bogus"); !errors.Is(err, errUnknownProvider) {
+		t.Errorf("bogus: %v, want errUnknownProvider", err)
+	}
+	wantProviderErr(t, f.svc.TestKey(ctx, "giphy"), provider.KeyMissing, provider.GIPHY, 0)
+	if f.hits.Load() != 0 {
+		t.Errorf("refusals made %d requests", f.hits.Load())
+	}
+}
+
+func TestRemoveKey(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	if err := f.svc.SaveKey(ctx, "giphy", "uat-key-123"); err != nil {
+		t.Fatal(err)
+	}
+	waitClips(t, f.clips)
+	*f.events = (*f.events)[:0]
+	if err := f.svc.RemoveKey(ctx, "giphy"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.store.Get("giphy"); !errors.Is(err, settings.ErrNoKey) {
+		t.Errorf("Keychain item still there: %v", err)
+	}
+	if _, ok := f.svc.Keys.Get(provider.GIPHY); ok {
+		t.Error("Keys still has the GIPHY key")
+	}
+	if _, err := f.gifs.Trending(ctx, "giphy", ""); err == nil {
+		t.Error("the seeded GIPHY page survived RemoveKey (no Invalidate)")
+	}
+	if s := f.clips.State(); s != search.ClipsNoKey {
+		t.Errorf("Clips state %s, want no_key", s)
+	}
+	if got := *f.events; len(got) != 1 || got[0] != "providers:changed" {
+		t.Errorf("events = %v, want [providers:changed]", got)
+	}
+	if err := f.svc.RemoveKey(ctx, "giphy"); err != nil {
+		t.Errorf("second RemoveKey = %v, want nil", err)
+	}
+	if err := f.svc.RemoveKey(ctx, "finergifs"); !errors.Is(err, errNoKeyProvider) {
+		t.Errorf("finergifs: %v", err)
+	}
+}
+
+func TestRemoveKeyKeychainFailure(t *testing.T) {
+	logs := captureLog(t)
+	f := newSettings(t, "")
+	ms := settings.NewMemoryStore()
+	_ = ms.Set("klipy", "uat-key-123")
+	f.svc.Keys = settings.NewKeys(keychainDown{ms})
+	f.svc.Keys.Load()
+	err := f.svc.RemoveKey(context.Background(), "klipy")
+	wantSettingsErr(t, err, "keychain_delete_failed")
+	if _, ok := f.svc.Keys.Get(provider.Klipy); !ok {
+		t.Error("the key went from the cache although the Keychain delete failed")
+	}
+	if !strings.Contains(logs.String(), "key not removed for klipy: keychain delete failed") || len(*f.events) != 0 {
+		t.Errorf("log %q, events %v", logs.String(), *f.events)
+	}
+}
+
+// A key_rejected from search (GIFs or Clips) marks the key rejected, so the panel and Settings agree.
+func TestSearchKeyRejectedMarks(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	if err := f.svc.SaveKey(ctx, "giphy", "uat-key-123"); err != nil {
+		t.Fatal(err)
+	}
+	if s := waitClips(t, f.clips); s != search.ClipsEnabled {
+		t.Fatalf("clips %s, want enabled", s)
+	}
+	if _, err := f.gifs.Search(ctx, "clips", "revoked", ""); err == nil {
+		t.Fatal("clips search with revoked succeeded")
+	}
+	if !f.svc.Keys.Rejected(provider.GIPHY) {
+		t.Error("a Clips key_rejected did not mark GIPHY rejected")
+	}
+	if err := f.svc.SaveKey(ctx, "klipy", "uat-key-123"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.gifs.Search(ctx, "klipy", "revoked", ""); err == nil || !f.svc.Keys.Rejected(provider.Klipy) {
+		t.Errorf("klipy revoked: %v, rejected %v", err, f.svc.Keys.Rejected(provider.Klipy))
 	}
 }
