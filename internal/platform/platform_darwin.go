@@ -180,6 +180,13 @@ func (darwin) SetAppearance(mode string) error {
 	return nil
 }
 
+func (darwin) SystemLocale() (string, string) {
+	cs := C.gsSystemLocale()
+	defer C.free(unsafe.Pointer(cs))
+	lang, region, _ := strings.Cut(C.GoString(cs), "|")
+	return lang, region
+}
+
 var errUnknownAppearance = errors.New("unknown appearance")
 
 // appearanceCode maps the theme pref to gsSetAppearance's mode: 0 system, 1 Aqua, 2 DarkAqua.

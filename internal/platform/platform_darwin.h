@@ -13,3 +13,4 @@ int gsFrontmostApp(int *pid, char **bundleID, char **name);
 int gsActivate(int pid);
 int gsOpenAXSettings(void);
 void gsSetAppearance(int mode);
+char *gsSystemLocale(void);

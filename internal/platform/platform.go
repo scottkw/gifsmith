@@ -44,4 +44,7 @@ type Platform interface {
 	RevealFile(path string) error
 	// SetAppearance sets the app-wide appearance: "" follows the system, "light" Aqua, "dark" DarkAqua.
 	SetAppearance(mode string) error
+	// SystemLocale is the first preferred language (BCP 47, e.g. "pt-BR") and the region code
+	// (e.g. "DE"); either may be "" when macOS reports none.
+	SystemLocale() (lang, region string)
 }

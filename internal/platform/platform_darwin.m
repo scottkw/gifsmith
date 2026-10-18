@@ -212,6 +212,15 @@ void gsSetAppearance(int mode) {
     }});
 }
 
+// "lang|region", strdup'd (the caller frees). NSLocale is thread-safe, so no main-thread hop.
+char *gsSystemLocale(void) {
+    @autoreleasepool {
+        NSString *lang = NSLocale.preferredLanguages.firstObject ?: @"";
+        NSString *region = NSLocale.currentLocale.countryCode ?: @"";
+        return strdup([NSString stringWithFormat:@"%@|%@", lang, region].UTF8String);
+    }
+}
+
 int gsOpenAXSettings(void) {
     __block int ok = 0;
     onMain(^{ @autoreleasepool {
