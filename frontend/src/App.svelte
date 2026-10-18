@@ -168,6 +168,7 @@
     input.focus();
     Events.On('panel:show', () => {
       clearTimeout(hideTimer); // a copy just before this show must not hide the panel again (02 IN-07)
+      menuOpen = false; // never reopens on its own
       now = Date.now();
       if (!keepStatus) setStatus('');
       keepStatus = false;
@@ -258,6 +259,7 @@
   }
 
   function switchTo(p: SlotId) {
+    menuOpen = false;
     if (p !== active) {
       active = p;
       clearTransient();
@@ -319,7 +321,10 @@
     s.pageErr = null;
     s.err = null;
     s.status = !page ? 'idle' : s.items.length ? 'ready' : 'empty';
-    if (p === active) selected = s.items.length ? 0 : -1;
+    if (p === active) {
+      selected = s.items.length ? 0 : -1;
+      menuOpen = false; // its item is gone
+    }
   }
 
   function retry() {
@@ -529,8 +534,15 @@
 </script>
 
 <!-- Clicks anywhere except a text field keep focus in the search input (the grid never takes focus). -->
+<!-- A mousedown outside the open action menu closes it without running anything. -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<main onmousedown={(e) => e.target instanceof HTMLInputElement || e.preventDefault()} onkeydown={onMainKeydown}>
+<main
+  onmousedown={(e) => {
+    if (menuOpen && !(e.target as Element).closest('[role=dialog]')) closeMenu();
+    if (!(e.target instanceof HTMLInputElement)) e.preventDefault();
+  }}
+  onkeydown={onMainKeydown}
+>
   <header class="search">
     <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
       <circle cx="7" cy="7" r="4.5" />

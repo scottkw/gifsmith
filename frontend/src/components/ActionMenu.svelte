@@ -24,6 +24,11 @@
   const shown = $derived(filterActions(rows, text));
   const filtering = $derived(!!text.trim());
 
+  // Keep the highlighted row visible inside the 224px list.
+  $effect(() => {
+    document.getElementById(`action-${shown[hi]?.id}`)?.scrollIntoView({ block: 'nearest' });
+  });
+
   export function focus() {
     field.focus();
   }
@@ -77,17 +82,26 @@
       {#if !filtering && i > 0 && r.group !== shown[i - 1].group}
         <div class="sep" aria-hidden="true"></div>
       {/if}
+      <!-- Keyboard use goes through the filter combobox (aria-activedescendant); rows never take focus. -->
+      <!-- Highlight on mousemove, not mouseenter: a menu opening under a resting pointer keeps row 1. -->
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div
         id="action-{r.id}"
         class="row"
         class:hi={i === hi}
+        class:destructive={r.destructive}
         role="option"
+        tabindex="-1"
         aria-selected={i === hi}
         aria-keyshortcuts={r.keys || undefined}
+        onmousemove={() => (hi = i)}
+        onclick={() => onrun(r.id)}
       >
         <span class="label">{r.label}</span>
         {#if r.hint}<span class="hint" aria-hidden="true"><b>{r.hint}</b></span>{/if}
       </div>
+    {:else}
+      <div class="empty">No matching actions</div>
     {/each}
   </div>
 </div>
@@ -126,6 +140,8 @@
     color: var(--text-secondary);
   }
   .list {
+    max-height: 224px;
+    overflow-y: auto;
     padding: 8px;
   }
   .row {
@@ -143,6 +159,17 @@
   }
   .row.hi {
     background: var(--surface-active);
+  }
+  .destructive .label {
+    color: var(--destructive);
+  }
+  .empty {
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font: var(--label);
+    color: var(--text-tertiary);
   }
   .label {
     min-width: 0;
