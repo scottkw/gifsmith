@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { actionErrorText, errorState, pagingMessage, providerName, keyMessage, revokedMessage } from './errors.ts';
+import { actionErrorText, libraryErrorText, errorState, pagingMessage, providerName, keyMessage, revokedMessage } from './errors.ts';
 
 const NOW = Date.UTC(2026, 9, 17, 19, 0, 0);
 const SWITCH = 'Other providers still work: ⌘1–⌘4.';
@@ -194,4 +194,9 @@ test('square crop errors show F6 and F7', () => {
   const g = { provider: 'giphy' } as Parameters<typeof actionErrorText>[1];
   assert.equal(actionErrorText('crop_failed', g), "Couldn't crop this GIF. Press ↵ to copy it as is, or pick another GIF.");
   assert.equal(actionErrorText('crop_too_large', g), 'This GIF is too large to crop (over 15 MB). Press ↵ to copy it as is.');
+});
+
+test('library write failures show F5 for the list that changed', () => {
+  assert.equal(libraryErrorText('favorites'), "Couldn't save your Favorites. Try again.");
+  assert.equal(libraryErrorText('recents'), "Couldn't save your Recents. Try again.");
 });

@@ -113,3 +113,8 @@ export function actionErrorText(kind: string, g: Gif, action: 'copy' | 'download
   if (g.isClip) return "Couldn't copy this MP4. The download failed. Try again or pick another clip.";
   return "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";
 }
+
+// skeleton (RED)
+export function libraryErrorText(_list: 'favorites' | 'recents'): string {
+  return '';
+}

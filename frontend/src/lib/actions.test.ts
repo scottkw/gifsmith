@@ -11,19 +11,19 @@ const giphy = buildActions(ctx(gif({ pageUrl: 'https://giphy.com/gifs/x' })));
 test('GIPHY item lists every row in the locked order with hints and groups', () => {
   assert.deepEqual(
     giphy.map((r) => r.id),
-    ['copy', 'paste', 'copyLink', 'pasteLink', 'copyMarkdown', 'pasteMarkdown', 'copyPage', 'open', 'download', 'copySquare', 'pasteSquare'],
+    ['copy', 'paste', 'copyLink', 'pasteLink', 'copyMarkdown', 'pasteMarkdown', 'copyPage', 'open', 'download', 'copySquare', 'pasteSquare', 'favorite'],
   );
   assert.deepEqual(
     giphy.map((r) => r.label),
-    ['Copy GIF', 'Paste GIF', 'Copy Link', 'Paste Link', 'Copy Markdown', 'Paste Markdown', 'Copy Page Link', 'Open in Browser', 'Download GIF', 'Copy Square GIF', 'Paste Square GIF'],
+    ['Copy GIF', 'Paste GIF', 'Copy Link', 'Paste Link', 'Copy Markdown', 'Paste Markdown', 'Copy Page Link', 'Open in Browser', 'Download GIF', 'Copy Square GIF', 'Paste Square GIF', 'Add to Favorites'],
   );
   assert.deepEqual(
     giphy.map((r) => r.hint),
-    ['↵', '⌘↵', '⌘⇧C', '', '⌘⇧M', '', '', '⌘O', '⌘S', '', ''],
+    ['↵', '⌘↵', '⌘⇧C', '', '⌘⇧M', '', '', '⌘O', '⌘S', '', '', '⌘⇧F'],
   );
   assert.deepEqual(
     giphy.map((r) => r.group),
-    [1, 1, 2, 2, 2, 2, 2, 3, 3, 4, 4],
+    [1, 1, 2, 2, 2, 2, 2, 3, 3, 4, 4, 5],
   );
   assert.equal(giphy[2].keys, 'Meta+Shift+C');
   assert.equal(giphy[3].keys, '');
@@ -33,7 +33,7 @@ test('item without a page URL omits Copy Page Link and Open in Browser', () => {
   const ids = buildActions(ctx(gif({ provider: 'klipy' }))).map((r) => r.id);
   assert.ok(!ids.includes('copyPage'));
   assert.ok(!ids.includes('open'));
-  assert.equal(ids.length, 9);
+  assert.equal(ids.length, 10);
 });
 
 test('Clips read MP4; a Clip without a GIF rendition has no link or Markdown rows', () => {
@@ -42,7 +42,7 @@ test('Clips read MP4; a Clip without a GIF rendition has no link or Markdown row
   assert.ok(withGif.some((r) => r.id === 'copyLink'));
   const bare = buildActions(ctx(gif({ isClip: true }))).map((r) => r.id);
   for (const id of ['copyLink', 'pasteLink', 'copyMarkdown', 'pasteMarkdown'] as const) assert.ok(!bare.includes(id), id);
-  assert.deepEqual(bare, ['copy', 'paste', 'download']);
+  assert.deepEqual(bare, ['copy', 'paste', 'download', 'favorite']);
 });
 
 test('filterActions matches a trimmed, case-insensitive label substring', () => {
@@ -86,4 +86,32 @@ test('Paste Square GIF follows Copy Square GIF; a Clip never lists a square row'
   for (const g of [gif({ isClip: true }), gif({ isClip: true, gifUrl: 'https://media.giphy.com/x.gif' })]) {
     assert.ok(!buildActions(ctx(g)).some((r) => r.id === 'copySquare' || r.id === 'pasteSquare'));
   }
+});
+
+test('favorite row toggles by state; Recents adds Remove from Recents and Clear Recents (group 6)', () => {
+  const g = gif({ pageUrl: 'https://giphy.com/gifs/x' });
+  const row = (rows: ReturnType<typeof buildActions>, id: string) => rows.find((r) => r.id === id);
+  const add = row(buildActions(ctx(g)), 'favorite')!;
+  assert.deepEqual([add.label, add.hint, add.keys, add.group, add.destructive], ['Add to Favorites', '⌘⇧F', 'Meta+Shift+F', 5, false]);
+  const fav = row(buildActions({ ...ctx(g), favorited: true }), 'favorite')!;
+  assert.deepEqual([fav.label, fav.destructive], ['Remove from Favorites', true]);
+
+  const provider = buildActions({ ...ctx(g), favorited: true }).map((r) => r.id);
+  assert.ok(!provider.includes('removeRecent') && !provider.includes('clearRecents'));
+
+  const recents = buildActions({ ...ctx(g), tab: 'recents' });
+  assert.deepEqual(
+    recents.slice(-3).map((r) => [r.id, r.label, r.hint, r.group, r.destructive]),
+    [
+      ['favorite', 'Add to Favorites', '⌘⇧F', 5, false],
+      ['removeRecent', 'Remove from Recents', '⌘⌫', 6, true],
+      ['clearRecents', 'Clear Recents', '', 6, true],
+    ],
+  );
+  const favorites = buildActions({ ...ctx(g), tab: 'favorites', favorited: true });
+  assert.deepEqual(
+    favorites.slice(-1).map((r) => [r.id, r.label, r.destructive]),
+    [['favorite', 'Remove from Favorites', true]],
+  );
+  assert.ok(!favorites.some((r) => r.id === 'removeRecent' || r.id === 'clearRecents'));
 });

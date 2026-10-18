@@ -93,3 +93,16 @@ test('routeKey maps Cmd+S to download and Cmd+R to reveal (no Shift)', () => {
   assert.equal(key('r', { metaKey: true }), 'reveal');
   assert.equal(key('R', { metaKey: true, shiftKey: true }), 'none');
 });
+
+test('routeKey maps Cmd+Backspace to remove, Cmd+Z (no Shift) to undo, Cmd+Shift+F to favorite', () => {
+  assert.equal(key('Backspace', { metaKey: true }), 'remove');
+  assert.equal(key('Backspace'), 'none');
+  assert.equal(key('z', { metaKey: true }), 'undo');
+  assert.equal(key('Z', { metaKey: true }), 'undo');
+  assert.equal(key('z', { metaKey: true, shiftKey: true }), 'none');
+  assert.equal(key('Z', { metaKey: true, shiftKey: true }), 'none');
+  assert.equal(key('f', { metaKey: true, shiftKey: true }), 'favorite');
+  assert.equal(key('F', { metaKey: true, shiftKey: true }), 'favorite');
+  assert.equal(key('f', { metaKey: true }), 'none');
+  assert.equal(key('5', { metaKey: true }), 'slot5');
+});

@@ -41,3 +41,8 @@ export function rows(secs: Section[]): Row[] {
   });
   return out;
 }
+
+// skeleton (RED)
+export function moveSectioned(index: number, _dir: 'left' | 'right' | 'up' | 'down', _sizes: number[]): number {
+  return index;
+}

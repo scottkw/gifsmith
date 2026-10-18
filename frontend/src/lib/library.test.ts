@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { flatItems, rows, sections } from './library.ts';
+import { flatItems, moveSectioned, rows, sections } from './library.ts';
 import type { Gif } from './api';
 
 const gif = (provider: string, id: string, title = `Moment ${id}`): Gif =>
@@ -61,4 +61,28 @@ test('rows: a 32px header then ceil(n/4) 152px tile rows per section', () => {
       ['tiles', 152, 1, 5],
     ],
   );
+});
+
+// Sections A (5 items: rows [0 1 2 3] [4]) and B (3 items: row [5 6 7]).
+test('moveSectioned crosses sections with left/right and by column with up/down', () => {
+  const m = (i: number, d: 'left' | 'right' | 'up' | 'down') => moveSectioned(i, d, [5, 3]);
+  assert.equal(m(4, 'right'), 5);
+  assert.equal(m(5, 'left'), 4);
+  assert.equal(m(1, 'down'), 4); // nothing directly below inside A: A's later row's last tile
+  assert.equal(m(3, 'down'), 4);
+  assert.equal(m(4, 'down'), 5); // A's last row -> B's first row, same column
+  assert.equal(m(5, 'down'), 5); // last section, last row
+  assert.equal(m(7, 'up'), 4); // column 2 clamped to A's last row's last tile
+  assert.equal(m(5, 'up'), 4);
+  assert.equal(m(2, 'up'), 2); // first section, first row
+  assert.equal(m(0, 'left'), 0);
+  assert.equal(m(7, 'right'), 7);
+});
+
+test('moveSectioned within one section is the Phase 2 grid move; down into a short next row clamps', () => {
+  assert.equal(moveSectioned(1, 'down', [10]), 5);
+  assert.equal(moveSectioned(6, 'up', [10]), 2);
+  assert.equal(moveSectioned(3, 'down', [4, 2]), 5); // column 3 clamped to B's last tile
+  assert.equal(moveSectioned(0, 'down', [1]), 0);
+  assert.equal(moveSectioned(0, 'right', []), 0);
 });
