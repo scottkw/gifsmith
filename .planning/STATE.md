@@ -5,16 +5,16 @@ milestone_name: Gifsmith MVP
 current_phase: 4
 current_phase_name: Settings, Shell Polish & Release
 status: executing
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-10-18T21:12:49.819Z"
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-10-18T21:45:22.801Z"
 last_activity: 2026-10-18
 last_activity_desc: Phase 4 execution started
-state_head: 76fd466f206f48c500d25eaccdf7146bc612d98c
+state_head: 0169d535c4814bd534b5a1674e4e8aa590a74c3f
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 24
-  completed_plans: 19
+  total_plans: 25
+  completed_plans: 20
 ---
 
 # Project State
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-18)
 ## Current Position
 
 Phase: 4 (Settings, Shell Polish & Release) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-10-18 — Phase 4 execution started
 
@@ -78,6 +78,7 @@ Progress: [████████░░] 75% (3/4 phases; 18/18 planned plans 
 | Phase 03 P07 | 33min | 3 tasks | 25 files |
 | Phase 03 P08 | 10min | 2 tasks | 1 files |
 | Phase 04 P01 | 22 min | 7 tasks | 42 files |
+| Phase 04 P02 | 28 min | 8 tasks | 46 files |
 
 ## Accumulated Context
 
@@ -153,6 +154,9 @@ Recent decisions affecting current work:
 - [Phase 04]: settings.Store is the single owner of settings.json; SetPref validates via Prefs.Normalize inside Update and emits settings:changed with the full Snapshot
 - [Phase 04]: Snapshot.launchAtLogin reports the OS state (Autostart.IsEnabled), not the pref
 - [Phase 04]: Vite 8 build.rolldownOptions.input serves the second settings.html entry
+- [Phase 04]: 04-02: search.Service keeps a key generation (429 recording) separate from the cache generation (Flush and Invalidate), so a parameter change never voids a real 429
+- [Phase 04]: 04-02: provider parameters are read per request through Params func on each client; Match System is stored as empty and resolved from platform.SystemLocale with en/us fallbacks
+- [Phase 04]: 04-02: the Keys card message line wraps instead of UI-SPEC's one-line ellipsis (K2/K3/K-T2 exceed 400px at 12px)
 
 ### Pending Todos
 
@@ -186,6 +190,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-18T21:12:49.623Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-10-18T21:45:22.525Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None

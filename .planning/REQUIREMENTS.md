@@ -24,7 +24,7 @@
 - [x] **SRCH-06**: Searches are debounced so free keys (100 calls/hour) last; a rate-limit hit shows a clear message with when to retry
 - [x] **SRCH-07**: Network, timeout, and provider errors show a per-provider message; one provider failing never blocks the others
 - [x] **SRCH-08**: User sees recent searches when the box is empty and can rerun one
-- [ ] **SRCH-09**: User can set GIPHY content rating (default PG-13)
+- [x] **SRCH-09**: User can set GIPHY content rating (default PG-13)
 
 ### Onboarding & Compliance
 
@@ -59,7 +59,7 @@
 ### Settings
 
 - [x] **SETT-01**: Settings open in their own window, where pasting into fields works
-- [ ] **SETT-02**: User can add, test, change (replace), and remove GIPHY and Klipy keys; each key row links to the provider's key sign-up page (GIPHY developer dashboard, Klipy Partner Panel)
+- [x] **SETT-02**: User can add, test, change (replace), and remove GIPHY and Klipy keys; each key row links to the provider's key sign-up page (GIPHY developer dashboard, Klipy Partner Panel)
 - [ ] **SETT-03**: User can rebind the global hotkeys; conflicts are reported and the old binding stays until the new one registers
 - [ ] **SETT-04**: User can set grid item size (search and trending), max results, download folder, hide filename, GIPHY and Klipy locales
 - [x] **SETT-05**: Settings shows Accessibility permission status and a button to grant it
@@ -119,7 +119,7 @@
 | SRCH-06 | Phase 2 | Complete |
 | SRCH-07 | Phase 2 | Complete |
 | SRCH-08 | Phase 3 | Complete |
-| SRCH-09 | Phase 4 | Pending |
+| SRCH-09 | Phase 4 | Complete |
 | ONBD-01 | Phase 2 | Complete |
 | ONBD-02 | Phase 2 | Complete |
 | ONBD-03 | Phase 2 | Complete |
@@ -142,7 +142,7 @@
 | LIBR-04 | Phase 3 | Complete |
 | LIBR-05 | Phase 3 | Complete |
 | SETT-01 | Phase 4 | Complete |
-| SETT-02 | Phase 4 | Pending |
+| SETT-02 | Phase 4 | Complete |
 | SETT-03 | Phase 4 | Pending |
 | SETT-04 | Phase 4 | Pending |
 | SETT-05 | Phase 4 | Complete |
