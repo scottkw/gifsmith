@@ -12,6 +12,7 @@ import {
   keySavedText,
   keyRemovedText,
   keyRemoveFailedText,
+  hotkeyErrorText,
 } from './errors.ts';
 
 const NOW = Date.UTC(2026, 9, 17, 19, 0, 0);
@@ -243,4 +244,16 @@ test('Keys pane save, remove and remove-failed texts (K-A, K-D, K-F)', () => {
   assert.equal(keySavedText('Klipy'), 'Saved. Klipy is ready.');
   assert.equal(keyRemovedText('GIPHY'), 'Removed. Add a key to use GIPHY again.');
   assert.equal(keyRemoveFailedText(), "Couldn't remove the key from the macOS Keychain. Try again.");
+});
+
+test('hotkeyErrorText: H1, H2, H3, H4, H4b and H7 with the combo as glyphs', () => {
+  assert.equal(hotkeyErrorText('hotkey_no_modifier', 'H', ''), 'Include ⌘, ⌥ or ⌃ in the shortcut.');
+  assert.equal(hotkeyErrorText('hotkey_duplicate', 'Ctrl+Option+Cmd+F', 'Open Favorites'), '⌃⌥⌘F is already used for Open Favorites.');
+  assert.equal(hotkeyErrorText('hotkey_duplicate', 'Cmd+Ctrl+Option+G', 'Open Gifsmith'), '⌃⌥⌘G is already used for Open Gifsmith.');
+  assert.equal(hotkeyErrorText('hotkey_duplicate', 'Cmd+Ctrl+Option+R', 'Open Recents'), '⌃⌥⌘R is already used for Open Recents.');
+  assert.equal(hotkeyErrorText('hotkey_system', 'Cmd+Q', ''), '⌘Q is a macOS shortcut. Choose another one.');
+  assert.equal(hotkeyErrorText('hotkey_register_failed', 'Cmd+Ctrl+Option+J', ''), "macOS couldn't register ⌃⌥⌘J. Your previous shortcut still works.");
+  assert.equal(hotkeyErrorText('hotkey_register_failed_new', 'Cmd+Ctrl+Option+J', ''), "macOS couldn't register ⌃⌥⌘J. Try a different shortcut.");
+  assert.equal(hotkeyErrorText('test_failed', 'Cmd+Ctrl+Option+F', ''), 'Nothing happened. Another app may be using ⌃⌥⌘F. Try a different shortcut.');
+  assert.equal(hotkeyErrorText('prefs_write_failed', 'Cmd+Ctrl+Option+F', ''), "Couldn't save this setting. Try again.");
 });

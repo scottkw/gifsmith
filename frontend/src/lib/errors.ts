@@ -133,3 +133,8 @@ export function testKeyMessage(e: ProviderErr | null, providerLabel: string, now
 export const keySavedText = (providerLabel: string) => `Saved. ${providerLabel} is ready.`;
 export const keyRemovedText = (providerLabel: string) => `Removed. Add a key to use ${providerLabel} again.`;
 export const keyRemoveFailedText = () => "Couldn't remove the key from the macOS Keychain. Try again.";
+
+// Hotkeys pane H1–H4b, H7, keyed by Go's SettingsError kind ('test_failed' = H7).
+export function hotkeyErrorText(kind: string, accel: string, otherSlotLabel: string): string {
+  return '';
+}

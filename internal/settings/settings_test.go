@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -408,5 +409,41 @@ func TestKeysDeleteAndRejected(t *testing.T) {
 	}
 	if v, ok := f.Get(provider.GIPHY); !ok || v != "uat-key-123" {
 		t.Error("a failed store delete changed the cache")
+	}
+}
+
+func TestStoreNormalizeHotkeys(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	dir := t.TempDir()
+	stored := `{"hotkeys":{"open":"Cmd+Q","favorites":"Ctrl+Option+Cmd+F","recents":"Cmd+Ctrl+Option+F"}}`
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(stored), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := OpenStore(dir).Get().Hotkeys; got != (Hotkeys{Favorites: "Cmd+Ctrl+Option+F"}) {
+		t.Errorf("Hotkeys = %+v, want Open reset, Favorites canonical, Recents (a duplicate) reset", got)
+	}
+	for _, f := range []string{"hotkeys.open", "hotkeys.recents"} {
+		if !strings.Contains(buf.String(), "reset "+f) {
+			t.Errorf("log %q does not name %s", buf.String(), f)
+		}
+	}
+	for _, c := range []struct {
+		in, want Hotkeys
+		reset    []string
+	}{
+		{Hotkeys{Open: "garbage"}, Hotkeys{}, []string{"hotkeys.open"}},
+		{Hotkeys{Open: "Shift+G"}, Hotkeys{}, []string{"hotkeys.open"}},
+		{Hotkeys{Favorites: "Ctrl+Option+Cmd+G"}, Hotkeys{}, []string{"hotkeys.favorites"}}, // equals the default Open
+		{Hotkeys{Open: "Cmd+Ctrl+Option+H", Recents: "Cmd+Ctrl+Option+H"}, Hotkeys{Open: "Cmd+Ctrl+Option+H"}, []string{"hotkeys.recents"}},
+		{Hotkeys{Open: "Cmd+Ctrl+Option+G"}, Hotkeys{}, nil}, // the default is stored as ""
+		{Hotkeys{Open: "Cmd+Ctrl+Option+H", Favorites: "Cmd+Ctrl+Option+G"}, Hotkeys{Open: "Cmd+Ctrl+Option+H", Favorites: "Cmd+Ctrl+Option+G"}, nil},
+	} {
+		p := Prefs{Hotkeys: c.in}
+		reset := p.Normalize()
+		if p.Hotkeys != c.want || !slices.Equal(reset, c.reset) {
+			t.Errorf("Normalize(%+v) = %+v, reset %v; want %+v, %v", c.in, p.Hotkeys, reset, c.want, c.reset)
+		}
 	}
 }
