@@ -104,11 +104,11 @@ Plans:
   4. The user can add or remove a favorite, and every successful copy or paste appears in Recents (most recent first, capped). Favorites and Recents are browsable grouped by provider (never blended), items can be removed from Recents, and both render from saved metadata with no API calls.
   5. The user can open a details view for a GIF (title, size, dimensions, tags, source links), and an empty search box shows recent searches that can be rerun.
 
-**Plans:** 8 plans
+**Plans:** 1/8 plans executed
 
 Plans:
 **Wave 1**
-- [ ] 03-01-PLAN.md — Tracer: ⌘⇧C copies the link through Go + Platform.CopyText (server build on platform.Fake); Gif metadata fields; Markdown, page link, paste variants, Open in Browser
+- [x] 03-01-PLAN.md — Tracer: ⌘⇧C copies the link through Go + Platform.CopyText (server build on platform.Fake); Gif metadata fields; Markdown, page link, paste variants, Open in Browser
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 03-02-PLAN.md — ⌘K action menu: pure action table + placement, popover with filter/keyboard/mouse, one runAction dispatcher
@@ -164,5 +164,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Native Spike & Signed Dev Loop | 4/4 | Complete    | 2026-10-17 |
 | 2. Providers, Search UI & First Run | 6/6 | Complete    | 2026-10-17 |
-| 3. Action Pipeline & Library | 0/TBD | Not started | - |
+| 3. Action Pipeline & Library | 1/8 | In Progress | - |
 | 4. Settings, Shell Polish & Release | 0/TBD | Not started | - |
