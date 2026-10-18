@@ -380,5 +380,20 @@ func (a *ActionService) Download(ctx context.Context, g provider.Gif) (DownloadR
 	return DownloadResult{Name: filepath.Base(path), Folder: filepath.Base(dir)}, nil
 }
 
-// ShowDownload is a RED skeleton.
-func (a *ActionService) ShowDownload(ctx context.Context) error { return nil }
+// ShowDownload reveals the last downloaded file in Finder (platform.Fake in the UAT build).
+// It takes no path from JS: only a file Download saved itself can be shown.
+func (a *ActionService) ShowDownload(ctx context.Context) error {
+	if !a.busy.TryLock() {
+		return ErrBusy
+	}
+	defer a.busy.Unlock()
+	if a.lastDownload == "" {
+		return actionErr("nothing_to_show")
+	}
+	if err := a.Platform.RevealFile(a.lastDownload); err != nil {
+		log.Printf("show download: %v", err)
+		return actionErr("open_failed")
+	}
+	log.Printf("show download: revealed")
+	return nil
+}

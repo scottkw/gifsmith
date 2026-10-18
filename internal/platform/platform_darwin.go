@@ -161,5 +161,12 @@ func releasePasteboard(name string) {
 	C.gsReleasePasteboard(cn)
 }
 
-// RevealFile is a RED skeleton.
-func (darwin) RevealFile(path string) error { return ErrUnsupported }
+// RevealFile opens a Finder window with path selected.
+func (darwin) RevealFile(path string) error {
+	cp := C.CString(path)
+	defer C.free(unsafe.Pointer(cp))
+	if C.gsReveal(cp) == 0 {
+		return errors.New("could not reveal the file")
+	}
+	return nil
+}

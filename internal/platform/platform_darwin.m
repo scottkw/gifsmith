@@ -221,3 +221,13 @@ int gsOpenURL(const char *url) {
     }});
     return ok;
 }
+
+// Never called from tests: it opens a Finder window.
+int gsReveal(const char *path) {
+    NSString *p = [NSString stringWithUTF8String:path]; // copied before the block; Go frees path after return
+    if (p == nil) return 0;
+    onMain(^{ @autoreleasepool {
+        [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs:@[[NSURL fileURLWithPath:p]]];
+    }});
+    return 1;
+}

@@ -1,17 +1,24 @@
 <script lang="ts">
   // Footer (32px): vendor attribution left, status or selected title center, key hints right.
+  // A toast may carry one action link and its shortcut hint after the message.
   let {
     attribution,
     text,
     tone,
     needsAccessibility,
     onenable,
+    actionLabel,
+    actionHint,
+    onaction,
   }: {
     attribution: 'giphy' | 'klipy' | 'finer';
     text: string;
     tone: '' | 'success' | 'error';
     needsAccessibility: boolean;
     onenable: () => void;
+    actionLabel?: string;
+    actionHint?: string;
+    onaction?: () => void;
   } = $props();
 </script>
 
@@ -30,10 +37,16 @@
     {/if}
   </span>
   <span class="center {tone}">
-    {#if tone === 'success'}
-      <svg class="check" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" /></svg>
+    <span class="msg">
+      {#if tone === 'success'}
+        <svg class="check" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" /></svg>
+      {/if}
+      {text}
+    </span>
+    {#if actionLabel && onaction}
+      <button class="link" onclick={onaction}>{actionLabel}</button>
+      {#if actionHint}<span class="hint">{actionHint}</span>{/if}
     {/if}
-    {text}
   </span>
   {#if needsAccessibility}
     <button onclick={onenable}>Enable Automatic Paste…</button>
@@ -69,12 +82,35 @@
     height: 16px;
     width: auto;
   }
+  /* The message ellipsizes; the action link and its hint never shrink. */
   .center {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+  }
+  .msg {
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .link {
+    flex: none;
+    margin-left: 8px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    cursor: pointer;
+  }
+  .link:hover {
+    text-decoration: underline;
+  }
+  .hint {
+    flex: none;
+    margin-left: 4px;
+    color: var(--text-tertiary);
   }
   .center.success {
     color: var(--success);

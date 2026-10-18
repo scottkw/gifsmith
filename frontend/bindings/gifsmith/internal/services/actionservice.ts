@@ -73,3 +73,11 @@ export function PasteText(g: provider$0.Gif, kind: string): $CancellablePromise<
 export function RequestAccessibility(): $CancellablePromise<boolean> {
     return $Call.ByID(2791695815);
 }
+
+/**
+ * ShowDownload reveals the last downloaded file in Finder (platform.Fake in the UAT build).
+ * It takes no path from JS: only a file Download saved itself can be shown.
+ */
+export function ShowDownload(): $CancellablePromise<void> {
+    return $Call.ByID(1579908481);
+}

@@ -20,6 +20,7 @@
     requestAccessibility,
     search,
     setLastProvider,
+    showDownload,
     trending,
     type Gif,
     type Page,
@@ -91,6 +92,10 @@
   let selected = $state(-1);
   let status = $state(''); // footer center status line
   let tone = $state<'' | 'success' | 'error'>('');
+  // A toast may offer one action (link + shortcut hint); it goes whenever the status changes.
+  type ToastAction = { label: string; hint: string; run: () => void };
+  let toastAction = $state<ToastAction | null>(null);
+  let toastTimer: ReturnType<typeof setTimeout> | undefined;
   let copying = $state(false); // one Copy/Paste in flight; a second Enter would paste twice
   let needsAccessibility = $state(false);
   let downloadFolder: string | undefined; // display name from the last download, for F4
@@ -172,7 +177,8 @@
       clearTimeout(hideTimer); // a copy just before this show must not hide the panel again (02 IN-07)
       menuOpen = false; // never reopens on its own
       now = Date.now();
-      if (!keepStatus) setStatus('');
+      // A toast with an action (the download toast) outlives a hide inside its 5 s: a TCC prompt can hide the panel.
+      if (!keepStatus && !toastAction) setStatus('');
       keepStatus = false;
       needsAccessibility = false;
       if (card) setup?.focus();
@@ -212,9 +218,20 @@
     if (active === 'clips' && !clipsEnabled) recheckClips();
   }
 
-  function setStatus(text: string, t: typeof tone = '') {
+  // A later status replaces an earlier one, its action and its expiry; ms > 0 clears it after ms.
+  function setStatus(text: string, t: typeof tone = '', action: ToastAction | null = null, ms = 0) {
     status = text;
     tone = t;
+    toastAction = action;
+    clearTimeout(toastTimer);
+    if (ms) toastTimer = setTimeout(() => setStatus(''), ms);
+  }
+
+  // Running a toast's action (click or its shortcut) clears the toast.
+  function runToastAction() {
+    const a = toastAction;
+    setStatus('');
+    a?.run();
   }
 
   // A transient status (copy result, error) clears on the next keystroke or selection change.
@@ -398,7 +415,11 @@
           onInput();
         } else hide(); // no-op in the server build; nothing here depends on it
         return;
-      // 'tab': bound, no effect; 'reveal' (⌘R): captured so it never reloads; slot1–slot4: onMainKeydown.
+      case 'reveal':
+        // Show in Finder while the download toast is up; otherwise captured and ignored (never reloads).
+        if (toastAction?.hint === '⌘R') runToastAction();
+        return;
+      // 'tab': bound, no effect; slot1–slot4: onMainKeydown.
     }
   }
 
@@ -521,9 +542,9 @@
     try {
       const r = await download(g);
       downloadFolder = r.folder;
-      const text = `Downloaded to ${r.folder}`;
-      setStatus(text, 'success');
-      setTimeout(() => status === text && setStatus(''), DOWNLOAD_TOAST_MS);
+      // A Finder failure is logged in Go; the toast simply clears (UI-SPEC has no copy for it).
+      const reveal = () => void showDownload().catch(() => {});
+      setStatus(`Downloaded to ${r.folder}`, 'success', { label: 'Show in Finder', hint: '⌘R', run: reveal }, DOWNLOAD_TOAST_MS);
     } catch (err) {
       actionFailed(err, g, 'download');
     } finally {
@@ -685,7 +706,16 @@
     <ActionMenu bind:this={menu} rows={menuRows} {...menuAt} onrun={runAction} onclose={closeMenu} />
   {/if}
 
-  <Footer attribution={slot.attribution} text={footerCenter} {tone} {needsAccessibility} onenable={enableAutoPaste} />
+  <Footer
+    attribution={slot.attribution}
+    text={footerCenter}
+    {tone}
+    {needsAccessibility}
+    onenable={enableAutoPaste}
+    actionLabel={toastAction?.label}
+    actionHint={toastAction?.hint}
+    onaction={runToastAction}
+  />
 </main>
 
 <style>
