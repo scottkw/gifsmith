@@ -36,7 +36,7 @@ type SettingsService struct {
 	Autostart  Autostarter
 	Executable func() (string, error) // os.Executable; injectable for the not-in-Applications check
 
-	mu sync.Mutex // serializes SaveKey end to end: a verify never interleaves with another save's write
+	mu sync.Mutex // serializes SaveKey, TestKey and RemoveKey end to end: the Keychain ends in the last call's state
 }
 
 // validKey bounds what a key may contain: Klipy puts it in a URL path, GIPHY in a query.
@@ -58,12 +58,9 @@ func kindOf(err error) string {
 // SaveKey verifies key with a real first-page trending call and stores it only if that succeeds.
 // The verified page seeds the trending cache, so verification costs no extra request.
 func (s *SettingsService) SaveKey(ctx context.Context, p, key string) error {
-	id, ok := provider.ParseID(p)
-	if !ok {
-		return errUnknownProvider
-	}
-	if id != provider.GIPHY && id != provider.Klipy {
-		return errNoKeyProvider
+	id, err := keyProvider(p)
+	if err != nil {
+		return err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -104,13 +101,97 @@ type KeyStatus struct {
 }
 
 // KeyStatus reports GIPHY then Klipy.
-func (s *SettingsService) KeyStatus(ctx context.Context) []KeyStatus { return nil }
+func (s *SettingsService) KeyStatus(ctx context.Context) []KeyStatus {
+	out := make([]KeyStatus, 0, 2)
+	for _, id := range []provider.ID{provider.GIPHY, provider.Klipy} {
+		ks := KeyStatus{Provider: string(id), Status: "not_set"}
+		if key, ok := s.Keys.Get(id); ok {
+			r := []rune(key)
+			ks.Status, ks.Last4 = "saved", string(r[max(0, len(r)-4):])
+			if s.Keys.Rejected(id) {
+				ks.Status = "rejected"
+			}
+		}
+		out = append(out, ks)
+	}
+	return out
+}
 
-// TestKey makes one uncached first-page trending call with the stored key, inside the 429 budget.
-func (s *SettingsService) TestKey(ctx context.Context, p string) error { return nil }
+// keyProvider accepts only the providers that use a key.
+func keyProvider(p string) (provider.ID, error) {
+	id, ok := provider.ParseID(p)
+	if !ok {
+		return "", errUnknownProvider
+	}
+	if id != provider.GIPHY && id != provider.Klipy {
+		return "", errNoKeyProvider
+	}
+	return id, nil
+}
 
-// RemoveKey deletes the stored key from the Keychain and drops what was fetched with it.
-func (s *SettingsService) RemoveKey(ctx context.Context, p string) error { return nil }
+// TestKey makes one uncached first-page trending call with the stored key, inside the 429 budget
+// (refused while blocked). Success seeds the trending cache; key_rejected marks the key rejected.
+func (s *SettingsService) TestKey(ctx context.Context, p string) error {
+	id, err := keyProvider(p)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key, ok := s.Keys.Get(id)
+	if !ok {
+		return &provider.Error{Kind: provider.KeyMissing, Provider: id}
+	}
+	var page provider.Page
+	err = s.Svc.Guard(id, func() error {
+		var err error
+		page, err = s.NewClient(id, key).Trending(ctx, "")
+		return err
+	})
+	if err != nil {
+		log.Printf("key test for %s: %s", id, kindOf(err))
+		if kindOf(err) == string(provider.KeyRejected) {
+			s.Keys.MarkRejected(id)
+			s.emit("providers:changed")
+		}
+		return err
+	}
+	s.Svc.Seed(id, "", page)
+	log.Printf("key test for %s: ok", id)
+	if s.Keys.Rejected(id) {
+		s.Keys.ClearRejected(id)
+		s.emit("providers:changed")
+	}
+	return nil
+}
+
+// RemoveKey deletes the stored key from the Keychain and drops what was fetched with it. Removing
+// a key that is not there succeeds; a Keychain failure keeps the key.
+func (s *SettingsService) RemoveKey(ctx context.Context, p string) error {
+	id, err := keyProvider(p)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.Keys.Delete(id); err != nil {
+		log.Printf("key not removed for %s: keychain delete failed", id)
+		return errKeychainDelete
+	}
+	s.Svc.Invalidate(id)
+	if id == provider.GIPHY {
+		s.Clips.Reset() // no key, so no probe until a new key passes a GIFs call
+	}
+	log.Printf("key removed for %s", id)
+	s.emit("providers:changed")
+	return nil
+}
+
+func (s *SettingsService) emit(name string, data ...any) {
+	if s.Emit != nil {
+		s.Emit(name, data...)
+	}
+}
 
 // Autostarter is the login item (*application.AutostartManager in the app, a fake in the UAT build).
 type Autostarter interface {

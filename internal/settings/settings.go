@@ -51,7 +51,13 @@ func (s KeyringStore) Set(account, secret string) error {
 	return nil
 }
 
-func (s KeyringStore) Delete(account string) error { return nil }
+// Delete treats an absent item as deleted.
+func (s KeyringStore) Delete(account string) error {
+	if err := keyring.Delete(s.Service, account); err != nil && !errors.Is(err, keyring.ErrNotFound) {
+		return errors.New("keychain delete failed")
+	}
+	return nil
+}
 
 // MemoryStore is the SecretStore for tests and the -tags server UAT build.
 type MemoryStore struct {
@@ -78,16 +84,24 @@ func (s *MemoryStore) Set(account, secret string) error {
 	return nil
 }
 
-func (s *MemoryStore) Delete(account string) error { return nil }
+func (s *MemoryStore) Delete(account string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.m, account)
+	return nil
+}
 
 // Keys caches the stored keys: each Keychain read spawns /usr/bin/security, so read once at startup.
 type Keys struct {
-	store SecretStore
-	mu    sync.RWMutex
-	m     map[provider.ID]string
+	store    SecretStore
+	mu       sync.RWMutex
+	m        map[provider.ID]string
+	rejected map[provider.ID]bool // the vendor refused the stored key; cleared by Set, Delete, ClearRejected
 }
 
-func NewKeys(s SecretStore) *Keys { return &Keys{store: s, m: map[provider.ID]string{}} }
+func NewKeys(s SecretStore) *Keys {
+	return &Keys{store: s, m: map[provider.ID]string{}, rejected: map[provider.ID]bool{}}
+}
 
 func (k *Keys) Load() {
 	for _, p := range []provider.ID{provider.GIPHY, provider.Klipy} {
@@ -118,18 +132,45 @@ func (k *Keys) Set(p provider.ID, key string) error {
 	}
 	k.mu.Lock()
 	k.m[p] = key
+	delete(k.rejected, p)
 	k.mu.Unlock()
 	return nil
 }
 
 // Delete removes p's key from the store, then the cache; a store error leaves both unchanged.
-func (k *Keys) Delete(p provider.ID) error { return nil }
+func (k *Keys) Delete(p provider.ID) error {
+	if err := k.store.Delete(string(p)); err != nil {
+		return err
+	}
+	k.mu.Lock()
+	delete(k.m, p)
+	delete(k.rejected, p)
+	k.mu.Unlock()
+	return nil
+}
 
 // MarkRejected records that the vendor refused p's stored key (a failed Test or search).
-func (k *Keys) MarkRejected(p provider.ID) {}
+func (k *Keys) MarkRejected(p provider.ID) { k.setRejected(p, true) }
+
+// ClearRejected records that p's stored key worked again (a passing Test).
+func (k *Keys) ClearRejected(p provider.ID) { k.setRejected(p, false) }
+
+func (k *Keys) setRejected(p provider.ID, on bool) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if _, ok := k.m[p]; ok && on {
+		k.rejected[p] = true
+	} else {
+		delete(k.rejected, p)
+	}
+}
 
 // Rejected reports whether p's stored key was refused since it was last set.
-func (k *Keys) Rejected(p provider.ID) bool { return false }
+func (k *Keys) Rejected(p provider.ID) bool {
+	k.mu.RLock()
+	defer k.mu.RUnlock()
+	return k.rejected[p]
+}
 
 // Func is a provider client's Key function; it sees later Sets.
 func (k *Keys) Func(p provider.ID) func() (string, bool) {

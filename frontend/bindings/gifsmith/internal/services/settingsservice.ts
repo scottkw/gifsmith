@@ -43,6 +43,13 @@ export function Choices(): $CancellablePromise<$models.Choices> {
 }
 
 /**
+ * KeyStatus reports GIPHY then Klipy.
+ */
+export function KeyStatus(): $CancellablePromise<$models.KeyStatus[] | null> {
+    return $Call.ByID(1785105224);
+}
+
+/**
  * LastProvider is the persisted provider id, or "" on first run or an unreadable file.
  */
 export function LastProvider(): $CancellablePromise<string> {
@@ -55,6 +62,14 @@ export function LastProvider(): $CancellablePromise<string> {
  */
 export function Params(): $CancellablePromise<provider$0.Params> {
     return $Call.ByID(3753961165);
+}
+
+/**
+ * RemoveKey deletes the stored key from the Keychain and drops what was fetched with it. Removing
+ * a key that is not there succeeds; a Keychain failure keeps the key.
+ */
+export function RemoveKey(p: string): $CancellablePromise<void> {
+    return $Call.ByID(1430588538, p);
 }
 
 /**
@@ -90,4 +105,12 @@ export function SetPref(name: string, value: string): $CancellablePromise<$model
 
 export function Snapshot(): $CancellablePromise<$models.Snapshot> {
     return $Call.ByID(1374333671);
+}
+
+/**
+ * TestKey makes one uncached first-page trending call with the stored key, inside the 429 budget
+ * (refused while blocked). Success seeds the trending cache; key_rejected marks the key rejected.
+ */
+export function TestKey(p: string): $CancellablePromise<void> {
+    return $Call.ByID(1694217650, p);
 }

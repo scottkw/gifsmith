@@ -22,6 +22,19 @@ export interface DownloadResult {
 }
 
 /**
+ * KeyStatus is one provider's key state for the Keys pane: never more than the last 4 characters.
+ */
+export interface KeyStatus {
+    "provider": string;
+
+    /**
+     * saved | not_set | rejected
+     */
+    "status": string;
+    "last4"?: string;
+}
+
+/**
  * ProviderStatus crosses to the webview: booleans and state strings only, never a key.
  */
 export interface ProviderStatus {

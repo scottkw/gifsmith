@@ -1136,7 +1136,7 @@ func TestTestKeyInsideBudget(t *testing.T) {
 		t.Fatal(err)
 	}
 	err := f.svc.TestKey(ctx, "giphy")
-	wantProviderErr(t, err, provider.RateLimited, provider.GIPHY, 429)
+	wantProviderErr(t, err, provider.RateLimited, provider.GIPHY, 0) // rate_limited carries Retry-After, not a status
 	before := f.hits.Load()
 	err = f.svc.TestKey(ctx, "giphy")
 	var pe *provider.Error

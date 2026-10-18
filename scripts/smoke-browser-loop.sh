@@ -250,6 +250,25 @@ DUPS=$(grep -o '"id":"klipy-dup"' "$BODY" | wc -l | tr -d ' ')
 [ "$DUPS" = "2" ] || fail "Trending(klipy): klipy-dup appears $DUPS times, want 2 (Klipy pages are never deduped)"
 echo "SaveKey(klipy, fixture key): 200; Trending(klipy) keeps both klipy-dup items"
 
+# Keys pane calls: KeyStatus shows the last 4 only; TestKey is uncached; RemoveKey succeeds.
+STATUS_ID=$(method_id "$SET" KeyStatus)
+TEST_ID=$(method_id "$SET" TestKey)
+REMOVE_ID=$(method_id "$SET" RemoveKey)
+[ -n "$STATUS_ID" ] && [ -n "$TEST_ID" ] && [ -n "$REMOVE_ID" ] || fail "missing KeyStatus/TestKey/RemoveKey method IDs"
+CODE=$(call "$STATUS_ID" '[]')
+if [ "$CODE" != "200" ] || ! grep -q '"last4":"-123"' "$BODY" || grep -q 'uat-key-123' "$BODY"; then
+  fail "SettingsService.KeyStatus: HTTP $CODE, body: $(cat "$BODY")"
+fi
+echo "SettingsService.KeyStatus: HTTP 200 $(cat "$BODY")"
+CODE=$(call "$TEST_ID" '["giphy"]')
+[ "$CODE" = "200" ] || fail "SettingsService.TestKey(giphy): HTTP $CODE, body: $(cat "$BODY")"
+echo "SettingsService.TestKey(giphy): HTTP 200"
+CODE=$(call "$REMOVE_ID" '["klipy"]')
+[ "$CODE" = "200" ] || fail "SettingsService.RemoveKey(klipy): HTTP $CODE, body: $(cat "$BODY")"
+CODE=$(call "$PROV_ID" '[]')
+[ "$CODE" = "200" ] && grep -q '"id":"klipy","configured":false' "$BODY" || fail "Providers after RemoveKey(klipy): HTTP $CODE, body: $(cat "$BODY")"
+echo "SettingsService.RemoveKey(klipy): HTTP 200; Providers now $(cat "$BODY")"
+
 CODE=$(call "$LAST_ID" '["giphy"]')
 [ "$CODE" = "200" ] || fail "SetLastProvider(giphy): HTTP $CODE, body: $(cat "$BODY")"
 grep -q '"lastProvider":"giphy"' bin/uat-config/settings.json || fail "settings.json: $(cat bin/uat-config/settings.json 2>&1)"

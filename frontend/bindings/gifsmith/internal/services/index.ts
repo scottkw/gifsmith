@@ -17,6 +17,7 @@ export {
 export type {
     Choices,
     DownloadResult,
+    KeyStatus,
     ProviderStatus,
     Result,
     Snapshot
