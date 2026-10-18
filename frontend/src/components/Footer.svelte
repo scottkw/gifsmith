@@ -38,7 +38,7 @@
   {#if needsAccessibility}
     <button onclick={onenable}>Enable Automatic Paste…</button>
   {:else}
-    <span class="hints"><b>↵</b> Copy&nbsp;&nbsp;&nbsp;<b>⌘↵</b> Paste</span>
+    <span class="hints"><b>↵</b> Copy&nbsp;&nbsp;&nbsp;<b>⌘↵</b> Paste&nbsp;&nbsp;&nbsp;<b>⌘K</b> Actions</span>
   {/if}
 </footer>
 

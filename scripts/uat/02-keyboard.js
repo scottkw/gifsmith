@@ -2,7 +2,8 @@
 //   bash scripts/smoke-browser-loop.sh --uat scripts/uat/02-keyboard.js
 // Headless only: keys go to the page in the dev-browser Chromium, never to the desktop.
 // Arrows move the selection (not the caret), Esc clears then hides (a no-op in the server
-// build), ⌘K is bound with no effect, and focus never leaves the search input.
+// build), ⌘K opens the action menu and Esc closes it leaving the UI as it was, Tab does nothing,
+// and focus always comes back to the search input.
 const page = await browser.newPage();
 const fail = (msg) => {
   throw new Error("UAT FAIL: " + msg);
@@ -53,10 +54,17 @@ await page.waitForFunction("parseFloat(document.querySelector('#grid > div').sty
 if ((await active()) !== "tile-18") fail("selection lost when page 2 appended");
 
 const before = await page.locator("main").innerHTML();
-await input.press("Meta+k");
+const focused = () => input.evaluate((el) => document.activeElement === el);
 await input.press("Tab");
-if ((await page.locator("main").innerHTML()) !== before) fail("⌘K/Tab changed the UI");
-if (!(await input.evaluate((el) => document.activeElement === el))) fail("Tab moved focus");
+if ((await page.locator("main").innerHTML()) !== before) fail("Tab changed the UI");
+if (!(await focused())) fail("Tab moved focus");
+await input.press("Meta+k");
+const dialog = page.locator("[role=dialog][aria-label=Actions]");
+await dialog.waitFor({ timeout: 2000 });
+await page.keyboard.press("Escape");
+await dialog.waitFor({ state: "detached", timeout: 2000 });
+if ((await page.locator("main").innerHTML()) !== before) fail("⌘K then Esc did not restore the UI");
+if (!(await focused())) fail("Esc from the menu did not return focus to the search input");
 
 await input.press("Escape");
 if ((await input.inputValue()) !== "") fail("Esc did not clear the query");

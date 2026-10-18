@@ -12,6 +12,7 @@
   --accent-fill: #0068d9;
   --destructive: #d70015;
   --success: #1b7a35;
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.16);
 
   --font: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
@@ -34,6 +35,7 @@
     --accent: #4da3ff;
     --destructive: #ff6961;
     --success: #30d158;
+    --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.5);
   }
 }
 

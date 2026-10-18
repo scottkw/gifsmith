@@ -28,8 +28,11 @@
     type TextKind,
   } from './lib/api';
   import { actionErrorText, errorState, pagingMessage, providerName, revokedMessage } from './lib/errors';
-  import { move, nearEnd, routeKey } from './lib/grid';
+  import { buildActions, type ActionId, type ActionRow } from './lib/actions';
+  import { COLS, move, nearEnd, routeKey } from './lib/grid';
+  import { placeMenu } from './lib/popover';
   import { CLIPS_ACCESS_MAILTO, SLOTS, slotById, type SlotId } from './lib/providers';
+  import ActionMenu from './components/ActionMenu.svelte';
   import Footer from './components/Footer.svelte';
   import ProviderTabs from './components/ProviderTabs.svelte';
   import ResultGrid from './components/ResultGrid.svelte';
@@ -94,6 +97,10 @@
   let timer: ReturnType<typeof setTimeout> | undefined;
   let hideTimer: ReturnType<typeof setTimeout> | undefined; // pending hide after a copy
   let now = $state(Date.now()); // clock for retry countdowns; set whenever an error arrives
+  let menuOpen = $state(false); // ⌘K action menu
+  let menuRows = $state<ActionRow[]>([]);
+  let menuAt = $state({ left: 0, top: 0 });
+  let menu = $state<ActionMenu>();
 
   const footerCenter = $derived(status || cur.items[selected]?.title || '');
   const busy = $derived(cur.status === 'loading' || cur.status === 'refreshing');
@@ -367,36 +374,83 @@
           if (a === 'copy' && errView?.tryAgain) retry();
           return;
         }
-        run(a);
+        runAction(a);
         return;
       case 'copyLink':
-        textAction('link');
-        return;
       case 'copyMarkdown':
-        textAction('markdown');
+      case 'open':
+        runAction(a);
         return;
-      case 'open': {
-        // Only GIPHY and Clips items carry a page URL; for the rest ⌘O does nothing.
-        const g = cur.items[selected];
-        if (g?.pageUrl) openItem(g);
+      case 'actions':
+        toggleMenu();
         return;
-      }
       case 'escape':
         if (query) {
           query = '';
           onInput();
         } else hide(); // no-op in the server build; nothing here depends on it
         return;
-      // 'actions' (⌘K, Phase 3 action menu) and 'tab': bound, no effect yet; slot1–slot4: onMainKeydown.
+      // 'tab': bound, no effect; slot1–slot4: onMainKeydown.
     }
   }
 
   // ⌘1–⌘4 from any field in the panel (search input or key field) switch provider.
   function onMainKeydown(e: KeyboardEvent) {
     const a = routeKey(e);
-    if (!a.startsWith('slot')) return;
-    e.preventDefault();
-    switchTo(SLOTS[Number(a.slice(4)) - 1].id);
+    if (a.startsWith('slot')) {
+      e.preventDefault();
+      switchTo(SLOTS[Number(a.slice(4)) - 1].id);
+      // The menu's filter has focus while it is open: its ⌘ shortcuts (⌘K, ⌘↵, ⌘⇧C, …) arrive here.
+    } else if (menuOpen && e.metaKey && e.target !== input) onKeydown(e);
+  }
+
+  // ⌘K: open beside the selected tile, or close. No tile on screen (empty, loading, message, setup card): nothing.
+  async function toggleMenu() {
+    if (menuOpen) return closeMenu();
+    const g = cur.items[selected];
+    const tile = document.getElementById(`tile-${selected}`);
+    if (!g || !tile) return;
+    menuRows = buildActions({ gif: g, tab: 'provider', inDetails: false, favorited: false });
+    menuOpen = true;
+    await tick(); // measure the rendered menu, then place it before the browser paints
+    menuAt = placeMenu(tile.getBoundingClientRect(), selected % COLS, menu!.height(), { w: innerWidth, h: innerHeight });
+    menu!.focus();
+  }
+
+  function closeMenu() {
+    menuOpen = false;
+    input.focus();
+  }
+
+  // The one dispatcher for the menu and every shortcut. The menu closes before anything runs.
+  function runAction(id: ActionId) {
+    if (menuOpen) closeMenu();
+    const g = cur.items[selected];
+    switch (id) {
+      case 'copy':
+      case 'paste':
+        run(id);
+        return;
+      case 'copyLink':
+        textAction('link');
+        return;
+      case 'pasteLink':
+        textAction('link', true);
+        return;
+      case 'copyMarkdown':
+        textAction('markdown');
+        return;
+      case 'pasteMarkdown':
+        textAction('markdown', true);
+        return;
+      case 'copyPage':
+        textAction('page');
+        return;
+      case 'open':
+        // Only GIPHY and Clips items carry a page URL; for the rest ⌘O does nothing.
+        if (g?.pageUrl) openItem(g);
+        return;
+    }
   }
 
   function run(action: 'copy' | 'paste') {
@@ -593,6 +647,10 @@
       />
     {/if}
   </section>
+
+  {#if menuOpen}
+    <ActionMenu bind:this={menu} rows={menuRows} {...menuAt} onrun={runAction} onclose={closeMenu} />
+  {/if}
 
   <Footer attribution={slot.attribution} text={footerCenter} {tone} {needsAccessibility} onenable={enableAutoPaste} />
 </main>
