@@ -120,6 +120,7 @@ func main() {
 	actions.Hide = sh.Hide
 	actions.Previous = sh.Previous
 	panel.HideFunc = sh.Hide
+	panel.OpenSettingsFunc = sh.OpenSettings
 	settingsSvc.ApplyTheme = sh.ApplyTheme
 	// The stored theme drives native appearance and window backgrounds before any window shows.
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {

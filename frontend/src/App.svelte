@@ -11,6 +11,7 @@
     copyText,
     download,
     openPage,
+    openSettings,
     openSource,
     hide,
     latest,
@@ -648,7 +649,11 @@
   // ⌘1–⌘6 from any field in the panel (search input or key field) switch provider or library tab.
   function onMainKeydown(e: KeyboardEvent) {
     const a = routeKey(e);
-    if (a.startsWith('slot')) {
+    // ⌘, from any panel context (search, setup card key field, action menu): Go hides the panel first.
+    if (a === 'settings') {
+      e.preventDefault();
+      openSettings();
+    } else if (a.startsWith('slot')) {
       e.preventDefault();
       const n = Number(a.slice(4));
       if (n <= SLOTS.length) switchTo(SLOTS[n - 1].id);

@@ -24,6 +24,7 @@ export type KeyAction =
   | 'remove'
   | 'undo'
   | 'details'
+  | 'settings'
   | 'none';
 
 // ← → wrap across rows and clamp at the ends; ↑ on the first row stays; ↓ with no tile directly
@@ -75,6 +76,7 @@ export function routeKey(e: {
   if (e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'r') return 'reveal';
   if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 'f') return 'favorite';
   if (e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'i') return 'details';
+  if (e.metaKey && !e.shiftKey && e.key === ',') return 'settings';
   // App captures ⌘⌫ and ⌘Z only when they act (a library item, a visible Undo toast); otherwise
   // they stay native text editing and undo in the search input.
   if (e.metaKey && e.key === 'Backspace') return 'remove';

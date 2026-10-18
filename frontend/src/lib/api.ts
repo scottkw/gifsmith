@@ -96,6 +96,7 @@ export const download = (g: Gif) => ActionService.Download(g);
 export const showDownload = () => ActionService.ShowDownload();
 export const requestAccessibility = () => ActionService.RequestAccessibility();
 export const hide = () => PanelService.Hide();
+export const openSettings = () => PanelService.OpenSettings();
 
 // Favorites, Recents and recent searches: local files only, never a provider request (D-09).
 // Go never sends null lists; the generated types allow it, so normalize once here.

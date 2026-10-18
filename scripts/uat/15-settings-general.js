@@ -59,5 +59,14 @@ await markIs("giphy-powered-light.png");
 if (!(await mark.count())) fail("GIPHY mark missing");
 await saveScreenshot(await B.screenshot(), "gifsmith-15-settings-light.png");
 
+// ⌘, in the panel asks Go to open Settings (server build: the shell hides/shows nothing real).
+await A.bringToFront();
+await A.locator("input[role=combobox]").focus();
+await A.keyboard.press("Meta+Comma");
+await A.waitForTimeout(500);
+const center = await A.locator("footer .center").evaluate((el) => ({ cls: el.className, text: el.innerText }));
+if (center.cls.includes("error")) fail("Cmd+, showed an error toast: " + center.text);
+await B.bringToFront();
+
 if (errors.length) fail("page error: " + errors[0]);
 console.log("UAT OK");
