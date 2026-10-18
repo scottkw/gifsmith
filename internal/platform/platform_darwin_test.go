@@ -67,3 +67,25 @@ func TestCopyFileMissingPath(t *testing.T) {
 		t.Fatal("CopyFile on a missing path returned nil")
 	}
 }
+
+func TestFakeSetAppearanceRecords(t *testing.T) {
+	f := &Fake{}
+	if err := f.SetAppearance("dark"); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.Calls) != 1 || f.Calls[0] != "SetAppearance:dark" {
+		t.Errorf("Calls = %v, want [SetAppearance:dark]", f.Calls)
+	}
+}
+
+// The mapping only; go test never calls the real SetAppearance (it would change NSApp for this process).
+func TestAppearanceCode(t *testing.T) {
+	for mode, want := range map[string]int{"": 0, "light": 1, "dark": 2} {
+		if got, err := appearanceCode(mode); got != want || err != nil {
+			t.Errorf("appearanceCode(%q) = %d, %v; want %d, nil", mode, got, err, want)
+		}
+	}
+	if _, err := appearanceCode("neon"); err == nil || err.Error() != "unknown appearance" {
+		t.Errorf("appearanceCode(neon) err = %v, want the fixed unknown appearance error", err)
+	}
+}

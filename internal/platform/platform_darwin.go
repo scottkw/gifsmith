@@ -170,3 +170,7 @@ func (darwin) RevealFile(path string) error {
 	}
 	return nil
 }
+
+func (darwin) SetAppearance(mode string) error { return nil } // RED skeleton
+
+func appearanceCode(mode string) (int, error) { return -1, nil } // RED skeleton

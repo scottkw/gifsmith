@@ -42,4 +42,6 @@ type Platform interface {
 	PasteShortcut() error
 	// RevealFile selects path in a Finder window (callers pass only files they saved).
 	RevealFile(path string) error
+	// SetAppearance sets the app-wide appearance: "" follows the system, "light" Aqua, "dark" DarkAqua.
+	SetAppearance(mode string) error
 }

@@ -86,3 +86,5 @@ func (f *Fake) PasteShortcut() error {
 	f.Note("PasteShortcut")
 	return f.PasteErr
 }
+
+func (f *Fake) SetAppearance(mode string) error { return nil } // RED skeleton
