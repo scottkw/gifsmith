@@ -97,8 +97,9 @@ export function revokedMessage(providerLabel: string): string {
   return `${providerLabel} rejected your saved key. It may have been revoked. Paste a new key to continue.`;
 }
 
-// Copy/paste failures (UI-SPEC F1/F3), keyed by Go's ActionError kind; '' = no typed cause.
+// Copy/paste/open failures (UI-SPEC F1/F3/F8), keyed by Go's ActionError kind; '' = no typed cause.
 export function actionErrorText(kind: string, g: Gif): string {
   if (kind === 'not_media') return `${providerName(g.provider)} sent something that isn't a GIF. Nothing was saved. Try another GIF.`;
+  if (kind === 'no_page' || kind === 'open_failed') return "Couldn't open the page in your browser.";
   return "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";
 }

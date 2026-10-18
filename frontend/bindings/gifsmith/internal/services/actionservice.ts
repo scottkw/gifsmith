@@ -22,11 +22,25 @@ export function Copy(g: provider$0.Gif): $CancellablePromise<$models.Result> {
 }
 
 /**
- * CopyText puts text Go builds from g on the clipboard as a plain string. kind: link.
+ * CopyText puts text Go builds from g on the clipboard as a plain string. kind: link | markdown | page.
  * The webview never composes the text: it only names the kind.
  */
 export function CopyText(g: provider$0.Gif, kind: string): $CancellablePromise<$models.Result> {
     return $Call.ByID(1904424890, g, kind);
+}
+
+/**
+ * OpenPage opens the item's GIPHY page in the default browser (platform.Fake in the UAT build).
+ */
+export function OpenPage(g: provider$0.Gif): $CancellablePromise<void> {
+    return $Call.ByID(393537743, g);
+}
+
+/**
+ * OpenSource opens the item's third-party source page; https only, it can point anywhere.
+ */
+export function OpenSource(g: provider$0.Gif): $CancellablePromise<void> {
+    return $Call.ByID(3789089137, g);
 }
 
 /**
@@ -35,6 +49,13 @@ export function CopyText(g: provider$0.Gif, kind: string): $CancellablePromise<$
  */
 export function Paste(g: provider$0.Gif): $CancellablePromise<$models.Result> {
     return $Call.ByID(1552752055, g);
+}
+
+/**
+ * PasteText copies text like CopyText, then pastes it like Paste. kind: link | markdown.
+ */
+export function PasteText(g: provider$0.Gif, kind: string): $CancellablePromise<$models.Result> {
+    return $Call.ByID(228149936, g, kind);
 }
 
 /**

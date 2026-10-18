@@ -2,7 +2,9 @@
 //   bash scripts/smoke-browser-loop.sh --uat scripts/uat/07-text-actions.js
 // Headless only: keys go to the page in the dev-browser Chromium, never to the desktop. The
 // server build runs platform.Fake, so copies never reach the real pasteboard.
-// ⌘⇧C copies the link (plain ⌘C stays native), and a copy whose media is HTML shows F3.
+// ⌘⇧C copies the link (plain ⌘C stays native), a copy whose media is HTML shows F3, ⌘⇧M copies
+// Markdown, and ⌘O opens a GIPHY page through Go (Fake records it, nothing opens) and does nothing
+// on Klipy (no page URL). Fixture key uat-key-123 only.
 const page = await browser.newPage();
 const fail = (msg) => {
   throw new Error("UAT FAIL: " + msg);
@@ -34,6 +36,35 @@ await input.fill("htmlmedia");
 await page.locator("#tile-0[aria-selected=true] svg.broken").waitFor({ timeout: 10000 });
 await input.press("Enter");
 await page.locator("footer .center.error", { hasText: F3 }).waitFor({ timeout: 10000 });
+
+const field = page.locator(".card input");
+const quiet = async (what) => {
+  // Let "… key saved" (2 s) clear first, so any toast after this is the action's own.
+  await page.locator("footer .center.success").waitFor({ state: "detached", timeout: 5000 });
+  await input.press("Meta+o");
+  await page.waitForTimeout(400);
+  if (await page.locator("footer .center.error").count()) fail(`${what}: ⌘O showed an error: ${await footer.innerText()}`);
+  if (await page.locator("footer .center.success").count()) fail(`${what}: ⌘O showed a toast: ${await footer.innerText()}`);
+};
+
+// GIPHY: Markdown and Open in Browser.
+await page.keyboard.press("Meta+1");
+await field.waitFor({ timeout: 5000 });
+await field.fill("uat-key-123");
+await field.press("Enter");
+await page.locator("#tile-0[aria-selected=true] img").waitFor({ timeout: 10000 });
+await input.press("Meta+Shift+M");
+await page.locator("footer .center.success", { hasText: "Copied Markdown" }).waitFor({ timeout: 5000 });
+await input.press("ArrowRight"); // clears the toast
+await quiet("GIPHY");
+
+// Klipy: no page URL, so ⌘O does nothing.
+await page.keyboard.press("Meta+3");
+await field.waitFor({ timeout: 5000 });
+await field.fill("uat-key-123");
+await field.press("Enter");
+await page.locator("#tile-0[aria-selected=true] img").waitFor({ timeout: 10000 });
+await quiet("Klipy");
 
 if (errors.length) fail("page error: " + errors[0]);
 console.log("UAT OK");

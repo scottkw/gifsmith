@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -92,12 +93,18 @@ func (a *ActionService) Paste(ctx context.Context, g provider.Gif) (Result, erro
 		return Result{}, ErrBusy
 	}
 	defer a.busy.Unlock()
-	if err := a.stage(ctx, g); err != nil {
+	return a.paste(func() error { return a.stage(ctx, g) }, "Pasted GIF")
+}
+
+// paste runs put (which fills the clipboard), then hides the panel and posts one ⌘V to the
+// previous app; okMsg is the result message when it did. The caller holds busy.
+func (a *ActionService) paste(put func() error, okMsg string) (Result, error) {
+	if err := put(); err != nil {
 		return Result{}, err
 	}
 	if !a.Platform.AccessibilityTrusted(false) {
-		log.Printf("paste: accessibility not trusted, copied only (UI shows Enable automatic paste…)")
-		return Result{Copied: true, NeedsAccessibility: true, Message: "Copied — press ⌘V to paste. To paste automatically, click Enable automatic paste… and turn on Gifsmith."}, nil
+		log.Printf("paste: accessibility not trusted, copied only (UI shows Enable Automatic Paste…)")
+		return Result{Copied: true, NeedsAccessibility: true, Message: "Copied — press ⌘V to paste. To paste automatically, click Enable Automatic Paste… and turn on Gifsmith."}, nil
 	}
 	sleep := a.Sleep
 	if sleep == nil {
@@ -133,58 +140,145 @@ func (a *ActionService) Paste(ctx context.Context, g provider.Gif) (Result, erro
 		return Result{Copied: true, Message: "Copied — automatic paste failed, press ⌘V"}, nil
 	}
 	log.Printf("paste: posted ⌘V (previous app %q)", prev.Name)
-	return Result{Copied: true, Pasted: true, Message: "Pasted GIF"}, nil
+	return Result{Copied: true, Pasted: true, Message: okMsg}, nil
 }
 
-// CopyText puts text Go builds from g on the clipboard as a plain string. kind: link.
+var (
+	copiedText = map[string]string{"link": "Copied link", "markdown": "Copied Markdown", "page": "Copied page link"}
+	pastedText = map[string]string{"link": "Pasted link", "markdown": "Pasted Markdown"}
+)
+
+// CopyText puts text Go builds from g on the clipboard as a plain string. kind: link | markdown | page.
 // The webview never composes the text: it only names the kind.
 func (a *ActionService) CopyText(ctx context.Context, g provider.Gif, kind string) (Result, error) {
 	if !a.busy.TryLock() {
 		return Result{}, ErrBusy
 	}
 	defer a.busy.Unlock()
-	if kind != "link" {
+	if err := a.putText(g, kind); err != nil {
+		return Result{}, err
+	}
+	return Result{Copied: true, Message: copiedText[kind]}, nil
+}
+
+// PasteText copies text like CopyText, then pastes it like Paste. kind: link | markdown.
+func (a *ActionService) PasteText(ctx context.Context, g provider.Gif, kind string) (Result, error) {
+	if !a.busy.TryLock() {
+		return Result{}, ErrBusy
+	}
+	defer a.busy.Unlock()
+	msg, ok := pastedText[kind]
+	if !ok {
 		return Result{}, actionErr("not_allowed")
 	}
-	text, err := a.linkFor(g)
+	return a.paste(func() error { return a.putText(g, kind) }, msg)
+}
+
+func (a *ActionService) putText(g provider.Gif, kind string) error {
+	text, err := a.textFor(g, kind)
 	if err != nil {
-		return Result{}, err
+		return err
 	}
 	if err := a.Platform.CopyText(text); err != nil {
 		log.Printf("copy text %s %s: %v", g.Provider, kind, err)
-		return Result{}, actionErr("copy_failed")
+		return actionErr("copy_failed")
 	}
 	log.Printf("copy text: %s %s", g.Provider, kind)
-	return Result{Copied: true, Message: "Copied link"}, nil
+	return nil
 }
 
-// linkFor is the GIF's media URL, checked against the same allowlist as downloads.
-// GIPHY links lose their tracking query; Klipy forbids altering URLs, so others pass byte for byte.
-func (a *ActionService) linkFor(g provider.Gif) (string, error) {
-	if g.IsClip { // DownloadURL is the MP4; the Clip's GIF rendition arrives with the metadata fields
-		return "", actionErr("no_link")
+func (a *ActionService) textFor(g provider.Gif, kind string) (string, error) {
+	switch kind {
+	case "link":
+		return a.linkFor(g)
+	case "markdown":
+		link, err := a.linkFor(g)
+		if err != nil {
+			return "", err
+		}
+		return markdownFor(g.Title, link), nil
+	case "page":
+		return pageFor(g)
 	}
-	u, err := url.Parse(g.DownloadURL)
+	return "", actionErr("not_allowed")
+}
+
+// linkFor is the GIF's media URL (a Clip's GIF rendition, never its MP4: D-18), checked against
+// the same allowlist as downloads. GIPHY links lose their tracking query; Klipy forbids altering
+// URLs, so other providers' links pass byte for byte.
+func (a *ActionService) linkFor(g provider.Gif) (string, error) {
+	raw := g.GifURL
+	if raw == "" {
+		if g.IsClip || g.Provider == provider.Clips {
+			return "", actionErr("no_link")
+		}
+		raw = g.DownloadURL
+	}
+	u, err := url.Parse(raw)
 	if err != nil || !a.Staging.Allows(g.Provider, u) {
 		return "", actionErr("not_allowed")
 	}
 	if g.Provider != provider.GIPHY && g.Provider != provider.Clips {
-		return g.DownloadURL, nil
+		return raw, nil
 	}
 	u.RawQuery, u.ForceQuery, u.Fragment, u.RawFragment = "", false, "", ""
 	return u.String(), nil
 }
 
-// PasteText copies text like CopyText, then pastes it like Paste. kind: link | markdown.
-func (a *ActionService) PasteText(ctx context.Context, g provider.Gif, kind string) (Result, error) {
-	return Result{}, nil
+// markdownFor is ![alt](link): whitespace runs collapse, an empty title becomes "GIF", and
+// backslash and brackets are escaped so the title cannot end the alt text early.
+func markdownFor(title, link string) string {
+	alt := strings.Join(strings.Fields(title), " ")
+	if alt == "" {
+		alt = "GIF"
+	}
+	alt = strings.NewReplacer(`\`, `\\`, `[`, `\[`, `]`, `\]`).Replace(alt)
+	return "![" + alt + "](" + link + ")"
 }
 
-// OpenPage opens the item's GIPHY page in the default browser.
-func (a *ActionService) OpenPage(ctx context.Context, g provider.Gif) error { return nil }
+// pageFor is the item's vendor page: GIPHY and Clips only (staging.PageAllow), never constructed.
+func pageFor(g provider.Gif) (string, error) {
+	u, err := url.Parse(g.PageURL)
+	if err != nil || !staging.PageAllow(g.Provider, u) {
+		return "", actionErr("no_page")
+	}
+	return u.String(), nil
+}
 
-// OpenSource opens the item's https source page in the default browser.
-func (a *ActionService) OpenSource(ctx context.Context, g provider.Gif) error { return nil }
+// OpenPage opens the item's GIPHY page in the default browser (platform.Fake in the UAT build).
+func (a *ActionService) OpenPage(ctx context.Context, g provider.Gif) error {
+	if !a.busy.TryLock() {
+		return ErrBusy
+	}
+	defer a.busy.Unlock()
+	page, err := pageFor(g)
+	if err != nil {
+		return err
+	}
+	return a.open(g, "page", page)
+}
+
+// OpenSource opens the item's third-party source page; https only, it can point anywhere.
+func (a *ActionService) OpenSource(ctx context.Context, g provider.Gif) error {
+	if !a.busy.TryLock() {
+		return ErrBusy
+	}
+	defer a.busy.Unlock()
+	u, err := url.Parse(g.SourceURL)
+	if err != nil || u.Scheme != "https" || u.Host == "" {
+		return actionErr("no_page")
+	}
+	return a.open(g, "source", u.String())
+}
+
+func (a *ActionService) open(g provider.Gif, kind, u string) error {
+	if err := a.Platform.OpenURL(u); err != nil {
+		log.Printf("open %s %s: %v", g.Provider, kind, err)
+		return actionErr("open_failed")
+	}
+	log.Printf("open: %s %s", g.Provider, kind)
+	return nil
+}
 
 // RequestAccessibility raises the macOS prompt and, if still untrusted, opens the settings pane.
 // Only an explicit button click calls this.

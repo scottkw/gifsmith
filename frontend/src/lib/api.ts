@@ -1,10 +1,10 @@
 // Thin facade over the generated bindings. Provider HTTP happens in Go; this only calls it.
-import { ActionService, GifService, PanelService, SettingsService, type ProviderStatus } from '../../bindings/gifsmith/internal/services';
+import { ActionService, GifService, PanelService, SettingsService, type ProviderStatus, type Result } from '../../bindings/gifsmith/internal/services';
 import type { Gif, Page } from '../../bindings/gifsmith/internal/provider';
 import { Browser, CancelError, type CancellablePromise } from '@wailsio/runtime';
 import { CLIPS_ACCESS_MAILTO, GIPHY_KEY_URL, KLIPY_KEY_URL } from './providers';
 
-export type { Gif, Page, ProviderStatus };
+export type { Gif, Page, ProviderStatus, Result };
 
 export const search = (p: string, q: string, cursor: string) => GifService.Search(p, q, cursor);
 export const trending = (p: string, cursor: string) => GifService.Trending(p, cursor);
@@ -63,8 +63,13 @@ export function providerError(e: unknown): ProviderErr | null {
 export const actionError = (e: unknown): { kind: string } | null => providerError(e);
 
 export const copy = (g: Gif) => ActionService.Copy(g);
-// Go builds the text from g; the webview only names the kind.
-export const copyText = (g: Gif, kind: 'link') => ActionService.CopyText(g, kind);
+// Go builds the text (and validates every URL) from g; the webview only names the kind.
+export type TextKind = 'link' | 'markdown' | 'page';
+export const copyText = (g: Gif, kind: TextKind) => ActionService.CopyText(g, kind);
+export const pasteText = (g: Gif, kind: 'link' | 'markdown') => ActionService.PasteText(g, kind);
+// Per-item URLs open only through Go (platform.Fake in the UAT build), never Browser.OpenURL.
+export const openPage = (g: Gif) => ActionService.OpenPage(g);
+export const openSource = (g: Gif) => ActionService.OpenSource(g);
 export const paste = (g: Gif) => ActionService.Paste(g);
 export const requestAccessibility = () => ActionService.RequestAccessibility();
 export const hide = () => PanelService.Hide();

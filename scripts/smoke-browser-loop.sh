@@ -181,6 +181,13 @@ echo "Clips probe: enabled; GifService.Trending(clips) returned isClip items"
 CODE=$(call "$TREND_ID" '["giphy",""]')
 [ "$CODE" = "200" ] && grep -q '/media/giphy-' "$BODY" || fail "Trending(giphy): HTTP $CODE, body: $(head -c 300 "$BODY")"
 echo "GifService.Trending(giphy): HTTP 200 with fixture /media/giphy- URLs"
+GIPHY_ITEM=$(node -e 'const p = JSON.parse(require("fs").readFileSync(0, "utf8")); process.stdout.write(JSON.stringify(p.items[0]))' <"$BODY")
+OPEN_ID=$(method_id "$SVC/actionservice.ts" OpenPage)
+[ -n "$OPEN_ID" ] || fail "could not find the ActionService.OpenPage method ID"
+# platform.Fake records the URL; nothing opens on this machine.
+CODE=$(call "$OPEN_ID" "[$GIPHY_ITEM]")
+[ "$CODE" = "200" ] || fail "ActionService.OpenPage(giphy item): HTTP $CODE, body: $(cat "$BODY")"
+echo "ActionService.OpenPage(giphy item): HTTP 200 (platform.Fake)"
 
 CODE=$(call "$SAVE_ID" '["klipy","uat-key-123"]')
 [ "$CODE" = "200" ] || fail "SaveKey(klipy, fixture key): HTTP $CODE, body: $(cat "$BODY")"

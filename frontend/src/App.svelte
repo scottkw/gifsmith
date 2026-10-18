@@ -7,11 +7,13 @@
     checkClips,
     copy,
     copyText,
+    openPage,
     hide,
     latest,
     lastProvider,
     openExternal,
     paste,
+    pasteText,
     providerError,
     providers,
     requestAccessibility,
@@ -22,6 +24,8 @@
     type Page,
     type ProviderErr,
     type ProviderStatus,
+    type Result,
+    type TextKind,
   } from './lib/api';
   import { actionErrorText, errorState, pagingMessage, providerName, revokedMessage } from './lib/errors';
   import { move, nearEnd, routeKey } from './lib/grid';
@@ -156,6 +160,7 @@
   onMount(async () => {
     input.focus();
     Events.On('panel:show', () => {
+      clearTimeout(hideTimer); // a copy just before this show must not hide the panel again (02 IN-07)
       now = Date.now();
       if (!keepStatus) setStatus('');
       keepStatus = false;
@@ -365,8 +370,17 @@
         run(a);
         return;
       case 'copyLink':
-        if (selected >= 0) textAction('link');
+        textAction('link');
         return;
+      case 'copyMarkdown':
+        textAction('markdown');
+        return;
+      case 'open': {
+        // Only GIPHY and Clips items carry a page URL; for the rest ⌘O does nothing.
+        const g = cur.items[selected];
+        if (g?.pageUrl) openItem(g);
+        return;
+      }
       case 'escape':
         if (query) {
           query = '';
@@ -385,23 +399,35 @@
     switchTo(SLOTS[Number(a.slice(4)) - 1].id);
   }
 
-  async function run(action: 'copy' | 'paste') {
+  function run(action: 'copy' | 'paste') {
     const g = cur.items[selected];
-    if (copying || !g) return;
-    if (g.isClip) {
+    if (g?.isClip && !copying) {
       setStatus(CLIPS_COPY);
       return;
     }
+    act(action === 'copy' ? copy : paste, action === 'paste');
+  }
+
+  // Go builds the text from the selected item; the webview only names the kind.
+  function textAction(kind: TextKind, pasteIt = false) {
+    if (pasteIt && kind !== 'page') act((g) => pasteText(g, kind), true);
+    else act((g) => copyText(g, kind), false); // there is no Paste Page Link
+  }
+
+  // One copy or paste of the selected item at a time. A copy confirms in the footer and hides the
+  // panel; a paste has hidden it already, unless it fell back to copying.
+  async function act(call: (g: Gif) => Promise<Result>, pasteIt: boolean) {
+    const g = cur.items[selected];
+    if (copying || !g) return;
     copying = true;
     setStatus('Copying…');
     try {
-      if (action === 'copy') {
-        const r = await copy(g);
+      const r = await call(g);
+      if (!pasteIt) {
         setStatus(r.message, 'success');
         scheduleHide();
       } else {
-        const r = await paste(g);
-        setStatus(r.message);
+        setStatus(r.message, r.pasted ? 'success' : '');
         needsAccessibility = r.needsAccessibility;
         keepStatus = r.copied && !r.pasted && !r.needsAccessibility;
       }
@@ -412,7 +438,7 @@
     }
   }
 
-  // Copy actions confirm in the footer, then hide the panel.
+  // Copy actions confirm in the footer, then hide the panel; panel:show cancels a pending hide.
   function scheduleHide() {
     clearTimeout(hideTimer);
     hideTimer = setTimeout(hide, HIDE_AFTER_COPY_MS);
@@ -425,19 +451,12 @@
     else setStatus(actionErrorText(kind, g), 'error');
   }
 
-  // Go builds the text from the selected item; the webview only names the kind.
-  async function textAction(kind: 'link') {
-    const g = cur.items[selected];
-    if (copying || !g) return;
-    copying = true;
+  // Success shows no toast: the browser takes focus and HideOnFocusLost hides the panel.
+  async function openItem(g: Gif) {
     try {
-      const r = await copyText(g, kind);
-      setStatus(r.message, 'success');
-      scheduleHide();
+      await openPage(g);
     } catch (err) {
       actionFailed(err, g);
-    } finally {
-      copying = false;
     }
   }
 

@@ -7,6 +7,8 @@ export type KeyAction =
   | 'copy'
   | 'paste'
   | 'copyLink'
+  | 'copyMarkdown'
+  | 'open'
   | 'escape'
   | 'actions'
   | 'tab'
@@ -58,6 +60,8 @@ export function routeKey(e: {
   if (e.metaKey && e.key.toLowerCase() === 'k') return 'actions';
   // ⌘⇧ letters may arrive as "C" or "c"; plain ⌘C stays native copy in the input.
   if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 'c') return 'copyLink';
+  if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 'm') return 'copyMarkdown';
+  if (e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'o') return 'open';
   if (e.metaKey && ['1', '2', '3', '4'].includes(e.key)) return `slot${e.key}` as KeyAction;
   return ARROWS[e.key] ?? 'none';
 }
