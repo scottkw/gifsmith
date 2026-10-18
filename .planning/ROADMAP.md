@@ -148,7 +148,27 @@ Plans:
   4. A Developer ID–signed, notarized DMG installs and runs on a clean user account (Gatekeeper accepts it, permissions start fresh) on macOS 13+ Apple Silicon. (manual, user-verified)
   5. The About screen credits the original MIT-licensed Raycast extension and its authors, and Klipy file actions stay disabled (link and Markdown only) unless written clearance from Klipy is recorded.
 
-**Plans**: TBD
+**Plans:** 6 plans
+
+Plans:
+**Wave 1**
+- [ ] 04-01-PLAN.md — Tracer: Theme from a real Settings window through one prefs Store to both webviews and NSApp appearance; window behaviour, ⌘,, Open at login, Automatic paste status, Klipy email + Apple agreement steps
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 04-02-PLAN.md — Content rating, page size, GIPHY language and Klipy country as per-request Params (Flush keeps 429 blocks); Keys pane add/test/change/remove with last-4 status
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 04-03-PLAN.md — Rebindable hotkeys with rollback, Favorites/Recents hotkeys, suspend-while-recording, 5 s Test; Phase 3 polish and Reduce Motion stills
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 04-04-PLAN.md — Validated download folder + hide filenames, configurable ↵/⌘↵ with the Klipy file-action gate (Go const), grid sizes and menu placement, Phase 4 UI backstops
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 04-05-PLAN.md — Signed arm64 DMG pipeline (release:build, notarized release, verify script, new background), About credits, README, release notes; blocking notary-profile checkpoint
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 04-06-PLAN.md — Full regression, notarized release run and verification, dev install for native UAT, clean-account install, draft GitHub Release
+
 **UI hint**: yes
 
 **Manual verification**: Criteria 2 and 4 need user-run native checks (global shortcut registration, login item, clean-account install). Klipy clearance (developers@klipy.com) is a pre-release gate and must be requested before this phase's release work.
@@ -165,4 +185,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Native Spike & Signed Dev Loop | 4/4 | Complete    | 2026-10-17 |
 | 2. Providers, Search UI & First Run | 6/6 | Complete    | 2026-10-17 |
 | 3. Action Pipeline & Library | 8/8 | Complete    | 2026-10-18 |
-| 4. Settings, Shell Polish & Release | 0/TBD | Not started | - |
+| 4. Settings, Shell Polish & Release | 0/6 | Planned | - |
