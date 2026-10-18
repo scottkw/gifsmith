@@ -174,10 +174,10 @@ func TestPasteWithoutAccessibility(t *testing.T) {
 		t.Errorf("result = %+v, want Copied+NeedsAccessibility with a message", r)
 	}
 	// Point at the button, not a Settings path (macOS 27 has no Privacy & Security › Accessibility).
-	if !strings.Contains(r.Message, "Enable automatic paste…") || strings.Contains(r.Message, "System Settings") {
-		t.Errorf("message = %q, want it to name the Enable automatic paste… button and no Settings path", r.Message)
+	if !strings.Contains(r.Message, "Enable Automatic Paste…") || strings.Contains(r.Message, "System Settings") {
+		t.Errorf("message = %q, want it to name the Enable Automatic Paste… button and no Settings path", r.Message)
 	}
-	// App.svelte shows "Enable automatic paste…" off this exact JSON key (models.ts Result).
+	// App.svelte shows "Enable Automatic Paste…" off this exact JSON key (models.ts Result).
 	if b, _ := json.Marshal(r); !strings.Contains(string(b), `"needsAccessibility":true`) {
 		t.Errorf("JSON = %s, want \"needsAccessibility\":true", b)
 	}
@@ -413,5 +413,170 @@ func TestCopyTextCopyError(t *testing.T) {
 	s, fx := newService(t, f)
 	if _, err := s.CopyText(context.Background(), fx.gif, "link"); actionKind(err) != "copy_failed" {
 		t.Errorf("err = %v, want kind copy_failed", err)
+	}
+}
+
+var (
+	giphyGif = provider.Gif{Provider: provider.GIPHY, ID: "a", Title: "Cat", DownloadURL: "https://media.giphy.com/media/a/giphy.gif?cid=1", PageURL: "https://giphy.com/gifs/x"}
+	klipyGif = provider.Gif{Provider: provider.Klipy, ID: "k", Title: "K", DownloadURL: "https://static.klipy.com/k.gif"}
+	finerGif = provider.Gif{Provider: provider.FinerGifs, ID: "f", Title: "F", DownloadURL: "https://media.thefinergifs.club/f.gif"}
+)
+
+// vendorService uses the real vendor allowlist (nil Allow) and never downloads.
+func vendorService(f *platform.Fake) *ActionService {
+	return &ActionService{Platform: f, Staging: &staging.Store{}, Hide: func() { f.Note("hide") },
+		Previous: func() platform.App { return prevApp }, Sleep: func(d time.Duration) { f.Note("sleep:" + d.String()) }}
+}
+
+func TestCopyTextMarkdown(t *testing.T) {
+	for title, want := range map[string]string{
+		"Cat [x]\nnap\\": `![Cat \[x\] nap\\](https://media.giphy.com/media/a/giphy.gif)`,
+		" \t":            `![GIF](https://media.giphy.com/media/a/giphy.gif)`,
+	} {
+		f := &platform.Fake{}
+		g := giphyGif
+		g.Title = title
+		r, err := vendorService(f).CopyText(context.Background(), g, "markdown")
+		if err != nil || r.Message != "Copied Markdown" || !r.Copied {
+			t.Fatalf("%q: %+v, %v", title, r, err)
+		}
+		if w := []string{"CopyText:" + want}; !slices.Equal(f.Calls, w) {
+			t.Errorf("%q: calls = %q, want %q", title, f.Calls, w)
+		}
+	}
+}
+
+func TestCopyTextPage(t *testing.T) {
+	f := &platform.Fake{}
+	r, err := vendorService(f).CopyText(context.Background(), giphyGif, "page")
+	if err != nil || r.Message != "Copied page link" {
+		t.Fatalf("%+v, %v", r, err)
+	}
+	if w := []string{"CopyText:https://giphy.com/gifs/x"}; !slices.Equal(f.Calls, w) {
+		t.Errorf("calls = %q, want %q", f.Calls, w)
+	}
+	evil := giphyGif
+	evil.PageURL = "https://evil.example/gifs/x"
+	klipyPage := klipyGif
+	klipyPage.PageURL = "https://giphy.com/gifs/x" // only GIPHY and Clips have pages
+	for _, g := range []provider.Gif{klipyGif, finerGif, evil, klipyPage} {
+		f := &platform.Fake{}
+		if _, err := vendorService(f).CopyText(context.Background(), g, "page"); actionKind(err) != "no_page" || len(f.Calls) != 0 {
+			t.Errorf("%s %q: err = %v, calls = %q; want no_page and no calls", g.Provider, g.PageURL, err, f.Calls)
+		}
+	}
+}
+
+// D-18: a Clip's link is its GIF rendition with the query removed, never the MP4.
+func TestCopyTextClipLink(t *testing.T) {
+	clip := provider.Gif{Provider: provider.Clips, ID: "c", IsClip: true, DownloadURL: "https://media.giphy.com/c.mp4", GifURL: "https://media.giphy.com/c/giphy.gif?cid=9"}
+	f := &platform.Fake{}
+	if _, err := vendorService(f).CopyText(context.Background(), clip, "link"); err != nil {
+		t.Fatal(err)
+	}
+	if w := []string{"CopyText:https://media.giphy.com/c/giphy.gif"}; !slices.Equal(f.Calls, w) {
+		t.Errorf("calls = %q, want %q", f.Calls, w)
+	}
+	clip.GifURL = ""
+	f = &platform.Fake{}
+	if _, err := vendorService(f).CopyText(context.Background(), clip, "markdown"); actionKind(err) != "no_link" || len(f.Calls) != 0 {
+		t.Errorf("clip without GifURL: err = %v, calls = %q; want no_link", err, f.Calls)
+	}
+}
+
+func TestCopyTextUnknownKind(t *testing.T) {
+	f := &platform.Fake{}
+	if _, err := vendorService(f).CopyText(context.Background(), giphyGif, "file:///etc/passwd"); actionKind(err) != "not_allowed" || len(f.Calls) != 0 {
+		t.Errorf("err = %v, calls = %q; want not_allowed", err, f.Calls)
+	}
+}
+
+func TestPasteTextTrusted(t *testing.T) {
+	for kind, msg := range map[string]string{"link": "Pasted link", "markdown": "Pasted Markdown"} {
+		f := &platform.Fake{Trusted: true, Frontmost: prevApp}
+		r, err := vendorService(f).PasteText(context.Background(), giphyGif, kind)
+		if err != nil || !r.Copied || !r.Pasted || r.Message != msg {
+			t.Fatalf("%s: %+v, %v", kind, r, err)
+		}
+		if len(f.Calls) == 0 || !strings.HasPrefix(f.Calls[0], "CopyText:") {
+			t.Fatalf("%s: calls = %q", kind, f.Calls)
+		}
+		want := []string{"AccessibilityTrusted:false", "hide", "sleep:80ms", "FrontmostApp", "PasteShortcut"}
+		if !slices.Equal(f.Calls[1:], want) {
+			t.Errorf("%s: calls = %q, want CopyText then %q", kind, f.Calls, want)
+		}
+	}
+	f := &platform.Fake{Trusted: true, Frontmost: prevApp}
+	if _, err := vendorService(f).PasteText(context.Background(), giphyGif, "page"); actionKind(err) != "not_allowed" || len(f.Calls) != 0 {
+		t.Errorf("PasteText page: err = %v, calls = %q; want not_allowed", err, f.Calls)
+	}
+}
+
+func TestPasteTextWithoutAccessibility(t *testing.T) {
+	f := &platform.Fake{}
+	r, err := vendorService(f).PasteText(context.Background(), giphyGif, "link")
+	if err != nil || !r.Copied || r.Pasted || !r.NeedsAccessibility || !strings.Contains(r.Message, "Enable Automatic Paste…") {
+		t.Errorf("%+v, %v; want copied only with the T5a message", r, err)
+	}
+	if slices.Contains(f.Calls, "hide") || slices.Contains(f.Calls, "PasteShortcut") {
+		t.Errorf("calls = %q", f.Calls)
+	}
+}
+
+func TestOpenPage(t *testing.T) {
+	f := &platform.Fake{}
+	if err := vendorService(f).OpenPage(context.Background(), giphyGif); err != nil {
+		t.Fatal(err)
+	}
+	if w := []string{"OpenURL:https://giphy.com/gifs/x"}; !slices.Equal(f.Calls, w) {
+		t.Errorf("calls = %q, want %q", f.Calls, w)
+	}
+	for _, g := range []provider.Gif{klipyGif, finerGif, {Provider: provider.GIPHY, PageURL: "javascript:alert(1)"}} {
+		f := &platform.Fake{}
+		if err := vendorService(f).OpenPage(context.Background(), g); actionKind(err) != "no_page" || len(f.Calls) != 0 {
+			t.Errorf("%s %q: err = %v, calls = %q; want no_page", g.Provider, g.PageURL, err, f.Calls)
+		}
+	}
+	f = &platform.Fake{OpenErr: errors.New("no browser")}
+	if err := vendorService(f).OpenPage(context.Background(), giphyGif); actionKind(err) != "open_failed" {
+		t.Errorf("err = %v, want open_failed", err)
+	}
+}
+
+func TestOpenSource(t *testing.T) {
+	f := &platform.Fake{}
+	g := giphyGif
+	g.SourceURL = "https://example.org/a"
+	if err := vendorService(f).OpenSource(context.Background(), g); err != nil {
+		t.Fatal(err)
+	}
+	if w := []string{"OpenURL:https://example.org/a"}; !slices.Equal(f.Calls, w) {
+		t.Errorf("calls = %q, want %q", f.Calls, w)
+	}
+	for _, src := range []string{"", "http://example.org/a", "file:///etc/passwd", "https://"} {
+		f := &platform.Fake{}
+		g.SourceURL = src
+		if err := vendorService(f).OpenSource(context.Background(), g); actionKind(err) != "no_page" || len(f.Calls) != 0 {
+			t.Errorf("%q: err = %v, calls = %q; want no_page", src, err, f.Calls)
+		}
+	}
+}
+
+func TestTextActionsRefuseWhileBusy(t *testing.T) {
+	f := &platform.Fake{Trusted: true}
+	s := vendorService(f)
+	s.busy.Lock()
+	defer s.busy.Unlock()
+	if _, err := s.PasteText(context.Background(), giphyGif, "link"); !errors.Is(err, ErrBusy) {
+		t.Errorf("PasteText err = %v", err)
+	}
+	if err := s.OpenPage(context.Background(), giphyGif); !errors.Is(err, ErrBusy) {
+		t.Errorf("OpenPage err = %v", err)
+	}
+	if err := s.OpenSource(context.Background(), giphyGif); !errors.Is(err, ErrBusy) {
+		t.Errorf("OpenSource err = %v", err)
+	}
+	if len(f.Calls) != 0 {
+		t.Errorf("calls = %q", f.Calls)
 	}
 }

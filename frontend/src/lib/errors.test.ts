@@ -162,3 +162,10 @@ test('action error rows F1 and F3 come from the kind, never the error text', () 
   assert.equal(actionErrorText('not_media', g), "The Finer Gifs Club sent something that isn't a GIF. Nothing was saved. Try another GIF.");
   assert.equal(actionErrorText('not_media', { ...g, provider: 'klipy' }), "Klipy sent something that isn't a GIF. Nothing was saved. Try another GIF.");
 });
+
+test('page errors show F8 and a missing link shows F1', () => {
+  const g = { provider: 'giphy' } as Parameters<typeof actionErrorText>[1];
+  assert.equal(actionErrorText('no_page', g), "Couldn't open the page in your browser.");
+  assert.equal(actionErrorText('open_failed', g), "Couldn't open the page in your browser.");
+  assert.equal(actionErrorText('no_link', g), "Couldn't copy this GIF. The download failed. Try again or pick another GIF.");
+});

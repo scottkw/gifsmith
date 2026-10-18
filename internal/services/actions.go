@@ -175,6 +175,17 @@ func (a *ActionService) linkFor(g provider.Gif) (string, error) {
 	return u.String(), nil
 }
 
+// PasteText copies text like CopyText, then pastes it like Paste. kind: link | markdown.
+func (a *ActionService) PasteText(ctx context.Context, g provider.Gif, kind string) (Result, error) {
+	return Result{}, nil
+}
+
+// OpenPage opens the item's GIPHY page in the default browser.
+func (a *ActionService) OpenPage(ctx context.Context, g provider.Gif) error { return nil }
+
+// OpenSource opens the item's https source page in the default browser.
+func (a *ActionService) OpenSource(ctx context.Context, g provider.Gif) error { return nil }
+
 // RequestAccessibility raises the macOS prompt and, if still untrusted, opens the settings pane.
 // Only an explicit button click calls this.
 func (a *ActionService) RequestAccessibility(ctx context.Context) (bool, error) {
