@@ -397,3 +397,8 @@ func (a *ActionService) ShowDownload(ctx context.Context) error {
 	log.Printf("show download: revealed")
 	return nil
 }
+
+// CopySquare puts a center-cropped square copy of the GIF on the clipboard as a file (D-16).
+func (a *ActionService) CopySquare(ctx context.Context, g provider.Gif) (Result, error) {
+	return Result{}, actionErr("download_failed") // RED skeleton
+}

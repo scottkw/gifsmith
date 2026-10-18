@@ -560,3 +560,45 @@ func TestSaveAnyFolderHideName(t *testing.T) {
 		t.Errorf("Save(hide) = %q, %v; want gifsmith-office-1.gif in the chosen folder", p, err)
 	}
 }
+
+func TestFetchMaxCap(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	if _, err := s.FetchMax(context.Background(), gif(base, "office-1", "big"), 64); !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("FetchMax(64) err = %v, want ErrTooLarge", err)
+	}
+	if e := entries(t, s.Dir); len(e) != 0 {
+		t.Errorf("Dir not empty after an oversized download: %q", e)
+	}
+	p, err := s.FetchMax(context.Background(), gif(base, "office-1", "Office moment 1"), 1<<20)
+	if err != nil || !strings.HasSuffix(p, "office-moment-1.gif") {
+		t.Fatalf("FetchMax(1 MB) = %q, %v", p, err)
+	}
+}
+
+func TestWriteDerived(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	g := gif(base, "office-1", "Office moment 1")
+	orig, err := s.Fetch(context.Background(), g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := s.WriteDerived(g, "square", []byte("GIF89a-derived"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rel, _ := filepath.Rel(s.Dir, p)
+	if ok, _ := regexp.MatchString(`^[0-9a-f]{16}/office-moment-1-square\.gif$`, filepath.ToSlash(rel)); !ok {
+		t.Errorf("derived at %q, want <16 hex>/office-moment-1-square.gif under Dir", rel)
+	}
+	if filepath.Dir(p) == filepath.Dir(orig) {
+		t.Error("derived file shares the original's directory: Sweep(derived) would keep the original")
+	}
+	if b, err := os.ReadFile(p); err != nil || string(b) != "GIF89a-derived" {
+		t.Errorf("derived bytes = %q, %v", b, err)
+	}
+	for _, e := range entries(t, s.Dir) {
+		if strings.HasSuffix(e, ".part") {
+			t.Errorf("leftover %s", e)
+		}
+	}
+}

@@ -75,6 +75,10 @@ func finerSearch(w http.ResponseWriter, r *http.Request, o Options) {
 		prefix = "broken-"
 	} else if hasWord(q.Get("q"), "htmlmedia") {
 		prefix = "html-"
+	} else if hasWord(q.Get("q"), "widemedia") { // 48x32 media (square crop)
+		prefix = "wide-"
+	} else if hasWord(q.Get("q"), "tallmedia") { // 32x48 media
+		prefix = "tall-"
 	}
 	results := []result{}
 	for n := max(start, 0) + 1; n <= found && len(results) < size; n++ {
@@ -301,6 +305,7 @@ var mp4 = []byte("\x00\x00\x00\x18ftypisom\x00\x00\x02\x00isommp41")
 
 // media serves a tiny 2-frame animated GIF whose colour is derived from the file name, or for
 // .mp4 names the ftyp fixture. Names starting "broken" answer 500; "html" an HTML page with 200.
+// GIFs are 32x32; names starting "wide" are 48x32 and "tall" 32x48 (square crop fixtures).
 func media(w http.ResponseWriter, r *http.Request) {
 	file := r.PathValue("file")
 	ext := path.Ext(file)
@@ -328,11 +333,17 @@ func media(w http.ResponseWriter, r *http.Request) {
 	sum := h.Sum32()
 	c1 := color.RGBA{uint8(sum), uint8(sum >> 8), uint8(sum >> 16), 255}
 	c2 := color.RGBA{255 - c1.R, 255 - c1.G, 255 - c1.B, 255}
+	wd, ht := 32, 32
+	if strings.HasPrefix(name, "wide") {
+		wd = 48
+	} else if strings.HasPrefix(name, "tall") {
+		ht = 48
+	}
 	anim := &gif.GIF{}
 	for _, fg := range []color.RGBA{c1, c2} {
-		img := image.NewPaletted(image.Rect(0, 0, 32, 32), color.Palette{fg, color.White})
+		img := image.NewPaletted(image.Rect(0, 0, wd, ht), color.Palette{fg, color.White})
 		for y := 12; y < 20; y++ { // a white bar so the frames differ visibly even for similar colours
-			for x := 0; x < 32; x++ {
+			for x := 0; x < wd; x++ {
 				img.SetColorIndex(x, y, 1)
 			}
 		}

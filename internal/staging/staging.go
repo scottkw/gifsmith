@@ -86,6 +86,16 @@ func (s *Store) Fetch(ctx context.Context, g provider.Gif) (string, error) {
 	return "", err
 }
 
+// FetchMax is Fetch with a byte cap of max: a larger download is ErrTooLarge.
+func (s *Store) FetchMax(ctx context.Context, g provider.Gif, max int64) (string, error) {
+	return "", ErrDownload // RED skeleton
+}
+
+// WriteDerived stages b, a file made from g (variant "square"), in its own hash directory.
+func (s *Store) WriteDerived(g provider.Gif, variant string, b []byte) (string, error) {
+	return "", ErrDownload // RED skeleton
+}
+
 // Save downloads g into dir as <FileStem><ext>, then "<stem> (2)<ext>", " (3)"… and returns the
 // path. It never overwrites, never creates dir, and never leaves a partial file under a final name:
 // the body goes to a hidden temp file that os.Link claims under the first free name.

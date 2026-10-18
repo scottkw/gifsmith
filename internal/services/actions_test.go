@@ -2,8 +2,11 @@ package services
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"image/gif"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -918,5 +921,57 @@ func TestShowDownloadRefusesWhileBusy(t *testing.T) {
 	}
 	if len(f.Calls) != 0 {
 		t.Errorf("calls = %q, want none", f.Calls)
+	}
+}
+
+// squareOf is the fixture item renamed to a fakeapi media file (wide-*: 48x32, tall-*: 32x48).
+func squareOf(g provider.Gif, name string) provider.Gif {
+	base, _, _ := strings.Cut(g.DownloadURL, "/media/")
+	g.ID, g.Title, g.DownloadURL = name, "Wide moment 1", base+"/media/"+name+".gif"
+	return g
+}
+
+func TestCopySquare(t *testing.T) {
+	f := &platform.Fake{}
+	s, fx := newService(t, f)
+	g := squareOf(fx.gif, "wide-1")
+	r, err := s.CopySquare(context.Background(), g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.Copied || r.Message != "Copied square GIF — press ⌘V to paste" {
+		t.Errorf("result = %+v, want Copied with the T1s message", r)
+	}
+	path := stagedPath(t, f)
+	if len(f.Calls) != 1 || !strings.HasSuffix(path, "-square.gif") {
+		t.Fatalf("calls = %q, want one CopyFile of a *-square.gif", f.Calls)
+	}
+	sum := sha1.Sum([]byte(string(g.Provider) + ":" + g.ID))
+	if filepath.Base(filepath.Dir(path)) == hex.EncodeToString(sum[:])[:16] {
+		t.Error("square file staged in the original's hash directory")
+	}
+	if ents, _ := os.ReadDir(fx.dir); len(ents) != 1 || ents[0].Name() != filepath.Base(filepath.Dir(path)) {
+		t.Errorf("staging holds %d entries, want only the square file's directory", len(ents))
+	}
+	fh, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fh.Close()
+	out, err := gif.DecodeAll(fh)
+	if err != nil || out.Config.Width != 32 || out.Config.Height != 32 || len(out.Image) != 2 {
+		t.Fatalf("staged square: %v, want a 32x32 two-frame GIF (got %+v)", err, out)
+	}
+}
+
+func TestCopySquareRefusesClips(t *testing.T) {
+	f := &platform.Fake{}
+	s, fx := newService(t, f)
+	_, err := s.CopySquare(context.Background(), clipOf(fx.gif, "clip-1-720p"))
+	if actionKind(err) != "not_allowed" {
+		t.Errorf("err = %v, want kind not_allowed", err)
+	}
+	if n := fx.hits.Load(); n != 0 || len(f.Calls) != 0 {
+		t.Errorf("a Clip square crop made %d requests and calls %q, want none", n, f.Calls)
 	}
 }
