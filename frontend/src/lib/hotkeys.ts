@@ -4,6 +4,8 @@ export type KeyLike = { key: string; code: string; ctrlKey: boolean; altKey: boo
 export type Recorded = { kind: 'accel'; accel: string } | { kind: 'held'; glyphs: string } | { kind: 'no_modifier' } | { kind: 'unsupported' };
 
 export const DEFAULT_OPEN = 'Cmd+Ctrl+Option+G';
+export type Slot = 'open' | 'favorites' | 'recents';
+export const SLOT_LABELS: Record<Slot, string> = { open: 'Open Gifsmith', favorites: 'Open Favorites', recents: 'Open Recents' };
 
 // Display order ⌃⌥⇧⌘, each with its Wails modifier name.
 const MODS = [

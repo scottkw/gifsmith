@@ -36,6 +36,10 @@ await saveScreenshot(await B.screenshot(), "gifsmith-17-hotkeys-default.png");
 // Record ⌃⌥⌘H: the field shows the new combo only after Go accepted it.
 await open.click();
 await waitText(open, "Type shortcut…");
+// No ⌘/⌥/⌃: H1, and the field keeps recording.
+await B.keyboard.press("KeyH");
+await B.getByText("Include ⌘, ⌥ or ⌃ in the shortcut.").waitFor({ timeout: 3000 });
+await waitText(open, "Type shortcut…");
 await B.keyboard.down("Control");
 await B.keyboard.down("Alt");
 await B.keyboard.down("Meta");
@@ -46,6 +50,7 @@ await B.keyboard.up("Alt");
 await B.keyboard.up("Control");
 await waitText(open, "⌃⌥⌘H");
 if (await reset.isDisabled()) fail("Reset to Default disabled after a rebind");
+if (await B.getByText("Include ⌘, ⌥ or ⌃ in the shortcut.").count()) fail("H1 still shown after a successful rebind");
 await saveScreenshot(await B.screenshot(), "gifsmith-17-hotkeys-rebound.png");
 
 // Persisted: a reload reads it back from Go.

@@ -3,6 +3,7 @@
 package settings
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"log"
@@ -280,6 +281,33 @@ func (p *Prefs) Normalize() []string {
 	if p.KlipyCountry != "" && !slices.Contains(klipy.Countries, p.KlipyCountry) {
 		p.KlipyCountry = ""
 		reset = append(reset, "klipyCountry")
+	}
+	return append(reset, p.Hotkeys.normalize()...)
+}
+
+// normalize canonicalises each binding and resets one that is invalid, a macOS shortcut or a
+// duplicate of an earlier slot (Open, which defaults to ⌃⌥⌘G, then Favorites, then Recents).
+func (h *Hotkeys) normalize() []string {
+	var reset, taken []string
+	for _, f := range []struct {
+		name string
+		v    *string
+		def  string
+	}{{"hotkeys.open", &h.Open, DefaultOpenHotkey}, {"hotkeys.favorites", &h.Favorites, ""}, {"hotkeys.recents", &h.Recents, ""}} {
+		if *f.v != "" {
+			c, err := CanonicalHotkey(*f.v)
+			if err != nil || slices.Contains(taken, c) {
+				c = ""
+				reset = append(reset, f.name)
+			}
+			*f.v = c
+		}
+		if eff := cmp.Or(*f.v, f.def); eff != "" {
+			taken = append(taken, eff)
+		}
+	}
+	if h.Open == DefaultOpenHotkey {
+		h.Open = ""
 	}
 	return reset
 }

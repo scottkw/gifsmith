@@ -1,6 +1,7 @@
 // Provider error -> UI-SPEC copy rows (E1–E5f, E2, E6). No Svelte or DOM imports so node --test can
 // load it. Copy is built only from the provider name and the HTTP status: never a URL, body or key.
 import type { Gif, ProviderErr } from './api';
+import { glyphs } from './hotkeys.ts';
 
 export type ErrorState = { id: 'E1' | 'E3' | 'E4' | 'E5' | 'E5f'; heading: string; body: string; tryAgain: boolean; retryAt?: number };
 
@@ -134,7 +135,22 @@ export const keySavedText = (providerLabel: string) => `Saved. ${providerLabel} 
 export const keyRemovedText = (providerLabel: string) => `Removed. Add a key to use ${providerLabel} again.`;
 export const keyRemoveFailedText = () => "Couldn't remove the key from the macOS Keychain. Try again.";
 
-// Hotkeys pane H1–H4b, H7, keyed by Go's SettingsError kind ('test_failed' = H7).
+// Hotkeys pane H1–H4b, H7, keyed by Go's SettingsError kind ('test_failed' = H7); the combo shows as glyphs.
 export function hotkeyErrorText(kind: string, accel: string, otherSlotLabel: string): string {
-  return '';
+  const combo = glyphs(accel);
+  switch (kind) {
+    case 'hotkey_no_modifier':
+      return 'Include ⌘, ⌥ or ⌃ in the shortcut.';
+    case 'hotkey_duplicate':
+      return `${combo} is already used for ${otherSlotLabel}.`;
+    case 'hotkey_system':
+      return `${combo} is a macOS shortcut. Choose another one.`;
+    case 'hotkey_register_failed':
+      return `macOS couldn't register ${combo}. Your previous shortcut still works.`;
+    case 'hotkey_register_failed_new':
+      return `macOS couldn't register ${combo}. Try a different shortcut.`;
+    case 'test_failed':
+      return `Nothing happened. Another app may be using ${combo}. Try a different shortcut.`;
+  }
+  return "Couldn't save this setting. Try again.";
 }

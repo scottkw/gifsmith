@@ -53,7 +53,8 @@ func wire() deps {
 		// Never the real login item; FAKE_AUTOSTART=fail makes Enable/Disable fail (UAT G2).
 		Autostart: &memAutostart{fail: os.Getenv("FAKE_AUTOSTART") == "fail"},
 		// Server builds have no global shortcuts; this records bindings and never fires.
-		Registrar: &memRegistrar{bound: map[string]bool{}},
+		// FAKE_HOTKEY_FAIL=<accelerator> makes that combo fail to register (UAT H4).
+		Registrar: &memRegistrar{bound: map[string]bool{}, fail: fakeHotkeyFail()},
 	}
 }
 
@@ -61,11 +62,27 @@ func wire() deps {
 type memRegistrar struct {
 	mu    sync.Mutex
 	bound map[string]bool
+	fail  string // canonical; "" = none
+}
+
+func fakeHotkeyFail() string {
+	v := os.Getenv("FAKE_HOTKEY_FAIL")
+	if v == "" {
+		return ""
+	}
+	c, err := settings.CanonicalHotkey(v)
+	if err != nil {
+		log.Fatalf("FAKE_HOTKEY_FAIL=%q: %v", v, err)
+	}
+	return c
 }
 
 func (r *memRegistrar) Register(accel string, _ func()) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if accel == r.fail {
+		return errors.New("RegisterEventHotKey failed (OSStatus -9878)")
+	}
 	if r.bound[accel] {
 		return fmt.Errorf("global shortcut %q is already registered", accel)
 	}

@@ -3,7 +3,7 @@
   // the whole recording so the current combo is captured, not fired; every way out resumes them.
   // The field shows a new combo only after Go registered it.
   import { resumeHotkeys, setHotkey, settingsError, suspendHotkeys, type SettingsSnapshot } from '../lib/api';
-  import { accelFromEvent, glyphs } from '../lib/hotkeys';
+  import { accelFromEvent, canonical, DENYLIST, glyphs, type Slot } from '../lib/hotkeys';
 
   let {
     slot,
@@ -13,7 +13,7 @@
     onsaved,
     onfail,
   }: {
-    slot: string;
+    slot: Slot;
     label: string;
     value: string; // canonical accelerator, '' = not set
     describedby: string;
@@ -44,6 +44,7 @@
     saving = true;
     try {
       onsaved(await setHotkey(slot, accel));
+      onfail('', '', '');
     } catch (err) {
       const se = settingsError(err);
       onfail(se?.kind ?? 'hotkey_register_failed', accel, se?.slot ?? '');
@@ -66,9 +67,17 @@
     e.preventDefault();
     if (saving) return;
     if (e.key === 'Escape' && !mods) return stop();
+    if ((e.key === 'Backspace' || e.key === 'Delete') && !mods) {
+      if (slot !== 'open') save(''); // Open Gifsmith can only be reset, never cleared
+      return;
+    }
     const r = accelFromEvent(e);
     if (r.kind === 'held') held = r.glyphs;
-    else if (r.kind === 'accel') save(r.accel);
+    else if (r.kind === 'no_modifier') onfail('hotkey_no_modifier', '', ''); // H1, still recording
+    else if (r.kind === 'accel' && DENYLIST.has(canonical(r.accel))) {
+      onfail('hotkey_system', r.accel, '');
+      stop();
+    } else if (r.kind === 'accel') save(r.accel);
   }
 
   function onkeyup(e: KeyboardEvent) {

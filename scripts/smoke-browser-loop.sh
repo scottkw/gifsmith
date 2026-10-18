@@ -8,7 +8,8 @@
 #   scripts/smoke-browser-loop.sh --uat <file.js> start both, run the dev-browser script headless, need "UAT OK"
 #
 # FAKE_FINER=down (and FAKE_CLIPS, from plan 02-06) pass through to the fixture server;
-# FAKE_AUTOSTART=fail makes the server build's in-memory login item fail.
+# FAKE_AUTOSTART=fail makes the server build's in-memory login item fail; FAKE_HOTKEY_FAIL=<accelerator>
+# makes that combo fail to register with the server build's fake Registrar.
 # UAT_SEED_FAVORITES='<bytes>' seeds bin/uat-config/favorites.json (e.g. a corrupt file); a --uat
 # run then also fails if the app changed that file (an unreadable library file is never overwritten).
 set -euo pipefail
@@ -36,6 +37,7 @@ if [ -n "$UAT_SCRIPT" ]; then
   RUN_VIA=$(sed -n 2p "$UAT_SCRIPT")
   case "$RUN_VIA" in *FAKE_CLIPS=denied*) : "${FAKE_CLIPS:=denied}" ;; esac
   case "$RUN_VIA" in *FAKE_AUTOSTART=fail*) : "${FAKE_AUTOSTART:=fail}" ;; esac
+  case "$RUN_VIA" in *FAKE_HOTKEY_FAIL=*) : "${FAKE_HOTKEY_FAIL:=$(sed -E 's/.*FAKE_HOTKEY_FAIL=([^ ]+).*/\1/' <<<"$RUN_VIA")}" ;; esac
   case "$RUN_VIA" in *"UAT_SEED_FAVORITES='{not json'"*) : "${UAT_SEED_FAVORITES:={not json}" ;; esac
 fi
 
@@ -75,7 +77,7 @@ cleanup() {
 trap cleanup EXIT
 
 WAILS_SERVER_PORT="$SERVER_PORT" FAKE_FINER="${FAKE_FINER:-}" FAKE_CLIPS="${FAKE_CLIPS:-}" FAKE_AUTOSTART="${FAKE_AUTOSTART:-}" \
-  bin/gifsmith-server >bin/smoke-server.log 2>&1 &
+  FAKE_HOTKEY_FAIL="${FAKE_HOTKEY_FAIL:-}" bin/gifsmith-server >bin/smoke-server.log 2>&1 &
 PIDS+=("$!")
 # exec so the recorded PID is vite itself, not a wrapper subshell.
 (cd frontend && GIFSMITH_BACKEND="http://localhost:$SERVER_PORT" WAILS_VITE_PORT="$VITE_PORT" \

@@ -3,14 +3,14 @@
   // registration; a row shows a new combo only once Go accepted it.
   import { Events } from '@wailsio/runtime';
   import { onMount, untrack } from 'svelte';
-  import { setHotkey, type SettingsSnapshot } from '../lib/api';
-  import { canonical, DEFAULT_OPEN, glyphs } from '../lib/hotkeys';
+  import { setHotkey, settingsError, type SettingsSnapshot } from '../lib/api';
+  import { hotkeyErrorText } from '../lib/errors';
+  import { canonical, DEFAULT_OPEN, SLOT_LABELS, type Slot } from '../lib/hotkeys';
   import HotkeyRecorder from './HotkeyRecorder.svelte';
 
   let { initial }: { initial: SettingsSnapshot } = $props();
 
-  type Slot = 'open';
-  const ROWS: { slot: Slot; label: string }[] = [{ slot: 'open', label: 'Open Gifsmith' }];
+  const ROWS: { slot: Slot; label: string }[] = [{ slot: 'open', label: SLOT_LABELS.open }];
 
   let hk = $state(untrack(() => ({ ...initial.hotkeys })));
   let msg = $state<Record<string, { text: string; tone: 'secondary' | 'success' | 'error' }>>({});
@@ -21,16 +21,19 @@
     hk = { ...s.hotkeys };
   }
 
-  function fail(slot: Slot, kind: string, accel: string) {
-    msg[slot] = kind ? { text: `Couldn't set ${glyphs(accel)}. Your previous shortcut still works.`, tone: 'error' } : { text: '', tone: 'secondary' };
+  // '' clears the row's message; otherwise H1–H4b under the row. The field keeps its combo either way.
+  function fail(slot: Slot, kind: string, accel: string, other = '') {
+    const text = kind ? hotkeyErrorText(kind, accel, SLOT_LABELS[other as Slot] ?? '') : '';
+    msg[slot] = { text, tone: kind ? 'error' : 'secondary' };
   }
 
   async function reset() {
     msg.open = { text: '', tone: 'secondary' };
     try {
       saved(await setHotkey('open', DEFAULT_OPEN));
-    } catch {
-      fail('open', 'hotkey_register_failed', DEFAULT_OPEN);
+    } catch (err) {
+      const se = settingsError(err);
+      fail('open', se?.kind ?? 'hotkey_register_failed', DEFAULT_OPEN, se?.slot);
     }
   }
 </script>
@@ -45,7 +48,7 @@
         value={hk[r.slot] ?? ''}
         describedby="hk-{r.slot}-msg"
         onsaved={saved}
-        onfail={(kind, accel) => fail(r.slot, kind, accel)}
+        onfail={(kind, accel, other) => fail(r.slot, kind, accel, other)}
       />
       {#if r.slot === 'open'}
         <button class="btn-secondary" disabled={canonical(hk.open || DEFAULT_OPEN) === DEFAULT_OPEN} onclick={reset}>Reset to Default</button>
