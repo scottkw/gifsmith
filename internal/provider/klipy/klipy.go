@@ -117,7 +117,8 @@ func (c *Client) get(ctx context.Context, kind string, v url.Values, cursor stri
 		return provider.Page{}, &provider.Error{Kind: provider.KeyRejected, Provider: provider.Klipy}
 	}
 	v.Set("page", strconv.Itoa(page))
-	v.Set("per_page", strconv.Itoa(provider.PageSize))
+	prm := provider.ParamsOf(c.Params)
+	v.Set("per_page", strconv.Itoa(min(max(prm.PageSize, 8), 50))) // Klipy accepts 8..50
 	v.Set("content_filter", "medium")
 
 	var r response

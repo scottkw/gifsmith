@@ -81,13 +81,6 @@ func (c *Client) id() provider.ID {
 	return provider.GIPHY
 }
 
-func (c *Client) params() provider.Params {
-	if c.Params == nil {
-		return provider.DefaultParams()
-	}
-	return c.Params()
-}
-
 func (c *Client) bad(status int) error {
 	return &provider.Error{Kind: provider.HTTP, Provider: c.id(), Status: status}
 }
@@ -176,9 +169,10 @@ func (c *Client) get(ctx context.Context, path string, v url.Values, cursor stri
 	if !ok || key == "" {
 		return provider.Page{}, &provider.Error{Kind: provider.KeyMissing, Provider: c.id()}
 	}
-	prm := c.params()
+	prm := provider.ParamsOf(c.Params)
+	limit := min(prm.PageSize, 50)
 	v.Set("api_key", key)
-	v.Set("limit", strconv.Itoa(min(prm.PageSize, 50)))
+	v.Set("limit", strconv.Itoa(limit))
 	v.Set("offset", strconv.Itoa(offset))
 	v.Set("rating", prm.Rating) // always sent: Clips search defaults to R
 	if c.Clips {
@@ -220,7 +214,7 @@ func (c *Client) get(ctx context.Context, path string, v url.Values, cursor stri
 		items = append(items, g)
 	}
 	next := offset + len(items)
-	more := len(items) == provider.PageSize
+	more := len(items) == limit // the size requested, not a constant
 	if total := int(r.Pagination.TotalCount); total > 0 {
 		more = next < total
 	}

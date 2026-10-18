@@ -55,9 +55,6 @@ func ClampID(s string) string {
 	return s[:i]
 }
 
-// PageSize is the requested page size (6 rows of 4); clients clamp it to vendor limits.
-const PageSize = 24
-
 // DefaultPageSize is the page size when the user has not chosen one.
 const DefaultPageSize = 24
 
@@ -79,6 +76,14 @@ var (
 // DefaultParams are the values a fresh install sends.
 func DefaultParams() Params {
 	return Params{PageSize: DefaultPageSize, Rating: "pg-13", Lang: "en", Country: "us"}
+}
+
+// ParamsOf is f's current Params, or DefaultParams when a client has no Params func (tests).
+func ParamsOf(f func() Params) Params {
+	if f == nil {
+		return DefaultParams()
+	}
+	return f()
 }
 
 type Gif struct {

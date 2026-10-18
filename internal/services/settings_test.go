@@ -61,7 +61,7 @@ func newSettings(t *testing.T, base string) settingsFixture {
 	newClient := func(p provider.ID, key string) provider.Provider {
 		k := func() (string, bool) { return key, true }
 		if p == provider.Klipy {
-			return &klipy.Client{BaseURL: base + "/klipy", Key: k, HTTP: hc}
+			return &klipy.Client{BaseURL: base + "/klipy", Key: k, HTTP: hc, Params: params}
 		}
 		return &giphy.Client{BaseURL: base + "/giphy", Key: k, HTTP: hc, Params: params}
 	}
@@ -69,7 +69,7 @@ func newSettings(t *testing.T, base string) settingsFixture {
 	svc := search.New(map[provider.ID]provider.Provider{
 		provider.GIPHY: &giphy.Client{BaseURL: base + "/giphy", Key: keys.Func(provider.GIPHY), HTTP: hc, Params: params},
 		provider.Clips: clipsClient,
-		provider.Klipy: &klipy.Client{BaseURL: base + "/klipy", Key: keys.Func(provider.Klipy), HTTP: hc},
+		provider.Klipy: &klipy.Client{BaseURL: base + "/klipy", Key: keys.Func(provider.Klipy), HTTP: hc, Params: params},
 	}, nil)
 	var probes atomic.Int32
 	clips := &search.Clips{

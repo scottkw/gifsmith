@@ -52,11 +52,12 @@ func (c *Client) Search(ctx context.Context, q, cursor string) (provider.Page, e
 		}
 		start = n
 	}
+	size := provider.ParamsOf(c.Params).PageSize
 	v := url.Values{
 		"q":        {q},
 		"q.parser": {"simple"},
 		"sort":     {"_score desc"},
-		"size":     {strconv.Itoa(provider.PageSize)},
+		"size":     {strconv.Itoa(size)},
 		"start":    {strconv.Itoa(start)},
 	}
 	var r response
@@ -81,7 +82,7 @@ func (c *Client) Search(ctx context.Context, q, cursor string) (provider.Page, e
 		items = append(items, provider.Gif{Provider: provider.FinerGifs, ID: provider.ClampID(f.Fileid), Title: provider.ClampTitle(title), PreviewURL: u, DownloadURL: u})
 	}
 	next := start + len(items)
-	more := len(items) == provider.PageSize
+	more := len(items) == size
 	if r.Hits != nil {
 		more = next < r.Hits.Found
 	}

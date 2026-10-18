@@ -65,8 +65,8 @@ func main() {
 	svc := search.New(map[provider.ID]provider.Provider{
 		provider.GIPHY:     &giphy.Client{BaseURL: d.GiphyBase, Key: keys.Func(provider.GIPHY), HTTP: d.HTTP, Params: params},
 		provider.Clips:     clipsClient,
-		provider.Klipy:     &klipy.Client{BaseURL: d.KlipyBase, Key: keys.Func(provider.Klipy), HTTP: d.HTTP},
-		provider.FinerGifs: &finergifs.Client{BaseURL: d.FinerBase, MediaBase: d.FinerMedia, HTTP: d.HTTP},
+		provider.Klipy:     &klipy.Client{BaseURL: d.KlipyBase, Key: keys.Func(provider.Klipy), HTTP: d.HTTP, Params: params},
+		provider.FinerGifs: &finergifs.Client{BaseURL: d.FinerBase, MediaBase: d.FinerMedia, HTTP: d.HTTP, Params: params},
 	}, nil)
 	clips := &search.Clips{
 		// Same key, same 429 budget as GIPHY GIFs: a probe 429 blocks both.
@@ -81,7 +81,7 @@ func main() {
 	settingsSvc = &services.SettingsService{Keys: keys, Store: store, Platform: plat, Executable: os.Executable, Svc: svc, Clips: clips, NewClient: func(p provider.ID, key string) provider.Provider {
 		candidate := func() (string, bool) { return key, true }
 		if p == provider.Klipy {
-			return &klipy.Client{BaseURL: d.KlipyBase, Key: candidate, HTTP: d.HTTP}
+			return &klipy.Client{BaseURL: d.KlipyBase, Key: candidate, HTTP: d.HTTP, Params: params}
 		}
 		return &giphy.Client{BaseURL: d.GiphyBase, Key: candidate, HTTP: d.HTTP, Params: params}
 	}}
