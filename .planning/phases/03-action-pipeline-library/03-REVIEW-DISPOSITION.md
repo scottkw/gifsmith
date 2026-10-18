@@ -5,7 +5,7 @@ titles: json
 findings:
   - id: CR-01
     severity: critical
-    disposition: open
+    disposition: fixed
     title: "The decode budget counts only `w*h`, so zero-pixel transparent frames still turn a 15 MB GIF into about 4 GB of live heap and 9 GB of process memory"
   - id: IN-01
     severity: info
@@ -56,7 +56,7 @@ recorded: 2026-10-18T17:44:26.582Z
 
 | Finding | Severity | Disposition | Source |
 |---------|----------|-------------|--------|
-| CR-01 | critical | open | - |
+| CR-01 | critical | fixed | 6928379, 39d5c97 (frameOverhead per frame; verifier confirmed closed) |
 | IN-01 | info | open | - |
 | IN-02 | info | open | - |
 | IN-03 | info | open | - |

@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Native Spike & Signed Dev Loop** - Hard go/no-go gate: hotkey panel → copy GIF file → paste into TextEdit, from signed and notarized builds (completed 2026-10-17)
 - [x] **Phase 2: Providers, Search UI & First Run** - Vertical slice: search/trending → animated grid → copy, across Finer Gifs, GIPHY, Klipy (and Clips), with key setup and attribution (completed 2026-10-17)
-- [ ] **Phase 3: Action Pipeline & Library** - Every extension action (link, Markdown, download, square crop, ⌘K menu) plus favorites, recents, details, and recent searches
+- [x] **Phase 3: Action Pipeline & Library** - Every extension action (link, Markdown, download, square crop, ⌘K menu) plus favorites, recents, details, and recent searches (completed 2026-10-18)
 - [ ] **Phase 4: Settings, Shell Polish & Release** - Settings window, rebindable hotkeys, launch at login, then a signed, notarized DMG that installs on a clean Mac
 
 ## Phase Details
@@ -104,7 +104,7 @@ Plans:
   4. The user can add or remove a favorite, and every successful copy or paste appears in Recents (most recent first, capped). Favorites and Recents are browsable grouped by provider (never blended), items can be removed from Recents, and both render from saved metadata with no API calls.
   5. The user can open a details view for a GIF (title, size, dimensions, tags, source links), and an empty search box shows recent searches that can be rerun.
 
-**Plans:** 8/8 plans executed
+**Plans:** 8/8 plans complete
 
 Plans:
 **Wave 1**
@@ -164,5 +164,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Native Spike & Signed Dev Loop | 4/4 | Complete    | 2026-10-17 |
 | 2. Providers, Search UI & First Run | 6/6 | Complete    | 2026-10-17 |
-| 3. Action Pipeline & Library | 8/8 | In Progress | - |
+| 3. Action Pipeline & Library | 8/8 | Complete    | 2026-10-18 |
 | 4. Settings, Shell Polish & Release | 0/TBD | Not started | - |
