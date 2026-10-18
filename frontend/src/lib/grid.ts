@@ -2,7 +2,19 @@
 export const COLS = 4;
 
 export type Direction = 'left' | 'right' | 'up' | 'down';
-export type KeyAction = Direction | 'copy' | 'paste' | 'escape' | 'actions' | 'tab' | 'slot1' | 'slot2' | 'slot3' | 'slot4' | 'none';
+export type KeyAction =
+  | Direction
+  | 'copy'
+  | 'paste'
+  | 'copyLink'
+  | 'escape'
+  | 'actions'
+  | 'tab'
+  | 'slot1'
+  | 'slot2'
+  | 'slot3'
+  | 'slot4'
+  | 'none';
 
 // ← → wrap across rows and clamp at the ends; ↑ on the first row stays; ↓ with no tile directly
 // below goes to the last tile when it sits on a later row.
@@ -29,7 +41,14 @@ export function nearEnd(index: number, count: number): boolean {
 
 const ARROWS: Record<string, Direction> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
 
-export function routeKey(e: { key: string; metaKey: boolean; isComposing: boolean; keyCode: number; repeat: boolean }): KeyAction {
+export function routeKey(e: {
+  key: string;
+  metaKey: boolean;
+  shiftKey: boolean;
+  isComposing: boolean;
+  keyCode: number;
+  repeat: boolean;
+}): KeyAction {
   // Keys inside an open IME composition (WebKit: keyCode 229) belong to the IME: arrows pick
   // candidates, Enter commits, Esc cancels.
   if (e.isComposing || e.keyCode === 229) return 'none';
@@ -37,6 +56,8 @@ export function routeKey(e: { key: string; metaKey: boolean; isComposing: boolea
   if (e.key === 'Escape') return 'escape';
   if (e.key === 'Tab') return 'tab';
   if (e.metaKey && e.key.toLowerCase() === 'k') return 'actions';
+  // ⌘⇧ letters may arrive as "C" or "c"; plain ⌘C stays native copy in the input.
+  if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 'c') return 'copyLink';
   if (e.metaKey && ['1', '2', '3', '4'].includes(e.key)) return `slot${e.key}` as KeyAction;
   return ARROWS[e.key] ?? 'none';
 }

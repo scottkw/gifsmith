@@ -2,9 +2,11 @@
   import { onMount, tick } from 'svelte';
   import { Events } from '@wailsio/runtime';
   import {
+    actionError,
     cancel,
     checkClips,
     copy,
+    copyText,
     hide,
     latest,
     lastProvider,
@@ -21,7 +23,7 @@
     type ProviderErr,
     type ProviderStatus,
   } from './lib/api';
-  import { errorState, pagingMessage, providerName, revokedMessage } from './lib/errors';
+  import { actionErrorText, errorState, pagingMessage, providerName, revokedMessage } from './lib/errors';
   import { move, nearEnd, routeKey } from './lib/grid';
   import { CLIPS_ACCESS_MAILTO, SLOTS, slotById, type SlotId } from './lib/providers';
   import Footer from './components/Footer.svelte';
@@ -33,10 +35,8 @@
   const DEBOUNCE_MS = 450;
   const HIDE_AFTER_COPY_MS = 400;
   const KEY_SAVED_MS = 2000;
-  const COPY_FAILED = "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";
   const CLIPS_COPY = 'Copying Clips (MP4) arrives in the next update.';
   const AX_FAILED = "Couldn't ask macOS for Accessibility access. Try again.";
-  const BUSY = 'another action is still running'; // Go ErrBusy: a second call while one runs is ignored
 
   type Status = 'idle' | 'loading' | 'refreshing' | 'ready' | 'empty' | 'error';
   type Paging = 'idle' | 'loading' | 'end' | 'error';
@@ -88,6 +88,7 @@
   // Paste hides the panel before ⌘V; a copied-only fallback message must survive to the next show.
   let keepStatus = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let hideTimer: ReturnType<typeof setTimeout> | undefined; // pending hide after a copy
   let now = $state(Date.now()); // clock for retry countdowns; set whenever an error arrives
 
   const footerCenter = $derived(status || cur.items[selected]?.title || '');
@@ -363,6 +364,9 @@
         }
         run(a);
         return;
+      case 'copyLink':
+        if (selected >= 0) textAction('link');
+        return;
       case 'escape':
         if (query) {
           query = '';
@@ -394,7 +398,7 @@
       if (action === 'copy') {
         const r = await copy(g);
         setStatus(r.message, 'success');
-        setTimeout(hide, HIDE_AFTER_COPY_MS);
+        scheduleHide();
       } else {
         const r = await paste(g);
         setStatus(r.message);
@@ -402,9 +406,36 @@
         keepStatus = r.copied && !r.pasted && !r.needsAccessibility;
       }
     } catch (err) {
-      // Compared, never rendered: Go's ErrBusy is the one error that is silently ignored.
-      if ((err as Error)?.message === BUSY) setStatus('');
-      else setStatus(COPY_FAILED, 'error');
+      actionFailed(err, g);
+    } finally {
+      copying = false;
+    }
+  }
+
+  // Copy actions confirm in the footer, then hide the panel.
+  function scheduleHide() {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(hide, HIDE_AFTER_COPY_MS);
+  }
+
+  // Fixed copy keyed by Go's error kind, never the error's text. A busy refusal is silently ignored.
+  function actionFailed(err: unknown, g: Gif) {
+    const kind = actionError(err)?.kind ?? '';
+    if (kind === 'busy') setStatus('');
+    else setStatus(actionErrorText(kind, g), 'error');
+  }
+
+  // Go builds the text from the selected item; the webview only names the kind.
+  async function textAction(kind: 'link') {
+    const g = cur.items[selected];
+    if (copying || !g) return;
+    copying = true;
+    try {
+      const r = await copyText(g, kind);
+      setStatus(r.message, 'success');
+      scheduleHide();
+    } catch (err) {
+      actionFailed(err, g);
     } finally {
       copying = false;
     }

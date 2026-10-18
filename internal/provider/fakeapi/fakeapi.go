@@ -68,9 +68,16 @@ func finerSearch(w http.ResponseWriter, r *http.Request, o Options) {
 		ID     string `json:"id"`
 		Fields fields `json:"fields"`
 	}
+	// Failing-media words: fileids whose /media/ file answers 500 or HTML (copy error rows).
+	prefix := "office-"
+	if hasWord(q.Get("q"), "brokenmedia") {
+		prefix = "broken-"
+	} else if hasWord(q.Get("q"), "htmlmedia") {
+		prefix = "html-"
+	}
 	results := []result{}
 	for n := max(start, 0) + 1; n <= found && len(results) < size; n++ {
-		id := "office-" + strconv.Itoa(n)
+		id := prefix + strconv.Itoa(n)
 		results = append(results, result{ID: strconv.Itoa(n), Fields: fields{Name: id, Text: "Office moment " + strconv.Itoa(n), Fileid: id}})
 	}
 	writeJSON(w, map[string]any{"hits": map[string]int{"found": found, "start": start}, "results": results})
@@ -262,10 +269,20 @@ func Scenario(w http.ResponseWriter, r *http.Request, q string, firstPage bool, 
 }
 
 // media serves a tiny 2-frame animated GIF whose colour is derived from the file name.
+// Names starting "broken" answer 500; names starting "html" answer an HTML page with 200.
 func media(w http.ResponseWriter, r *http.Request) {
 	name, ok := strings.CutSuffix(r.PathValue("file"), ".gif")
 	if !ok || name == "" {
 		http.NotFound(w, r)
+		return
+	}
+	if strings.HasPrefix(name, "broken") {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if strings.HasPrefix(name, "html") {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = fmt.Fprint(w, "<html>error</html>")
 		return
 	}
 	h := fnv.New32a()

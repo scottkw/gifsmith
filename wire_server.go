@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"gifsmith/internal/platform"
 	"gifsmith/internal/provider"
 	"gifsmith/internal/provider/fakeapi"
 	"gifsmith/internal/settings"
@@ -43,5 +44,7 @@ func wire() deps {
 		Allow: func(p provider.ID, u *url.URL) bool {
 			return staging.VendorAllow(p, u) || (u.Scheme == "http" && u.Host == host)
 		},
+		// Never the real pasteboard or browser; Trusted false, so paste reports needsAccessibility.
+		Platform: &platform.Fake{},
 	}
 }

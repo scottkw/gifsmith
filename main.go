@@ -38,11 +38,12 @@ type deps struct {
 	ConfigDir             string // settings.json lives here
 	StagingDir            string
 	Allow                 func(provider.ID, *url.URL) bool // download allowlist for staging
+	Platform              platform.Platform                // native in the app; platform.Fake in the UAT build
 }
 
 func main() {
 	d := wire()
-	plat := platform.New()
+	plat := d.Platform
 	// Downloads get their own client: Fetch's 45 s deadline bounds them, and the
 	// API client's 15 s timeout would cut off a multi-MB original on a slow link.
 	stage := &staging.Store{Dir: d.StagingDir, HTTP: &http.Client{}, Allow: d.Allow}
@@ -83,9 +84,14 @@ func main() {
 			application.NewService(panel),
 			application.NewService(settingsSvc),
 		},
-		MarshalError: provider.MarshalError,
-		Assets:       application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
-		Mac:          application.MacOptions{ActivationPolicy: application.ActivationPolicyAccessory},
+		MarshalError: func(err error) []byte {
+			if b := provider.MarshalError(err); b != nil {
+				return b
+			}
+			return services.MarshalError(err)
+		},
+		Assets: application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
+		Mac:    application.MacOptions{ActivationPolicy: application.ActivationPolicyAccessory},
 		// Used only by -tags server builds (browser UAT); WAILS_SERVER_PORT overrides.
 		Server: application.ServerOptions{Host: "localhost", Port: 8089},
 	})

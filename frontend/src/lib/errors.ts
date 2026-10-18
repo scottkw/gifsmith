@@ -1,6 +1,6 @@
 // Provider error -> UI-SPEC copy rows (E1–E5f, E2, E6). No Svelte or DOM imports so node --test can
 // load it. Copy is built only from the provider name and the HTTP status: never a URL, body or key.
-import type { ProviderErr } from './api';
+import type { Gif, ProviderErr } from './api';
 
 export type ErrorState = { id: 'E1' | 'E3' | 'E4' | 'E5' | 'E5f'; heading: string; body: string; tryAgain: boolean; retryAt?: number };
 
@@ -95,4 +95,10 @@ export function keyMessage(e: ProviderErr | null, providerLabel: string, now: nu
 // K6: a stored key rejected during search or trending (S13).
 export function revokedMessage(providerLabel: string): string {
   return `${providerLabel} rejected your saved key. It may have been revoked. Paste a new key to continue.`;
+}
+
+// Copy/paste failures (UI-SPEC F1/F3), keyed by Go's ActionError kind; '' = no typed cause.
+export function actionErrorText(kind: string, g: Gif): string {
+  if (kind === 'not_media') return `${providerName(g.provider)} sent something that isn't a GIF. Nothing was saved. Try another GIF.`;
+  return "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";
 }

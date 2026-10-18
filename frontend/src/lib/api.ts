@@ -59,7 +59,12 @@ export function providerError(e: unknown): ProviderErr | null {
   return c && typeof c.kind === 'string' ? c : null;
 }
 
+// Go's services.ActionError arrives as err.cause too: { kind } only.
+export const actionError = (e: unknown): { kind: string } | null => providerError(e);
+
 export const copy = (g: Gif) => ActionService.Copy(g);
+// Go builds the text from g; the webview only names the kind.
+export const copyText = (g: Gif, kind: 'link') => ActionService.CopyText(g, kind);
 export const paste = (g: Gif) => ActionService.Paste(g);
 export const requestAccessibility = () => ActionService.RequestAccessibility();
 export const hide = () => PanelService.Hide();

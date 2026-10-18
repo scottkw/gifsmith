@@ -22,6 +22,14 @@ export function Copy(g: provider$0.Gif): $CancellablePromise<$models.Result> {
 }
 
 /**
+ * CopyText puts text Go builds from g on the clipboard as a plain string. kind: link.
+ * The webview never composes the text: it only names the kind.
+ */
+export function CopyText(g: provider$0.Gif, kind: string): $CancellablePromise<$models.Result> {
+    return $Call.ByID(1904424890, g, kind);
+}
+
+/**
  * Paste copies the GIF, hides the panel and posts one ⌘V to the previous app.
  * Without Accessibility it only copies and keeps the panel open with instructions.
  */

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"gifsmith/internal/platform"
 	"gifsmith/internal/settings"
 	"gifsmith/internal/staging"
 )
@@ -32,5 +33,6 @@ func wire() deps {
 		ConfigDir:  filepath.Join(config, "com.kenscott.gifsmith"),
 		StagingDir: filepath.Join(cache, "com.kenscott.gifsmith", "staging"),
 		Allow:      staging.VendorAllow,
+		Platform:   platform.New(),
 	}
 }

@@ -1,4 +1,7 @@
 int gsCopyFile(const char *pbName, const char *path);
+int gsCopyText(const char *pbName, const char *text);
+char *gsPasteboardString(const char *pbName);
+int gsOpenURL(const char *url);
 char *gsPasteboardFileURLs(const char *pbName);
 void gsReleasePasteboard(const char *pbName);
 void gsFocusWebView(void *nsWindow);

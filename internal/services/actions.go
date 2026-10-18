@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net/url"
 	"sync"
 	"time"
 
@@ -13,9 +14,6 @@ import (
 	"gifsmith/internal/provider"
 	"gifsmith/internal/staging"
 )
-
-// ErrBusy is returned when another action is still running (each bound call has its own goroutine).
-var ErrBusy = errors.New("another action is still running")
 
 // ErrClipsCopy: Clips are MP4, and file copy for them ships in Phase 3.
 var ErrClipsCopy = errors.New("copying Clips arrives in a later update")
@@ -48,15 +46,29 @@ func (a *ActionService) stage(ctx context.Context, g provider.Gif) error {
 	path, err := a.Staging.Fetch(ctx, g)
 	if err != nil {
 		log.Printf("stage %s: %v", g.Provider, err)
-		return err
+		return stageErr(err)
 	}
 	if err := a.Platform.CopyFile(path); err != nil {
-		return err
+		log.Printf("stage %s: pasteboard: %v", g.Provider, err)
+		return actionErr("copy_failed")
 	}
 	if err := a.Staging.Sweep(path); err != nil {
 		log.Printf("staging sweep: %v", err)
 	}
 	return nil
+}
+
+// stageErr maps the staging sentinels to action kinds (they never carry a URL either).
+func stageErr(err error) error {
+	switch {
+	case errors.Is(err, staging.ErrNotAllowed):
+		return actionErr("not_allowed")
+	case errors.Is(err, staging.ErrNotGIF):
+		return actionErr("not_media")
+	case errors.Is(err, staging.ErrTooLarge):
+		return actionErr("too_large")
+	}
+	return actionErr("download_failed")
 }
 
 // Copy puts the selected GIF on the clipboard as a file. The panel stays open:
@@ -124,9 +136,43 @@ func (a *ActionService) Paste(ctx context.Context, g provider.Gif) (Result, erro
 	return Result{Copied: true, Pasted: true, Message: "Pasted GIF"}, nil
 }
 
-// CopyText puts text built from g on the clipboard as a plain string.
+// CopyText puts text Go builds from g on the clipboard as a plain string. kind: link.
+// The webview never composes the text: it only names the kind.
 func (a *ActionService) CopyText(ctx context.Context, g provider.Gif, kind string) (Result, error) {
-	return Result{}, nil
+	if !a.busy.TryLock() {
+		return Result{}, ErrBusy
+	}
+	defer a.busy.Unlock()
+	if kind != "link" {
+		return Result{}, actionErr("not_allowed")
+	}
+	text, err := a.linkFor(g)
+	if err != nil {
+		return Result{}, err
+	}
+	if err := a.Platform.CopyText(text); err != nil {
+		log.Printf("copy text %s %s: %v", g.Provider, kind, err)
+		return Result{}, actionErr("copy_failed")
+	}
+	log.Printf("copy text: %s %s", g.Provider, kind)
+	return Result{Copied: true, Message: "Copied link"}, nil
+}
+
+// linkFor is the GIF's media URL, checked against the same allowlist as downloads.
+// GIPHY links lose their tracking query; Klipy forbids altering URLs, so others pass byte for byte.
+func (a *ActionService) linkFor(g provider.Gif) (string, error) {
+	if g.IsClip { // DownloadURL is the MP4; the Clip's GIF rendition arrives with the metadata fields
+		return "", actionErr("no_link")
+	}
+	u, err := url.Parse(g.DownloadURL)
+	if err != nil || !a.Staging.Allows(g.Provider, u) {
+		return "", actionErr("not_allowed")
+	}
+	if g.Provider != provider.GIPHY && g.Provider != provider.Clips {
+		return g.DownloadURL, nil
+	}
+	u.RawQuery, u.ForceQuery, u.Fragment, u.RawFragment = "", false, "", ""
+	return u.String(), nil
 }
 
 // RequestAccessibility raises the macOS prompt and, if still untrusted, opens the settings pane.

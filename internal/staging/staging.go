@@ -45,10 +45,7 @@ type Store struct {
 // Fetch downloads g.DownloadURL to <Dir>/<sha1(provider:id)[:16]>/<slug>.gif and returns that path.
 // Transport errors are never wrapped: their text holds the URL.
 func (s *Store) Fetch(ctx context.Context, g provider.Gif) (string, error) {
-	allow := s.Allow
-	if allow == nil {
-		allow = VendorAllow
-	}
+	allow := s.Allows
 	u, err := url.Parse(g.DownloadURL)
 	if err != nil || !allow(g.Provider, u) {
 		return "", ErrNotAllowed
@@ -119,6 +116,14 @@ func (s *Store) Fetch(ctx context.Context, g provider.Gif) (string, error) {
 	_ = os.Remove(part)
 	_ = os.Remove(dir) // only succeeds when empty: an earlier copy of the same GIF stays
 	return "", err
+}
+
+// Allows applies the store's allowlist (nil Allow = VendorAllow).
+func (s *Store) Allows(p provider.ID, u *url.URL) bool {
+	if s.Allow == nil {
+		return VendorAllow(p, u)
+	}
+	return s.Allow(p, u)
 }
 
 // Sweep removes every entry in Dir except the directory holding keep.

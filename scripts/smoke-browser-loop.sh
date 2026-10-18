@@ -117,13 +117,22 @@ echo "GET $PREVIEW: 200, image/gif bytes start GIF8"
 
 COPY_ID=$(method_id "$SVC/actionservice.ts" Copy)
 [ -n "$COPY_ID" ] || fail "could not find the ActionService.Copy method ID"
+# The server build runs platform.Fake: the copy succeeds without touching the real pasteboard.
 CODE=$(call "$COPY_ID" "[$ITEM]")
-if [ "$CODE" != "422" ] || ! grep -q 'not supported in this build' "$BODY"; then
+if [ "$CODE" != "200" ] || ! grep -q '"copied":true' "$BODY"; then
   fail "ActionService.Copy(gif) via proxy: HTTP $CODE, body: $(cat "$BODY")"
 fi
 STAGED=$(find bin/uat-cache/staging -name '*.gif' -type f 2>/dev/null | head -1)
 [ -n "$STAGED" ] || fail "ActionService.Copy(gif) staged no .gif under bin/uat-cache/staging"
-echo "ActionService.Copy(gif): staged $STAGED, then HTTP 422 $(cat "$BODY")"
+echo "ActionService.Copy(gif): staged $STAGED, HTTP 200 $(cat "$BODY")"
+
+COPYTEXT_ID=$(method_id "$SVC/actionservice.ts" CopyText)
+[ -n "$COPYTEXT_ID" ] || fail "could not find the ActionService.CopyText method ID"
+CODE=$(call "$COPYTEXT_ID" "[$ITEM,\"link\"]")
+if [ "$CODE" != "200" ] || ! grep -q '"message":"Copied link"' "$BODY"; then
+  fail "ActionService.CopyText(gif, link) via proxy: HTTP $CODE, body: $(cat "$BODY")"
+fi
+echo "ActionService.CopyText(gif, link): HTTP 200 $(cat "$BODY")"
 
 EVIL=$(node -e 'const g = JSON.parse(process.argv[1]); g.downloadUrl = "https://evil.example.test/x.gif"; process.stdout.write(JSON.stringify(g))' "$ITEM")
 CODE=$(call "$COPY_ID" "[$EVIL]")
