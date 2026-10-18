@@ -138,6 +138,7 @@
   let libSlow = $state(false); // the load has not answered within LIBRARY_SKELETON_MS
   let libSeq = 0;
   const keyOf = (g: Gif) => `${g.provider}:${g.id}`;
+  const noop = () => {};
   // The query filters library titles locally: no request, no debounce (D-06).
   const libSections = $derived(libTab && library ? sections(library[libTab].map((e) => e.gif), query) : []);
   const libItems = $derived(flatItems(libSections));
@@ -371,15 +372,8 @@
     if (libTab || p !== active || !q || s.q !== q || s.status !== 'ready' || savedKey === `${p}:${q}`) return;
     if (!shouldSave({ sinceKeyMs: Date.now() - lastKeyAt, firstPageItems: s.items.length, query: q })) return;
     savedKey = `${p}:${q}`;
-    remember(p, q);
-  }
-
-  // Go applies the list rules (dedupe, cap); a failed save only means no chip.
-  function remember(p: SlotId, q: string) {
-    saveSearch(p, q).then(
-      () => refreshLibrary(),
-      () => {},
-    );
+    // Go applies the list rules (dedupe, cap); a failed save only means no chip.
+    saveSearch(p, q).then(() => refreshLibrary(), noop);
   }
 
   // ↵ on a chip: the query becomes the chip text and the search fires at once (no debounce).
@@ -802,7 +796,7 @@
     if (!crop) busy();
     try {
       const r = await call(g);
-      if (searched) remember(p, searched);
+      if (searched) saveSearch(p, searched).then(() => refreshLibrary(), noop);
       if (!pasteIt) {
         setStatus(r.message, 'success');
         scheduleHide();
