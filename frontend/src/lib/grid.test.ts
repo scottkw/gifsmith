@@ -82,3 +82,11 @@ test('routeKey maps Cmd+Shift+M to copyMarkdown and Cmd+O (no Shift) to open', (
   assert.equal(key('O', { metaKey: true, shiftKey: true }), 'none');
   assert.equal(key('o'), 'none');
 });
+
+test('routeKey maps Cmd+S to download and Cmd+R to reveal (no Shift)', () => {
+  assert.equal(key('s', { metaKey: true }), 'download');
+  assert.equal(key('S', { metaKey: true, shiftKey: true }), 'none');
+  assert.equal(key('s'), 'none');
+  assert.equal(key('r', { metaKey: true }), 'reveal');
+  assert.equal(key('R', { metaKey: true, shiftKey: true }), 'none');
+});

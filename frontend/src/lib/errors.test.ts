@@ -175,3 +175,17 @@ test('Clips copy errors name the MP4 (F1 and F3 Clips variants)', () => {
   assert.equal(actionErrorText('download_failed', clip), "Couldn't copy this MP4. The download failed. Try again or pick another clip.");
   assert.equal(actionErrorText('not_media', clip), "GIPHY Clips sent something that isn't an MP4. Nothing was saved. Try another GIF.");
 });
+
+test('download errors show F2, F3 and F4', () => {
+  const g = { provider: 'finergifs' } as Parameters<typeof actionErrorText>[1];
+  const clip = { provider: 'clips', isClip: true } as Parameters<typeof actionErrorText>[1];
+  assert.equal(actionErrorText('download_failed', g, 'download'), "Couldn't download this GIF. Check your connection, then try again.");
+  assert.equal(actionErrorText('', g, 'download'), "Couldn't download this GIF. Check your connection, then try again.");
+  assert.equal(actionErrorText('download_failed', clip, 'download'), "Couldn't download this MP4. Check your connection, then try again.");
+  const F4 = "Couldn't save to Downloads. Check that the folder exists and that Gifsmith can write to it.";
+  assert.equal(actionErrorText('folder_unwritable', g, 'download'), F4);
+  assert.equal(actionErrorText('folder_unwritable', g, 'download', 'uat-downloads'), F4.replace('Downloads', 'uat-downloads'));
+  const F3 = "The Finer Gifs Club sent something that isn't a GIF. Nothing was saved. Try another GIF.";
+  assert.equal(actionErrorText('not_media', g, 'download'), F3);
+  assert.equal(actionErrorText('not_media', g, 'copy'), F3);
+});

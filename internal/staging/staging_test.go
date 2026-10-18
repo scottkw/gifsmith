@@ -391,3 +391,172 @@ func TestRemove(t *testing.T) {
 		t.Errorf("Remove(Dir) emptied the store: %v", err)
 	}
 }
+
+func TestFileStem(t *testing.T) {
+	g := provider.Gif{Title: "Office moment 1", ID: "office-1"}
+	for _, c := range []struct {
+		title, id string
+		hide      bool
+		want      string
+	}{
+		{"Office moment 1", "office-1", false, "office-moment-1-office-1"},
+		{"Office moment 1", "../../etc", false, "office-moment-1-etc"},
+		{"Office moment 1", "a/b c?d", false, "office-moment-1-abcd"},
+		{"Office moment 1", "..", false, "office-moment-1"},
+		{"", "office-1", false, "gif-office-1"},
+		{"Office moment 1", "office-1", true, "gifsmith-office-1"},
+		{"Office moment 1", "/..", true, "gifsmith"},
+	} {
+		g.Title, g.ID = c.title, c.id
+		if got := FileStem(g, c.hide); got != c.want {
+			t.Errorf("FileStem(%q, %q, %v) = %q, want %q", c.title, c.id, c.hide, got, c.want)
+		}
+	}
+	g.ID = strings.Repeat("a", 100)
+	if got := FileStem(g, false); got != "office-moment-1-"+strings.Repeat("a", 64) {
+		t.Errorf("long id: FileStem = %q, want the id capped at 64 bytes", got)
+	}
+}
+
+// saveDir is an empty destination folder outside the staging Dir.
+func saveDir(t *testing.T) string { t.Helper(); return t.TempDir() }
+
+func TestSaveGIF(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	dir := saveDir(t)
+	p, err := s.Save(context.Background(), gif(base, "office-1", "Office moment 1"), dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(dir, "office-moment-1-office-1.gif"); p != want {
+		t.Errorf("saved at %q, want %q", p, want)
+	}
+	b, err := os.ReadFile(p)
+	if err != nil || !strings.HasPrefix(string(b), "GIF8") {
+		t.Errorf("saved bytes start %q (err %v), want GIF8", b[:min(len(b), 6)], err)
+	}
+	if fi, err := os.Stat(p); err != nil || fi.Mode().Perm() != 0o644 {
+		t.Errorf("mode = %v (err %v), want 0644", fi.Mode().Perm(), err)
+	}
+	if e := entries(t, dir); len(e) != 1 {
+		t.Errorf("dir holds %q, want only the saved file (no .part)", e)
+	}
+	if e := entries(t, s.Dir); len(e) != 0 {
+		t.Errorf("a download went through staging: %q", e)
+	}
+}
+
+func TestSaveCollisionNeverOverwrites(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	dir := saveDir(t)
+	g := gif(base, "office-1", "Office moment 1")
+	first, err := s.Save(context.Background(), g, dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, _ := os.Stat(first)
+	for _, want := range []string{"office-moment-1-office-1 (2).gif", "office-moment-1-office-1 (3).gif"} {
+		p, err := s.Save(context.Background(), g, dir, false)
+		if err != nil || p != filepath.Join(dir, want) {
+			t.Errorf("Save = %q, %v; want %s", p, err, want)
+		}
+	}
+	after, _ := os.Stat(first)
+	if !after.ModTime().Equal(before.ModTime()) || after.Size() != before.Size() {
+		t.Error("the first download changed after later saves")
+	}
+}
+
+func TestSavePreexistingFileUntouched(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	dir := saveDir(t)
+	mine := filepath.Join(dir, "office-moment-1-office-1.gif")
+	if err := os.WriteFile(mine, []byte("the user's own file"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p, err := s.Save(context.Background(), gif(base, "office-1", "Office moment 1"), dir, false)
+	if err != nil || p != filepath.Join(dir, "office-moment-1-office-1 (2).gif") {
+		t.Errorf("Save = %q, %v; want the (2) name", p, err)
+	}
+	if b, _ := os.ReadFile(mine); string(b) != "the user's own file" {
+		t.Errorf("pre-existing file now holds %q", b)
+	}
+}
+
+func TestSaveClipMP4(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	dir := saveDir(t)
+	p, err := s.Save(context.Background(), clip(base, "clip-1-720p", "GIPHY clip 1"), dir, false)
+	if err != nil || p != filepath.Join(dir, "giphy-clip-1-clip-1-720p.mp4") {
+		t.Fatalf("Save(clip) = %q, %v; want giphy-clip-1-clip-1-720p.mp4", p, err)
+	}
+	if b, _ := os.ReadFile(p); len(b) < 8 || string(b[4:8]) != "ftyp" {
+		t.Errorf("saved bytes %q, want an ftyp box", b)
+	}
+}
+
+func TestSaveNotMediaLeavesNothing(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	for name, want := range map[string]error{"html-1": ErrNotGIF, "broken-1": ErrDownload} {
+		dir := saveDir(t)
+		_, err := s.Save(context.Background(), gif(base, name, "Office moment 1"), dir, false)
+		if !errors.Is(err, want) {
+			t.Errorf("%s: err = %v, want %v", name, err, want)
+		}
+		if e := entries(t, dir); len(e) != 0 {
+			t.Errorf("%s: dir holds %q, want nothing (not even a temp file)", name, e)
+		}
+	}
+}
+
+func TestSaveFolderErrors(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	ro := saveDir(t)
+	if err := os.Chmod(ro, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(ro, 0o700) })
+	for _, dir := range []string{filepath.Join(saveDir(t), "missing"), ro} {
+		_, err := s.Save(context.Background(), gif(base, "office-1", "Office moment 1"), dir, false)
+		if !errors.Is(err, ErrFolder) {
+			t.Errorf("%s: err = %v, want ErrFolder", dir, err)
+			continue
+		}
+		if strings.Contains(err.Error(), dir) || strings.Contains(err.Error(), "/") {
+			t.Errorf("error text %q holds a path", err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(ro), "missing")); err == nil {
+		t.Error("Save created the missing folder")
+	}
+}
+
+// Traversal ids (Klipy slugs, Finer "..") never leave the destination folder.
+func TestSaveTraversalID(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	dir := saveDir(t)
+	for _, id := range []string{"../../escape", "..", "a/../../b"} {
+		g := gif(base, "office-1", "Office moment 1")
+		g.ID = id
+		p, err := s.Save(context.Background(), g, dir, false)
+		if err != nil {
+			t.Fatalf("%q: %v", id, err)
+		}
+		if filepath.Dir(p) != dir {
+			t.Errorf("%q: saved at %q, outside %q", id, p, dir)
+		}
+	}
+}
+
+// Invariant: the destination is a parameter; any folder gets the same naming and hide rule.
+func TestSaveAnyFolderHideName(t *testing.T) {
+	s, base, _ := newStore(t, nil)
+	dir := filepath.Join(saveDir(t), "Chosen Folder")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	p, err := s.Save(context.Background(), gif(base, "office-1", "Office moment 1"), dir, true)
+	if err != nil || p != filepath.Join(dir, "gifsmith-office-1.gif") {
+		t.Errorf("Save(hide) = %q, %v; want gifsmith-office-1.gif in the chosen folder", p, err)
+	}
+}

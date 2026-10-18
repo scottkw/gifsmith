@@ -57,3 +57,14 @@ test('filterActions keeps order and buildActions never repeats an id', () => {
   assert.deepEqual(ids, ['paste', 'pasteLink', 'pasteMarkdown']);
   assert.equal(new Set(giphy.map((r) => r.id)).size, giphy.length);
 });
+
+test('Download comes right after Open in Browser, or after Paste Markdown without a page', () => {
+  const ids = giphy.map((r) => r.id);
+  assert.equal(ids[ids.indexOf('open') + 1], 'download');
+  const dl = giphy.find((r) => r.id === 'download')!;
+  assert.deepEqual([dl.label, dl.hint, dl.keys, dl.group], ['Download GIF', '⌘S', 'Meta+S', 3]);
+  const klipy = buildActions(ctx(gif({ provider: 'klipy' }))).map((r) => r.id);
+  assert.equal(klipy[klipy.indexOf('pasteMarkdown') + 1], 'download');
+  const clip = buildActions(ctx(gif({ isClip: true })));
+  assert.equal(clip.find((r) => r.id === 'download')?.label, 'Download MP4');
+});

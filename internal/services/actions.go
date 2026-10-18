@@ -38,8 +38,10 @@ type ActionService struct {
 	Previous func() platform.App
 	Sleep    func(time.Duration)         // nil means time.Sleep
 	After    func(time.Duration, func()) // nil means time.AfterFunc
-	busy     sync.Mutex                  // one action at a time: no racing pasteboard writes, no double ⌘V
-	gen      atomic.Uint64               // bumped on every clipboard write; a Klipy timer deletes only if unchanged
+	// DownloadsDir is the download destination (desktop ~/Downloads; Phase 4's picker replaces it).
+	DownloadsDir func() string
+	busy         sync.Mutex    // one action at a time: no racing pasteboard writes, no double ⌘V
+	gen          atomic.Uint64 // bumped on every clipboard write; a Klipy timer deletes only if unchanged
 }
 
 // stage downloads g, puts its file URL on the pasteboard and returns the staged path. Older
@@ -342,4 +344,15 @@ func (a *ActionService) RequestAccessibility(ctx context.Context) (bool, error) 
 // Wails cleanup, so no busy lock and no onMain: an action still running must not block quitting.
 func (a *ActionService) ServiceShutdown() error {
 	return a.Staging.Clear()
+}
+
+// DownloadResult names the saved file and its folder for the toast; never a path.
+type DownloadResult struct {
+	Name   string `json:"name"`
+	Folder string `json:"folder"`
+}
+
+// Download is a RED skeleton.
+func (a *ActionService) Download(ctx context.Context, g provider.Gif) (DownloadResult, error) {
+	return DownloadResult{}, actionErr("download_failed")
 }

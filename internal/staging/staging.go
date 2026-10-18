@@ -229,3 +229,14 @@ func slug(title string) string {
 	}
 	return s
 }
+
+// ErrFolder: the destination folder is missing or not writable (fixed text, no path).
+var ErrFolder = errors.New("the download folder is not writable")
+
+// FileStem is the download file name without its extension. RED skeleton.
+func FileStem(g provider.Gif, hide bool) string { return "" }
+
+// Save downloads g into dir without overwriting anything. RED skeleton.
+func (s *Store) Save(ctx context.Context, g provider.Gif, dir string, hide bool) (string, error) {
+	return "", ErrDownload
+}

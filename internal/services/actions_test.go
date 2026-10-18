@@ -770,3 +770,90 @@ func TestKlipyGraceOnlyAfterKlipyPaste(t *testing.T) {
 		}
 	}
 }
+
+// downloadService saves into a fresh temp folder, never the user's real Downloads.
+func downloadService(t *testing.T, f *platform.Fake) (*ActionService, fixture, string) {
+	t.Helper()
+	s, fx := newService(t, f)
+	dl := filepath.Join(t.TempDir(), "Downloads")
+	if err := os.Mkdir(dl, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s.DownloadsDir = func() string { return dl }
+	return s, fx, dl
+}
+
+func TestDownloadSavesWithoutStagingOrClipboard(t *testing.T) {
+	f := &platform.Fake{}
+	s, fx, dl := downloadService(t, f)
+	r, err := s.Download(context.Background(), fx.gif)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != (DownloadResult{Name: "office-moment-1-office-1.gif", Folder: "Downloads"}) {
+		t.Errorf("result = %+v", r)
+	}
+	if !exists(filepath.Join(dl, r.Name)) {
+		t.Errorf("%s not in the download folder", r.Name)
+	}
+	if len(f.Calls) != 0 {
+		t.Errorf("calls = %q, want no pasteboard or other platform call", f.Calls)
+	}
+	if ents, _ := os.ReadDir(fx.dir); len(ents) != 0 {
+		t.Errorf("staging holds %d entries after a download, want none", len(ents))
+	}
+	r2, err := s.Download(context.Background(), fx.gif)
+	if err != nil || r2.Name != "office-moment-1-office-1 (2).gif" {
+		t.Errorf("second download = %+v, %v; want the (2) name", r2, err)
+	}
+}
+
+// The folder name in the result follows whatever folder DownloadsDir supplies (Phase 4 picker).
+func TestDownloadFolderIsInjected(t *testing.T) {
+	s, fx, _ := downloadService(t, &platform.Fake{})
+	chosen := filepath.Join(t.TempDir(), "GIF stash")
+	if err := os.Mkdir(chosen, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s.DownloadsDir = func() string { return chosen }
+	r, err := s.Download(context.Background(), fx.gif)
+	if err != nil || r.Folder != filepath.Base(chosen) || !exists(filepath.Join(chosen, r.Name)) {
+		t.Errorf("Download = %+v, %v; want it saved in and named after %q", r, err, chosen)
+	}
+}
+
+func TestDownloadErrorKinds(t *testing.T) {
+	for name, want := range map[string]string{"broken-1": "download_failed", "html-1": "not_media", "missing-folder": "folder_unwritable", "no-folder": "folder_unwritable"} {
+		f := &platform.Fake{}
+		s, fx, dl := downloadService(t, f)
+		g := fx.gif
+		switch name {
+		case "missing-folder":
+			s.DownloadsDir = func() string { return filepath.Join(dl, "gone") }
+		case "no-folder":
+			s.DownloadsDir = func() string { return "" }
+		default:
+			g.DownloadURL = strings.Replace(g.DownloadURL, "office-1", name, 1)
+		}
+		_, err := s.Download(context.Background(), g)
+		if actionKind(err) != want || strings.Contains(err.Error(), "/") {
+			t.Errorf("%s: err = %v, want kind %s without a path or URL", name, err, want)
+		}
+		if ents, _ := os.ReadDir(dl); len(ents) != 0 {
+			t.Errorf("%s: download folder holds %d entries", name, len(ents))
+		}
+	}
+}
+
+func TestDownloadRefusesWhileBusy(t *testing.T) {
+	f := &platform.Fake{}
+	s, fx, dl := downloadService(t, f)
+	s.busy.Lock()
+	defer s.busy.Unlock()
+	if _, err := s.Download(context.Background(), fx.gif); !errors.Is(err, ErrBusy) {
+		t.Errorf("Download err = %v, want ErrBusy", err)
+	}
+	if ents, _ := os.ReadDir(dl); len(ents) != 0 || fx.hits.Load() != 0 {
+		t.Errorf("busy download wrote %d entries, made %d requests", len(ents), fx.hits.Load())
+	}
+}
