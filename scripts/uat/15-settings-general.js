@@ -59,6 +59,24 @@ await markIs("giphy-powered-light.png");
 if (!(await mark.count())) fail("GIPHY mark missing");
 await saveScreenshot(await B.screenshot(), "gifsmith-15-settings-light.png");
 
+// Sidebar keyboard: the General tab is the only tab stop; ↑/↓ clamp; Tab goes on into the pane.
+const tab = B.getByRole("tab", { name: "General" });
+if ((await tab.getAttribute("aria-selected")) !== "true") fail("General tab not selected");
+await tab.focus();
+for (const k of ["ArrowDown", "ArrowUp"]) {
+  await B.keyboard.press(k);
+  if (!(await tab.evaluate((el) => document.activeElement === el))) fail(`${k} moved focus off the only tab`);
+}
+await B.keyboard.press("Tab");
+const tabbed = await B.evaluate(() => document.activeElement && document.activeElement.getAttribute("type") + ":" + document.activeElement.name);
+if (tabbed !== "radio:theme") fail("Tab from the sidebar reached " + tabbed);
+const overflow = await B.evaluate(() => [
+  getComputedStyle(document.querySelector("[role=tabpanel]")).overflowY,
+  getComputedStyle(document.querySelector("[role=tablist]")).overflowY,
+]);
+if (overflow[0] !== "auto" || overflow[1] === "auto" || overflow[1] === "scroll") fail("pane/sidebar overflow " + overflow.join("/"));
+await saveScreenshot(await B.screenshot(), "gifsmith-15-settings-sidebar.png");
+
 // ⌘, in the panel asks Go to open Settings (server build: the shell hides/shows nothing real).
 await A.bringToFront();
 await A.locator("input[role=combobox]").focus();

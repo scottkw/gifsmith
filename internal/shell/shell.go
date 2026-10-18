@@ -30,6 +30,12 @@ type Shell struct {
 	mu             sync.Mutex
 	prev           platform.App // frontmost app when the panel was last shown
 	settingsPlaced bool         // the first Settings show of a launch is centred; later ones keep the user's spot
+
+	// vmu guards the two values below; it is never held across a window call, so window
+	// callbacks (which must not take mu) may take it.
+	vmu          sync.Mutex
+	settingsPrev int    // pid frontmost when Settings opened; it gets focus back on close
+	theme        string // last applied theme pref; "" (System) follows macOS changes
 }
 
 // New creates the panel once (hidden; never closed) and registers the hotkey after start.
@@ -71,11 +77,13 @@ func New(app *application.App, plat platform.Platform, trayIcon []byte) *Shell {
 		DisableResize:       true,
 		MinimiseButtonState: application.ButtonDisabled,
 		MaximiseButtonState: application.ButtonHidden,
+		// ⌘W hides like the red button; Esc is deliberately unbound (macOS settings windows stay open).
+		KeyBindings: map[string]func(application.Window){"Cmd+W": func(application.Window) { s.HideSettings() }},
 	})
-	// The red button hides Settings; it is never destroyed (window callback: no s.mu).
+	// The red button hides Settings; it is never destroyed.
 	s.settings.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		e.Cancel()
-		s.settings.Hide()
+		s.HideSettings()
 	})
 
 	// Replaces Wails' default menu: no File (⌘W), View (⌘R reload, zoom) or Window (⌘M).
@@ -96,6 +104,16 @@ func New(app *application.App, plat platform.Platform, trayIcon []byte) *Shell {
 	menu.Add("Quit Gifsmith").OnClick(func(*application.Context) { app.Quit() })
 	tray.SetMenu(menu)
 	log.Printf("tray menu ready")
+
+	// System follows macOS live: refresh the native backgrounds when the OS appearance changes.
+	app.Event.OnApplicationEvent(events.Common.ThemeChanged, func(*application.ApplicationEvent) {
+		s.vmu.Lock()
+		system := s.theme == ""
+		s.vmu.Unlock()
+		if system {
+			s.ApplyTheme("")
+		}
+	})
 
 	// Registered once the app runs so an OS rejection comes back here instead of the error handler.
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
@@ -159,9 +177,18 @@ func (s *Shell) OpenSettings() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.panel.Hide()
+	if !s.settings.IsVisible() { // a re-open keeps the app captured at the first open
+		app, err := s.plat.FrontmostApp()
+		if err != nil {
+			log.Printf("frontmost app: %v", err)
+		}
+		s.vmu.Lock()
+		s.settingsPrev = app.PID
+		s.vmu.Unlock()
+	}
 	if !s.settingsPlaced {
 		if wa := s.plat.CursorScreenWorkArea(); wa.Width > 0 && wa.Height > 0 {
-			s.settings.SetPosition(panelOrigin(wa, SettingsWidth, SettingsHeight))
+			s.settings.SetPosition(settingsOrigin(wa, SettingsWidth, SettingsHeight))
 		}
 		s.settingsPlaced = true
 	}
@@ -170,8 +197,25 @@ func (s *Shell) OpenSettings() {
 	s.app.Event.Emit("settings:show")
 }
 
+// HideSettings hides Settings and, when the panel is not up, asks the app that was frontmost when
+// it opened to come back (best effort). Window callbacks call it, so it never takes s.mu.
+func (s *Shell) HideSettings() {
+	s.settings.Hide()
+	s.vmu.Lock()
+	pid := s.settingsPrev
+	s.vmu.Unlock()
+	if pid != 0 && !s.panel.IsVisible() {
+		if err := s.plat.ActivateApp(pid); err != nil {
+			log.Printf("settings closed: %v", err)
+		}
+	}
+}
+
 // ApplyTheme sets the native appearance ("" follows macOS) and both windows' backgrounds to --bg.
 func (s *Shell) ApplyTheme(theme string) {
+	s.vmu.Lock()
+	s.theme = theme
+	s.vmu.Unlock()
 	if err := s.plat.SetAppearance(theme); err != nil {
 		log.Printf("appearance: %v", err)
 	}

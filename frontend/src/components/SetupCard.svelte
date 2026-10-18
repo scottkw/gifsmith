@@ -111,7 +111,7 @@
       aria-invalid={message ? 'true' : undefined}
       aria-describedby="setup-message"
     />
-    <button class="primary" type="submit" disabled={verifying || !value.trim()}>
+    <button class="btn-primary" type="submit" disabled={verifying || !value.trim()}>
       {#if verifying}<span class="spinner" aria-hidden="true"></span> Verifying…{:else}Save Key{/if}
     </button>
   </form>
@@ -133,7 +133,7 @@
         openExternal(slot.getKeyUrl!);
       }}>Get a free key ↗</a
     >
-    <button class="secondary" type="button" onclick={ontryfiner}>Try Finer Gifs (no key)</button>
+    <button class="btn-secondary" type="button" onclick={ontryfiner}>Try Finer Gifs (no key)</button>
   </div>
 </div>
 
@@ -175,7 +175,7 @@
     box-sizing: border-box;
     height: 32px;
     padding: 0 8px;
-    border: 1px solid var(--hairline);
+    border: 1px solid var(--control-border);
     border-radius: 6px;
     background: var(--bg);
     color: var(--text);
@@ -185,32 +185,6 @@
   }
   input.invalid {
     border-color: var(--destructive);
-  }
-  button {
-    height: 32px;
-    padding: 0 16px;
-    border: 0;
-    border-radius: 6px;
-    font: 600 14px/1 var(--font);
-    cursor: pointer;
-    white-space: nowrap;
-  }
-  .primary {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    background: var(--accent-fill);
-    color: #ffffff;
-  }
-  /* P6: disabled buttons read as inactive without an opacity change. */
-  button:disabled {
-    background: var(--surface-active);
-    color: var(--text-tertiary);
-    cursor: default;
-  }
-  .secondary {
-    background: var(--surface-active);
-    color: var(--text);
   }
   .message {
     height: 16px;

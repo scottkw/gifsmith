@@ -3,6 +3,7 @@
   import { Events } from '@wailsio/runtime';
   import { onMount, untrack } from 'svelte';
   import { setPref, type SettingsSnapshot } from '../lib/api';
+  import SettingRow from './SettingRow.svelte';
 
   let { initial }: { initial: SettingsSnapshot } = $props();
 
@@ -30,16 +31,32 @@
   }
 </script>
 
-<h1>General</h1>
-<div class="row">
-  <span id="theme-label">Theme</span>
-  <div role="radiogroup" aria-labelledby="theme-label">
-    {#each THEMES as t (t.value)}
-      <label>
-        <input type="radio" name="theme" value={t.value} checked={theme === t.value} onchange={() => chooseTheme(t.value)} />
-        {t.label}
-      </label>
-    {/each}
-  </div>
+<div class="settings-section">
+  <SettingRow label="Theme" id="theme-label" error={themeError}>
+    <div class="radios" role="radiogroup" aria-labelledby="theme-label">
+      {#each THEMES as t (t.value)}
+        <label>
+          <input type="radio" name="theme" value={t.value} checked={theme === t.value} onchange={() => chooseTheme(t.value)} />
+          {t.label}
+        </label>
+      {/each}
+    </div>
+  </SettingRow>
 </div>
-{#if themeError}<p role="alert">{themeError}</p>{/if}
+
+<style>
+  .radios {
+    display: flex;
+    gap: 16px;
+  }
+  label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font: var(--body);
+    color: var(--text);
+  }
+  input {
+    margin: 0;
+  }
+</style>
