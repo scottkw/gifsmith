@@ -137,6 +137,19 @@ func TestMapperBadCursor(t *testing.T) {
 	}
 }
 
+// WR-02: a long subtitle is clamped to the library title limit.
+func TestMapperLongTitleClamped(t *testing.T) {
+	text := strings.Repeat("ü", provider.MaxTitleRunes+50)
+	c, _ := bodyClient(t, `{"results":[{"fields":{"name":"n","text":"`+text+`","fileid":"f1"}}]}`)
+	p, err := c.Search(context.Background(), "x", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Items) != 1 || p.Items[0].Title != string([]rune(text)[:provider.MaxTitleRunes]) {
+		t.Errorf("items = %+v, want the title clamped", p.Items)
+	}
+}
+
 func TestMapperNoHitsFullPage(t *testing.T) {
 	var b strings.Builder
 	b.WriteString(`{"results":[`)

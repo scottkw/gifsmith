@@ -138,6 +138,19 @@ func TestTitleFallsBackToSlug(t *testing.T) {
 	}
 }
 
+// WR-02: a long slug (the id, and the title when there is none) is clamped to the library limits.
+func TestLongSlugClamped(t *testing.T) {
+	slug := strings.Repeat("é", provider.MaxTitleRunes+50)
+	c, _, _ := stubClient(t, 200, body(1, false, item(slug, "https://s/sm.gif", "", "https://s/hd.gif")))
+	p, err := c.Search(context.Background(), "cat", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Items) != 1 || p.Items[0].ID != slug[:provider.MaxIDBytes] || p.Items[0].Title != string([]rune(slug)[:provider.MaxTitleRunes]) {
+		t.Errorf("items = %+v, want id and title clamped", p.Items)
+	}
+}
+
 func TestMDFallback(t *testing.T) {
 	c, _, _ := stubClient(t, 200, body(1, false, item("a", "https://s/sm.gif", "https://s/md.gif", "")))
 	p, err := c.Search(context.Background(), "cat", "")

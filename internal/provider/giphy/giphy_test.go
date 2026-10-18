@@ -126,6 +126,19 @@ func TestTitleFallsBackToSlug(t *testing.T) {
 	}
 }
 
+// WR-02: a long user-supplied title or id is clamped to the library limits, so the item stays savable.
+func TestLongTitleAndIDClamped(t *testing.T) {
+	id, title := strings.Repeat("a", provider.MaxIDBytes+50), strings.Repeat("ü", provider.MaxTitleRunes+50)
+	c, _, _ := stubClient(t, 200, nil, `{"data":[{"id":"`+id+`","slug":"s","title":"`+title+`","images":{"fixed_width":{"url":"https://m/p.gif"},"original":{"url":"https://m/o.gif"}}}],"pagination":{"total_count":1,"count":1,"offset":0}}`)
+	p, err := c.Search(context.Background(), "cat", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Items) != 1 || p.Items[0].ID != id[:provider.MaxIDBytes] || p.Items[0].Title != string([]rune(title)[:provider.MaxTitleRunes]) {
+		t.Errorf("items = %+v, want id and title clamped", p.Items)
+	}
+}
+
 func TestMissingURLIsHTTPError(t *testing.T) {
 	for name, body := range map[string]string{
 		"no original": `{"data":[{"id":"a","slug":"a","title":"a","images":{"fixed_width":{"url":"https://m/p.gif"}}}],"pagination":{"total_count":1,"count":1,"offset":0}}`,

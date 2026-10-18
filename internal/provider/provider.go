@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"unicode/utf8"
 )
 
 type ID string
@@ -25,6 +26,33 @@ func ParseID(s string) (ID, bool) {
 		return id, true
 	}
 	return "", false
+}
+
+// Library limits (library.Validate): the mappers clamp vendor text to them, so a long
+// user-supplied title or id never makes an item unsavable (WR-02).
+const (
+	MaxTitleRunes = 500
+	MaxIDBytes    = 200
+)
+
+// ClampTitle shortens s to MaxTitleRunes runes.
+func ClampTitle(s string) string {
+	if r := []rune(s); len(r) > MaxTitleRunes {
+		return string(r[:MaxTitleRunes])
+	}
+	return s
+}
+
+// ClampID shortens s to at most MaxIDBytes bytes, never splitting a rune.
+func ClampID(s string) string {
+	if len(s) <= MaxIDBytes {
+		return s
+	}
+	i := MaxIDBytes
+	for i > 0 && !utf8.RuneStart(s[i]) {
+		i--
+	}
+	return s[:i]
 }
 
 // PageSize is the requested page size (6 rows of 4); clients clamp it to vendor limits.

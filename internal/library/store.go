@@ -87,10 +87,10 @@ func Validate(g provider.Gif, allow func(provider.ID, *url.URL) bool) error {
 	if _, ok := provider.ParseID(string(g.Provider)); !ok {
 		return bad("provider")
 	}
-	if g.ID == "" || len(g.ID) > 200 {
+	if g.ID == "" || len(g.ID) > provider.MaxIDBytes {
 		return bad("id")
 	}
-	if utf8.RuneCountInString(g.Title) > 500 {
+	if utf8.RuneCountInString(g.Title) > provider.MaxTitleRunes {
 		return bad("title")
 	}
 	allowed := func(raw string) bool {

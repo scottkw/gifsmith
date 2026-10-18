@@ -3,7 +3,9 @@ package provider
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestErrorString(t *testing.T) {
@@ -44,5 +46,23 @@ func TestParseID(t *testing.T) {
 		if _, ok := ParseID(s); ok {
 			t.Errorf("ParseID(%q) accepted", s)
 		}
+	}
+}
+
+// WR-02: vendor text is clamped to the library limits, never splitting a rune.
+func TestClamp(t *testing.T) {
+	long := strings.Repeat("ü", MaxTitleRunes+7)
+	if got := ClampTitle(long); utf8.RuneCountInString(got) != MaxTitleRunes || !utf8.ValidString(got) {
+		t.Errorf("ClampTitle: %d runes, valid %v; want %d", utf8.RuneCountInString(got), utf8.ValidString(got), MaxTitleRunes)
+	}
+	if got := ClampTitle("Cat GIF"); got != "Cat GIF" {
+		t.Errorf("ClampTitle(short) = %q", got)
+	}
+	odd := "a" + strings.Repeat("é", MaxIDBytes) // 2-byte runes straddle the byte limit
+	if got := ClampID(odd); len(got) != MaxIDBytes-1 || !utf8.ValidString(got) || !strings.HasPrefix(odd, got) {
+		t.Errorf("ClampID: %d bytes, valid %v; want %d valid bytes", len(got), utf8.ValidString(got), MaxIDBytes-1)
+	}
+	if got := ClampID(strings.Repeat("a", MaxIDBytes)); len(got) != MaxIDBytes {
+		t.Errorf("ClampID(at limit) = %d bytes, want %d", len(got), MaxIDBytes)
 	}
 }

@@ -197,7 +197,7 @@ func (c *Client) get(ctx context.Context, path string, v url.Values, cursor stri
 		if title == "" {
 			title = d.Slug
 		}
-		g := provider.Gif{Provider: c.id(), ID: d.ID, Title: title, PreviewURL: d.Images.FixedWidth.URL, IsClip: c.Clips,
+		g := provider.Gif{Provider: c.id(), ID: provider.ClampID(d.ID), Title: provider.ClampTitle(title), PreviewURL: d.Images.FixedWidth.URL, IsClip: c.Clips,
 			PageURL: pageURL(c.id(), d.URL), SourceURL: sourceURL(d.Source)}
 		g.DownloadURL, g.Width, g.Height = dl.URL, int(dl.Width), int(dl.Height)
 		if c.Clips {

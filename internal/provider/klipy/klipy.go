@@ -149,7 +149,7 @@ func (c *Client) get(ctx context.Context, kind string, v url.Values, cursor stri
 			title = d.Slug
 		}
 		// No PageURL: Klipy returns none, and one is never constructed.
-		items = append(items, provider.Gif{Provider: provider.Klipy, ID: d.Slug, Title: title, PreviewURL: d.File.SM.GIF.URL, DownloadURL: dl,
+		items = append(items, provider.Gif{Provider: provider.Klipy, ID: provider.ClampID(d.Slug), Title: provider.ClampTitle(title), PreviewURL: d.File.SM.GIF.URL, DownloadURL: dl,
 			Width: int(file.Width), Height: int(file.Height), Size: int64(file.Size), Tags: tags(d.Tags), MediumURL: d.File.MD.GIF.URL})
 	}
 	if skipped > 0 {
