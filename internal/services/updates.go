@@ -195,17 +195,21 @@ func (u *UpdateService) Reveal() {
 // RunAutoUpdates checks after delay and then every every while enabled() holds; failures only
 // log (Check does). A package func, not a method, so Wails never binds it to JS.
 func RunAutoUpdates(ctx context.Context, u *UpdateService, enabled func() bool, delay, every time.Duration) {
-	t := time.NewTimer(delay)
-	defer t.Stop()
+	runAutoUpdates(ctx, u, enabled, delay, every, time.After)
+}
+
+// runAutoUpdates takes the timer as after, so tests drive it with a channel instead of sleeping.
+func runAutoUpdates(ctx context.Context, u *UpdateService, enabled func() bool, delay, every time.Duration, after func(time.Duration) <-chan time.Time) {
+	wait := delay
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-t.C:
+		case <-after(wait):
 		}
 		if enabled() {
 			_, _ = u.Check(ctx)
 		}
-		t.Reset(every)
+		wait = every
 	}
 }

@@ -749,9 +749,9 @@ func TestSaveKeyTriggersClips(t *testing.T) {
 	if err := f.svc.SaveKey(ctx, "giphy", "bad-key-123"); err == nil {
 		t.Fatal("bad key saved")
 	}
-	time.Sleep(50 * time.Millisecond)
-	if n := f.probes.Load(); n != 0 {
-		t.Errorf("failed SaveKey probed Clips %d times, want 0", n)
+	// No sleep needed: a probe starts only with a saved key (State is no_key without one).
+	if s, n := f.clips.State(), f.probes.Load(); s != search.ClipsNoKey || n != 0 {
+		t.Errorf("failed SaveKey: clips %s, probes %d; want no_key, 0", s, n)
 	}
 	if err := f.svc.SaveKey(ctx, "giphy", "uat-key-123"); err != nil {
 		t.Fatal(err)
@@ -770,9 +770,10 @@ func TestSaveKeyTriggersClips(t *testing.T) {
 	if err := f.svc.SaveKey(ctx, "klipy", "uat-key-123"); err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(50 * time.Millisecond)
-	if n := f.probes.Load(); n != 2 {
-		t.Errorf("Klipy save probed Clips (probes %d, want 2)", n)
+	// No sleep needed: a reset + probe would leave Clips checking before SaveKey returned, and a
+	// probe that already finished counted itself first.
+	if s, n := f.clips.State(), f.probes.Load(); s != search.ClipsEnabled || n != 2 {
+		t.Errorf("Klipy save: clips %s, probes %d; want enabled, 2", s, n)
 	}
 }
 
@@ -786,9 +787,9 @@ func TestGiphySuccessTriggersClipsOnce(t *testing.T) {
 	if _, err := f.gifs.Search(ctx, "giphy", "boom", ""); err == nil {
 		t.Fatal("boom succeeded")
 	}
-	time.Sleep(50 * time.Millisecond)
-	if n := f.probes.Load(); n != 0 {
-		t.Errorf("a failed GIPHY call probed Clips (%d)", n)
+	// No sleep needed: Trigger moves Clips to checking before it returns.
+	if s, n := f.clips.State(), f.probes.Load(); s != search.ClipsUnknown || n != 0 {
+		t.Errorf("a failed GIPHY call: clips %s, probes %d; want unknown, 0", s, n)
 	}
 	for range 2 {
 		if _, err := f.gifs.Trending(ctx, "giphy", ""); err != nil {
