@@ -186,7 +186,17 @@ test('page errors show F8 and a missing link shows F1', () => {
 test('Clips copy errors name the MP4 (F1 and F3 Clips variants)', () => {
   const clip = { provider: 'clips', isClip: true } as Parameters<typeof actionErrorText>[1];
   assert.equal(actionErrorText('download_failed', clip), "Couldn't copy this MP4. The download failed. Try again or pick another clip.");
-  assert.equal(actionErrorText('not_media', clip), "GIPHY Clips sent something that isn't an MP4. Nothing was saved. Try another GIF.");
+  assert.equal(actionErrorText('not_media', clip), "GIPHY Clips sent something that isn't an MP4. Nothing was saved. Try another clip.");
+});
+
+test('text copy/paste failures show F11 and invalid_item shows F12 (P25)', () => {
+  const g = { provider: 'giphy' } as Parameters<typeof actionErrorText>[1];
+  const F11 = "Couldn't copy to the clipboard. Try again.";
+  for (const k of ['copy_failed', 'no_link', 'not_allowed', '']) assert.equal(actionErrorText(k, g, 'text'), F11, k);
+  const F12 = "This GIF's details are incomplete. Pick another GIF.";
+  assert.equal(actionErrorText('invalid_item', g, 'text'), F12);
+  assert.equal(actionErrorText('invalid_item', g), F12);
+  assert.equal(actionErrorText('invalid_item', g, 'download'), F12);
 });
 
 test('download errors show F2, F3 and F4', () => {
