@@ -56,6 +56,7 @@ var (
 	errHotkeySystem     = &SettingsError{Kind: "hotkey_system"}
 	errHotkeyFailed     = &SettingsError{Kind: "hotkey_register_failed"}
 	errHotkeyFailedNew  = &SettingsError{Kind: "hotkey_register_failed_new"}
+	errHotkeyFailedLost = &SettingsError{Kind: "hotkey_register_failed_lost"}
 )
 
 // Canonical validates accel (allow-listed keys, at least one of Cmd/Option/Ctrl, not a macOS
@@ -142,7 +143,11 @@ func (h *Hotkeys) Bind(slot, accel string) error {
 			}
 		}
 	}
+	old := *cur
 	if err := h.rebind(slot, c); err != nil {
+		if err == errHotkeyFailedLost {
+			*slotOf(&h.failed, slot) = old // still stored, no longer registered
+		}
 		return err
 	}
 	*slotOf(&h.failed, slot) = ""
@@ -176,6 +181,7 @@ func (h *Hotkeys) rebind(slot, c string) error {
 			if err := h.Reg.Register(old, h.callback(slot)); err != nil {
 				log.Printf("hotkey restore failed: %s: %v", old, err)
 				*cur = ""
+				return errHotkeyFailedLost
 			}
 			return errHotkeyFailed
 		}

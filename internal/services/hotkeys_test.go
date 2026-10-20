@@ -192,12 +192,27 @@ func TestBindRestoreFailsLogs(t *testing.T) {
 	f := newHotkeys(t, settings.Hotkeys{})
 	buf := captureLog(t)
 	f.reg.fail = map[string]bool{"Cmd+Ctrl+Option+J": true, DefaultOpenHotkey: true}
-	wantSettingsErr(t, f.h.Bind("open", "Cmd+Ctrl+Option+J"), "hotkey_register_failed")
+	wantSettingsErr(t, f.h.Bind("open", "Cmd+Ctrl+Option+J"), "hotkey_register_failed_lost")
 	if !strings.Contains(buf.String(), "hotkey restore failed") {
 		t.Errorf("log = %q, want a restore failure line", buf.String())
 	}
-	if got := f.h.Bindings().Open; got != "" {
-		t.Errorf("Open = %q, want cleared after a failed restore", got)
+	if bound, failed := f.h.State(); bound.Open != "" || failed.Open != DefaultOpenHotkey {
+		t.Errorf("State = %+v, %+v; want Open cleared and reported failed", bound, failed)
+	}
+}
+
+func TestSetHotkeyRestoreFailsUnbindsTray(t *testing.T) {
+	f, reg := settingsWithHotkeys(t)
+	var tray []string
+	f.svc.OnOpenHotkey = func(a string) { tray = append(tray, a) }
+	reg.fail = map[string]bool{"Cmd+Ctrl+Option+J": true, DefaultOpenHotkey: true}
+	snap, err := f.svc.SetHotkey(context.Background(), "open", "Cmd+Ctrl+Option+J")
+	wantSettingsErr(t, err, "hotkey_register_failed_lost")
+	if snap.Hotkeys.Open != "" || !reflect.DeepEqual(tray, []string{""}) {
+		t.Errorf("snapshot Open %q, tray %v; want both unbound", snap.Hotkeys.Open, tray)
+	}
+	if ev := *f.events; len(ev) != 1 || ev[0] != "settings:changed" {
+		t.Errorf("events = %v, want settings:changed", ev)
 	}
 }
 

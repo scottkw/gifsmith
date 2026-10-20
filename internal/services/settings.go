@@ -543,7 +543,14 @@ func (s *SettingsService) SetHotkey(ctx context.Context, slot, accel string) (Sn
 	s.Hotkeys.Resume()
 	was := s.Hotkeys.Bindings()
 	if err := s.Hotkeys.Bind(slot, accel); err != nil {
-		return s.Snapshot(ctx), err
+		snap := s.Snapshot(ctx)
+		if snap.Hotkeys != was { // the old combo did not come back either: the slot is unbound now
+			if slot == "open" && s.OnOpenHotkey != nil {
+				s.OnOpenHotkey("")
+			}
+			s.emit("settings:changed", snap)
+		}
+		return snap, err
 	}
 	b := s.Hotkeys.Bindings()
 	c := *slotOf(&b, slot)
