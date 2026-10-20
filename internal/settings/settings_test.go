@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -215,6 +216,32 @@ func TestStoreUnreadableIsFirstRun(t *testing.T) {
 	}
 	if buf.Len() == 0 {
 		t.Error("unreadable settings file was not logged")
+	}
+}
+
+func TestStoreNeverOverwritesUnreadable(t *testing.T) {
+	log.SetOutput(io.Discard)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	dir := t.TempDir()
+	file := filepath.Join(dir, "settings.json")
+	bad := []byte(`{"theme":"dark","pageSize":"36"}`) // one wrong-typed field fails the whole decode
+	if err := os.WriteFile(file, bad, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := OpenStore(dir)
+	if _, err := s.Update(func(p *Prefs) error { p.LastProvider = "klipy"; return nil }); !errors.Is(err, ErrUnreadable) {
+		t.Fatalf("Update over an unreadable file: err = %v, want ErrUnreadable", err)
+	}
+	if b, _ := os.ReadFile(file); !bytes.Equal(b, bad) {
+		t.Fatalf("settings.json = %s, want it left as is", b)
+	}
+	// Fixed by hand: the next write re-reads it and keeps its fields.
+	if err := os.WriteFile(file, []byte(`{"theme":"dark","pageSize":36}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	p, err := s.Update(func(p *Prefs) error { p.LastProvider = "klipy"; return nil })
+	if err != nil || p.Theme != "dark" || p.PageSize != 36 || p.LastProvider != "klipy" {
+		t.Errorf("Update after the fix = %+v, %v; want the file's prefs plus lastProvider", p, err)
 	}
 }
 

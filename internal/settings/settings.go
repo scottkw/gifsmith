@@ -369,27 +369,42 @@ const prefsFile = "settings.json"
 // Store is the single owner of settings.json: every write is a load-modify-save under one mutex,
 // so concurrent writers (panel and Settings) never erase each other's fields.
 type Store struct {
-	dir string
-	mu  sync.Mutex
-	p   Prefs
+	dir        string
+	mu         sync.Mutex
+	p          Prefs
+	unreadable bool // settings.json exists but could not be read: run on defaults, never overwrite it
 }
 
-// OpenStore reads dir/settings.json once. A missing file is the first run; an unreadable one is
-// treated as the first run too, logged. Unknown values reset to their defaults, logged by name.
+// ErrUnreadable refuses a write over a settings.json that exists but could not be read.
+var ErrUnreadable = errors.New("settings file unreadable")
+
+// OpenStore reads dir/settings.json once. A missing file is the first run. An unreadable one runs
+// on defaults, logged, and is never written over (as the library's files). Unknown values reset to
+// their defaults, logged by name.
 func OpenStore(dir string) *Store {
 	s := &Store{dir: dir}
-	b, err := os.ReadFile(filepath.Join(dir, prefsFile))
-	if err == nil {
-		err = json.Unmarshal(b, &s.p)
-	}
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		log.Printf("settings unreadable, treating as first run: %v", err)
-		s.p = Prefs{}
-	}
-	for _, f := range s.p.Normalize() {
-		log.Printf("settings: reset %s to default", f)
+	if err := s.load(); err != nil {
+		log.Printf("settings unreadable, using defaults and leaving the file as is: %v", err)
 	}
 	return s
+}
+
+// load reads settings.json into s.p; on failure s.p is unchanged and s.unreadable is set.
+func (s *Store) load() error {
+	var p Prefs
+	b, err := os.ReadFile(filepath.Join(s.dir, prefsFile))
+	if err == nil {
+		err = json.Unmarshal(b, &p)
+	}
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		s.unreadable = true
+		return err
+	}
+	for _, f := range p.Normalize() {
+		log.Printf("settings: reset %s to default", f)
+	}
+	s.p, s.unreadable = p, false
+	return nil
 }
 
 func (s *Store) Get() Prefs {
@@ -403,6 +418,9 @@ func (s *Store) Get() Prefs {
 func (s *Store) Update(f func(*Prefs) error) (Prefs, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.unreadable && s.load() != nil { // re-read: a file fixed or removed since launch is usable again
+		return s.p, ErrUnreadable
+	}
 	next := s.p
 	if err := f(&next); err != nil {
 		return s.p, err
