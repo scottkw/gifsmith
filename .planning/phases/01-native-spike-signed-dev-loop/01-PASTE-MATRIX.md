@@ -4,7 +4,7 @@
 |-------|-------|
 | macOS version | 27.0.1 |
 | Dev build commit | e9f1230 (gate re-test build; first signed build ce0c96d) |
-| Notarized build commit | PENDING: deferred to Phase 4 (Apple agreement 403). No notarized build exists; every "Notarized" cell below stays PENDING for the same reason |
+| Notarized build commit | 8428b30 (04-06 `wails3 task darwin:release`, 2026-10-19; app notary id a46eb52e-c6e6-4ac2-8b28-05af458ca034 Accepted, DMG notary id f5f85406-c0dc-45d8-bb46-df79e7293a1e Accepted, both stapled). Notarized cells below stay PENDING until the 04-06 clean-account reply |
 | Paste delay (ms) | 80 |
 | Date | 2026-10-17 |
 
@@ -30,7 +30,7 @@
 | N12 | ⌘Enter with Accessibility OFF shows the copied + how-to-grant message and pastes nothing | PASS | PENDING | |
 | N13 | "Enable automatic paste…" raises the prompt / opens the Accessibility pane | PENDING | PENDING | Earlier FAIL was plain Enter (Copy path). Button not clicked in the re-test; the user reached the permission list via the same `x-apple.systempreferences:…?Privacy_Accessibility` URL the button opens (run by the orchestrator), so the destination is confirmed but the click itself is unverified. Re-check at 01-04 UAT |
 | N14 | ⌘Enter with Accessibility ON pastes into TextEdit with no manual ⌘V | PASS | PENDING | First try crashed (TIS keyboard-layout lookup off the main thread); fixed in e9f1230. Re-test: ⌃⌥⌘G then ⌘Enter ×5 in TextEdit pasted each time, no crash |
-| N15 | Accessibility grant carried over from the previous build without re-granting | n/a | PENDING | Dev column n/a: first signed build |
+| N15 | Accessibility grant carried over from the previous build without re-granting | n/a | PASS | Dev column n/a: first signed build. Notarized: same DR as the signed dev build; grant carries over (04-06: `codesign -d -r-` of bin/release/Gifsmith.app equals ~/Applications/Gifsmith.app, identifier "com.kenscott.gifsmith" + Developer ID anchor + leaf OU S2K7P43927) |
 
 ## 2. Per-app paste matrix
 
@@ -52,7 +52,7 @@ Slack, Discord, Telegram and the Safari/Chrome composers were not tested in the 
 
 **macOS 27 Settings finding (for Phase 4 Settings/onboarding):** on macOS 27.0.1 the user saw no "Accessibility" row under System Settings › Privacy & Security. The permission list is reachable only via the URL `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility` (what "Enable automatic paste…" opens). Onboarding copy must not tell the user to navigate there by hand; use the button/URL.
 
-**Notarized columns:** deferred to Phase 4 (Apple agreement 403). `xcrun notarytool store-credentials gifsmith-notary … --team-id S2K7P43927` fails with "HTTP status code: 403. A required agreement is missing or has expired", even after the user accepted the developer.apple.com agreement banner and retried about 30 minutes later. No keychain profile exists, so no notarized build was made.
+**Notarized columns:** deferred to Phase 4 (Apple agreement 403). `xcrun notarytool store-credentials gifsmith-notary … --team-id S2K7P43927` fails with "HTTP status code: 403. A required agreement is missing or has expired", even after the user accepted the developer.apple.com agreement banner and retried about 30 minutes later. No keychain profile exists, so no notarized build was made. **Update (04-06, 2026-10-19):** resolved; the `gifsmith-notary` profile works and the first notarized build (8428b30) was accepted and stapled.
 
 ## 3. Payload conclusion
 
