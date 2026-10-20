@@ -495,10 +495,11 @@ func (s *SettingsService) SetLaunchAtLogin(ctx context.Context, on bool) (Snapsh
 			return s.Snapshot(ctx), errNotInApplications
 		}
 	}
-	op, apply := "disable", s.Autostart.Disable
+	op, apply, undo := "disable", s.Autostart.Disable, s.Autostart.Enable
 	if on {
-		op, apply = "enable", s.Autostart.Enable
+		op, apply, undo = "enable", s.Autostart.Enable, s.Autostart.Disable
 	}
+	was, wasErr := s.Autostart.IsEnabled()
 	if err := apply(); err != nil {
 		log.Printf("autostart: %s failed", op)
 		return s.Snapshot(ctx), errAutostartFailed
@@ -506,6 +507,12 @@ func (s *SettingsService) SetLaunchAtLogin(ctx context.Context, on bool) (Snapsh
 	p, err := s.Store.Update(func(p *settings.Prefs) error { p.LaunchAtLogin = on; return nil })
 	if err != nil {
 		log.Printf("settings write failed: launchAtLogin")
+		// Put the login item back, so a reported failure means nothing changed (as SetHotkey).
+		if wasErr != nil || was != on {
+			if err := undo(); err != nil {
+				log.Printf("autostart: rollback after the failed write failed")
+			}
+		}
 		return s.snapshotOf(p), errPrefsWriteFailed
 	}
 	return s.changed(), nil

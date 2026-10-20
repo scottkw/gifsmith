@@ -692,6 +692,38 @@ func TestSetLaunchAtLoginFailures(t *testing.T) {
 	wantSettingsErr(t, err, "autostart_failed")
 }
 
+// readOnlyDir makes every settings write in dir fail (the file stays readable) until the test ends.
+func readOnlyDir(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+}
+
+// WR-04: a failed write puts the login item back, so the reported failure leaves the OS unchanged.
+func TestSetLaunchAtLoginWriteFailureRollsBack(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	as := f.svc.Autostart.(*fakeAutostart)
+	readOnlyDir(t, f.dir)
+	for _, on := range []bool{true, false} {
+		as.enabled = !on
+		_, err := f.svc.SetLaunchAtLogin(ctx, on)
+		wantSettingsErr(t, err, "prefs_write_failed")
+		if as.enabled != !on || f.svc.Store.Get().LaunchAtLogin || len(*f.events) != 0 {
+			t.Errorf("on=%v: OS enabled %v, pref %v, events %v; want all unchanged", on, as.enabled, f.svc.Store.Get().LaunchAtLogin, *f.events)
+		}
+	}
+	// Already in the requested state: the rollback must not flip it.
+	as.enabled = true
+	_, err := f.svc.SetLaunchAtLogin(ctx, true)
+	wantSettingsErr(t, err, "prefs_write_failed")
+	if !as.enabled {
+		t.Error("rollback disabled a login item that was already on")
+	}
+}
+
 func TestApplyStartup(t *testing.T) {
 	for _, tc := range []struct {
 		name          string
