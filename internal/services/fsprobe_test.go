@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -72,4 +73,14 @@ func TestValidateDownloadDirStatfsError(t *testing.T) {
 	dir := t.TempDir()
 	statfs := func(string) (string, bool, error) { return "", false, errors.New("statfs failed") }
 	wantFolderErr(t, ValidateDownloadDir(dir, statfs), "folder_unwritable", filepath.Base(dir))
+}
+
+func TestStatfsTempDir(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("Statfs is macOS only")
+	}
+	typ, local, err := Statfs(t.TempDir())
+	if err != nil || typ == "" || !local {
+		t.Fatalf("Statfs(temp dir) = %q, %v, %v; want a type name, local", typ, local, err)
+	}
 }
