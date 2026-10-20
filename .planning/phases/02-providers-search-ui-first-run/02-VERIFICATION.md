@@ -1,8 +1,8 @@
 ---
 phase: 02-providers-search-ui-first-run
-verified: 2026-10-17T22:41:41Z
+verified: 2026-10-20T19:19:58Z
 status: passed
-score: 92/94 must-haves verified (5 roadmap SCs + 89 plan truths; 2 uncertain = intentional review-fix deviations awaiting override acceptance; 0 failed)
+score: 94/94 must-haves verified (5 roadmap SCs + 89 plan truths; 2 via accepted overrides; 6 hold as intentionally superseded by later-phase requirements; 0 failed, 0 behavior-unverified)
 covered_files:
   - ".gitignore"
   - ".planning/phases/02-providers-search-ui-first-run/02-01-PLAN.md"
@@ -37,11 +37,13 @@ covered_files:
   - "frontend/src/components/SetupCard.svelte"
   - "frontend/src/components/StateMessage.svelte"
   - "frontend/src/components/Tile.svelte"
+  - "frontend/src/lib/actions.ts"
   - "frontend/src/lib/api.ts"
   - "frontend/src/lib/errors.test.ts"
   - "frontend/src/lib/errors.ts"
   - "frontend/src/lib/grid.test.ts"
   - "frontend/src/lib/grid.ts"
+  - "frontend/src/lib/prefs.ts"
   - "frontend/src/lib/providers.ts"
   - "frontend/src/main.ts"
   - "frontend/tsconfig.json"
@@ -91,7 +93,7 @@ covered_files:
   - "scripts/uat/06-clips.js"
   - "wire_desktop.go"
   - "wire_server.go"
-covered_digest: "v3:sha256:b22116a239cf530f1eaa19ce4794c406c4db8e9269aa7be10b2e8587bc43ff20"
+covered_digest: "v3:sha256:2e77c9020ef9bcea93e55a79c17bf5bf43e0285733781b62066a04425176fd71"
 behavior_unverified: 0
 overrides_applied: 2
 overrides:
@@ -103,248 +105,221 @@ overrides:
     reason: "WR-02 fix e3501b7: a persisted Clips tab is restored when a GIPHY key exists and probes once behind the S2 skeleton (bootClips); without a GIPHY key it still opens on GIPHY. User observed 'Clips tab restored after relaunch' natively."
     accepted_by: "Ken Scott"
     accepted_at: "2026-10-17T23:04:59Z"
-human_verification_resolution: "Accepted by user 2026-10-17T23:04:59Z: both overrides above; the 11 judgment-tier prohibitions reviewed (the 3 bounded automatic requests — post-GIPHY Clips probe, one re-probe, GIPHY trending fetch when restoring a Clips tab — accepted); MVP-mode mismatch resolved by dropping mvp mode from Phases 2-4 in ROADMAP.md."
-human_verification:
-  - test: "Accept or reject an override for plan 02-04's Klipy truth 'only items with type gif are mapped and any other items are counted in a log line'"
-    expected: "Override accepted (suggested YAML in the report). Since review fix 50824e1 (WR-04), klipy.go keeps any item that has GIF renditions in place, ads included, and skips plus logs only items with no GIF renditions. This follows the Klipy no-filter rule and ROADMAP SC1 more closely than the plan text did."
-    why_human: "The code contradicts the plan truth as written, on purpose. Only the user can accept the deviation. The related product question (unlabelled Klipy ads, IN-09) is still open with developers@klipy.com. PROJECT.md Key Decisions and COVERAGE.md still say 'non-gif items are skipped'. Their wording should be aligned when the override is accepted."
-  - test: "Accept or reject an override for plan 02-05's truth 'at launch the panel opens … on GIPHY when the persisted provider is Clips but Clips is unavailable'"
-    expected: "Override accepted. Since review fix e3501b7 (WR-02, iteration 1), a persisted Clips tab is restored at launch whenever a GIPHY key exists. bootClips then fetches GIPHY trending and probes once behind the S2 skeleton. The app still opens on GIPHY when no GIPHY key is stored (App.svelte:173). The user already watched this behavior natively ('Clips tab restored after relaunch')."
-    why_human: "This is an intentional contradiction of the plan text, and it needs a recorded human acceptance. The behavior was watched natively, but no override entry records the acceptance."
-  - test: "Review the 11 flagged judgment-tier prohibitions P1-P11 (deduplicated across plans 02-01..02-06) against the non-authoritative LLM-judge verdicts in the Prohibitions table"
-    expected: "Accept or reject each verdict. 10 are judged 'no violation found'. P8 ('no requests the user did not cause') is judged 'no material violation, 3 bounded exceptions noted'."
-    why_human: "Per ADR-550, judgment-tier prohibitions have no wired enforcement. They are flagged for review and never passed silently. P12 (official GIPHY PNGs) was checked deterministically and needs no judgment."
-  - test: "Decide the MVP-mode discrepancy: ROADMAP marks Phase 2 '**Mode:** mvp', but its goal is not a user story (user-story.validate → valid: false)"
-    expected: "Either reformat the goal with /gsd-mvp-phase 2, or drop mode: mvp from Phase 2 (and Phases 3 and 4, which have the same pattern) in ROADMAP.md"
-    why_human: "The MVP verifier rule says to refuse verification for a non-user-story goal. I did not refuse, for the same reason as Phase 1. This phase's goal is already phrased as a user flow, so the report includes a derived User Flow Coverage table."
+re_verification:
+  previous_status: passed
+  previous_score: "92/94 (2 uncertain, then accepted as overrides on 2026-10-17T23:04:59Z)"
+  reason: "Flagged stale: Phase 3 and Phase 4 changed code this report covers (provider Params from Settings, App.svelte, SettingsService, staging, actions)."
+  gaps_closed: []
+  gaps_remaining: []
+  regressions: []
+  superseded_by_later_phases:
+    - "⌘K bound with no effect -> opens the action menu (Phase 3, SRCH-05/ACTN)"
+    - "Enter/⌘Enter on a Clip refused with E8 -> Clips copy/paste as MP4 (Phase 3, ACTN-09); TestCopyClipRefused replaced by TestCopyClipMP4/TestPasteClipMP4"
+    - "Enter always copies the GIF file -> Enter runs the user's primary action (default copy; Phase 4 SETT default actions); on Klipy it falls back to Copy Link until Klipy clears temp-file copies (Phase 4, RELS-04, KlipyFileActionsCleared=false)"
+    - "GIPHY rating fixed pg-13 / fixed page size -> per-request provider.Params from Settings, defaults pg-13 / en / us (Phase 4, SRCH-09, SETT-04); Clips probe keeps pg-13 fixed"
+    - "Single staged copy file is the only media on disk -> plus user-initiated Downloads and square-crop staging with eager cleanup (Phase 3, ACTN-10)"
+    - "Keys never reach the webview at all -> Settings › Keys shows the last 4 characters only (Phase 4, SETT-02; the full key still never reaches the webview)"
+human_verification_resolution: "Carried forward from 2026-10-17T23:04:59Z (overrides, prohibitions P1-P11, MVP-mode decision). No new human items in this re-verification."
 ---
 
 # Phase 2: Providers, Search UI & First Run Verification Report
 
 **Phase Goal:** A stranger can open the panel, get set up with a key (or skip to the keyless provider), search or browse trending GIFs on any available provider in a fast keyboard-driven animated grid, and Enter copies the GIF, with vendor-required attribution and honest error handling.
-**Verified:** 2026-10-17T22:41:41Z (code at 7c2c247; HEAD later moved to 2958cc8, which changes only REQUIREMENTS.md and ROADMAP.md)
-**Status:** human_needed
-**Re-verification:** No, initial verification
+**Verified:** 2026-10-20T19:19:58Z (code at HEAD 7874dc6 on `gsd/phase-04-settings-shell-polish-release`; no code diff from `main`)
+**Status:** passed
+**Re-verification:** Yes. **Re-verified 2026-10-20 after Phase 4.** The 2026-10-17 report (initial verification, code at 7c2c247) was flagged stale because Phases 3 and 4 changed files it covers. This pass re-checked every roadmap SC, plan truth group and requirement ID against today's code.
+
+## Re-verified 2026-10-20 after Phase 4
+
+What I did, and what I relied on:
+
+- **Diffed** the Phase 2 code surface from `c9ffb49` (Phase 2 complete) to HEAD: 182 non-planning files changed. The Phase 2 core (`search.go`, `clips.go`, `httpx.go`, `gifs.go`, the three provider clients, `SaveKey`, `providers.ts`, `Footer.svelte`, `SetupCard.svelte`, `ProviderTabs.svelte`, the official GIPHY PNGs) was read at HEAD.
+- **Ran myself:** `go test -race -count=1 ./internal/...` (14 packages ok, fakeapi has no tests; exit 0), `go vet . ./internal/...` (clean), `node --test src/lib/*.test.ts` (103 pass, 0 fail), `svelte-check` (191 files, 0 errors, 0 warnings), a debt-marker grep (none) and sha256 of the attribution PNGs (unchanged since Phase 2; no diff in `frontend/public/attribution`).
+- **Not re-run, by instruction:** the browser smoke and headless UAT loop (ports are shared with concurrent verifiers). The most recent verifier-run evidence for those scripts is the Phase 4 verification (`04-VERIFICATION.md:263`, HEAD 7e8792a): SMOKE OK and 35/35 UAT OK, which includes all nine Phase 2 scripts (01-tracer, 02-grid, 02-keyboard, 03-states, 05-setup, 05-tabs, 06-backstops, 06-clips, 06-clips-denied). `git diff 7e8792a HEAD -- . ':!.planning'` is empty, so that run covers today's code exactly.
+- **Known accepted debt (not a gap):** the 18-backstops `CancelledRejectionError` flake recorded in `.planning/phases/04-settings-shell-polish-release/deferred-items.md` (status acknowledged). Its owner is the Phase 2 search/cancel path in `App.svelte`, and it has no user-visible effect.
+
+### What Phase 3 and Phase 4 changed in Phase 2's surface
+
+| Phase 2 behavior | Today | Changed by | Verdict |
+|------------------|-------|------------|---------|
+| GIPHY `rating=pg-13`, fixed page size | `provider.Params` read per request from SettingsService (`main.go:71-78`), default `pg-13`/`en`/`us` (`provider.go:77-79`); `lang` sent on search only; Clips probe keeps `pg-13` (`giphy.go:118`). Param change calls `Search.Flush` (drops cache, keeps the 429 block) | Phase 4 SRCH-09, SETT-04 | Superseded intentionally; Phase 2 defaults preserved |
+| Klipy `content_filter=medium`, key in path, 8..50 per page | Unchanged; `per_page` now `min(max(PageSize,8),50)`, `locale` from Params (`klipy.go:117-120`). No-filter/no-reorder mapping and WR-04 logged skip unchanged | Phase 4 SETT-04 | Holds |
+| ⌘K bound, no effect | Opens the action menu (`App.svelte:652-653,715`) | Phase 3 | Superseded (SC2 already scoped the menu to Phase 3) |
+| Clip copy refused with E8 | Clips copy/paste the 720p MP4 (`giphy.go:151-158` clipRendition, `TestCopyClipMP4`) | Phase 3 ACTN-09 | Superseded (was listed as deferred in the original report) |
+| Enter copies the GIF file | Enter runs `effectiveAction(..., 'primary')` (`actions.ts:43-45`); default `copy` (`settings.go:212`). On Klipy it returns Copy Link because `KlipyFileActionsCleared = false` (`actions.go:45`), enforced again in Go (`actions.go:104`) | Phase 4 RELS-04, SETT default actions | Superseded intentionally for Klipy pending written clearance; GIPHY and Finer Gifs still copy the file by default |
+| Keys never reach the webview | `KeyStatus` returns status plus `Last4` only (`services/settings.go:108-112`) | Phase 4 SETT-02 (04-CONTEXT.md:19) | Holds in substance; the full key never reaches the webview or logs |
+| Hide-after-copy timer survives a re-show (IN-07) | `clearTimeout(hideTimer)` on `panel:show` (`App.svelte:277`) | Phase 3/4 fix | Info item closed |
 
 ## Mode discrepancy (MVP)
 
-ROADMAP marks Phase 2 `**Mode:** mvp`, but its goal fails `user-story.validate` (no "As a…, I want to…, so that…"). The MVP rule says to refuse and ask for `/gsd-mvp-phase 2`. I did not refuse. Phase 1 set the same precedent, and this goal is already phrased as a stranger's flow. So I derived the flow from the goal text below and then ran the standard goal-backward checks. The user decides how to fix the mode (human item 4).
+Resolved 2026-10-17: `mvp` mode was dropped from Phases 2-4 in ROADMAP.md. Standard goal-backward verification applies. The User Flow Coverage table is kept because the goal is phrased as a flow.
 
 ## User Flow Coverage
 
 Flow, derived from the goal: «A stranger opens the panel → sets up a key or skips to the keyless provider → searches or browses trending on any available provider in a fast keyboard grid → Enter copies the GIF, with attribution and honest errors.»
 
-| Step | Expected | Evidence | Status |
-|------|----------|----------|--------|
-| Open the panel | ⌃⌥⌘G shows a non-activating panel | `shell.go:81-88` registers the hotkey and `show()` focuses the webview. `bin/install-dev.log` (17:32:16) shows "tray menu ready" and "hotkey registered: Ctrl+Option+Cmd+G". The user approved native UAT on 2026-10-17. | ✓ |
-| First run: setup card | Opens on GIPHY with the S1 card, a key field, Save Key, "Get a free key ↗" and "Try Finer Gifs (no key)" | `App.svelte:98-102,173`, `SetupCard.svelte`. UAT `05-setup.js` and `05-tabs.js` ("first run not on GIPHY") pass (re-run). | ✓ |
-| Paste key → verified → saved | A real trending call checks the key, then it is written to the Keychain. A bad key gets K2. | `services/settings.go:50-85` (validKey → NewClient().Trending → Keys.Set → Invalidate+Seed). `TestSaveKeyVerifiesAndSeeds` and `TestSaveKeyRejectedKeepsOldKey` pass. Smoke: a bad key gives `key_rejected` for giphy (401) and klipy (404), and the key is not echoed. Native: real GIPHY and Klipy keys saved and still present after relaunch. | ✓ |
-| Or skip to the keyless provider | "Try Finer Gifs (no key)" switches to Finer Gifs and shows S8 | `App.svelte:274-277`, `05-setup.js:146-149` | ✓ |
-| Browse trending / search | An empty box shows trending. Typing searches after a 450 ms debounce, in an animated, virtualized grid. | `App.svelte:221-237`, `ResultGrid.svelte`. Verifier-run debounce probe: 6 keystrokes in 516 ms gave **1** bound call, 453 ms after the last input, and a 1-character query gave 0 calls plus S8. UAT `02-grid` (virtualized, pages to End of results at 60) passes. | ✓ |
-| Any available provider | GIPHY, Klipy, Finer Gifs, and Clips when approved, via ⌘1–⌘4 or pills. Each provider keeps its own state. | `providers.ts`, `ProviderTabs.svelte`, `App.svelte:247-257`. UAT `05-tabs` and `06-clips` pass. | ✓ |
-| Keyboard-driven | Arrows move, Enter copies, ⌘Enter pastes, Esc clears then hides, ⌘K and Tab are bound | `grid.ts` (tests 1-8 pass) and `App.svelte:344-382`. UAT `02-keyboard` passes. Esc-hides and ⌘W were checked natively by the user. | ✓ |
-| Enter copies the GIF | Go downloads (allowlist, 200, GIF magic, ≤50 MB), stages, and puts the file URL on the pasteboard. The panel hides 400 ms later. | `actions.go:41-73`, `staging.go`. Smoke: Copy stages `office-moment-1.gif`, and a disallowed URL is refused. Native: GIFs from GIPHY and Klipy pasted as animated GIFs (user-approved). | ✓ |
-| Attribution | Official "Powered by GIPHY" mark on GIPHY and Clips, "Search KLIPY" plus "Powered by KLIPY", a Finer credit | `Footer.svelte`, `providers.ts`. **The PNGs match the official giphy-attribution-marks.zip byte for byte** (sha256 checked by the verifier, see below). | ✓ |
-| Honest errors | Per-provider E1–E5f copy, no URL or key, and one provider failing never blocks the others | `errors.ts` (15 node tests pass) and per-provider `states` in `App.svelte:70`. UAT `03-states` passes, including the leak check on page text. | ✓ |
-| **Outcome** | A stranger goes from nothing to a copied GIF without help | Every step above is verified in code, by automated UAT, and in the user-approved native session with real keys | ✓ |
+| Step | Expected | Evidence (HEAD) | Status |
+|------|----------|-----------------|--------|
+| Open the panel | Global hotkey shows a non-activating panel | `shell.go:59-71` (NonActivating, `HideOnEscape:false`, WindowClosing hook); default `Cmd+Ctrl+Option+G` (`settings.go:224`), now rebindable (Phase 4 SETT-03). Native approval from 2026-10-17 plus Phase 4 UAT. | ✓ |
+| First run: setup card | Opens on GIPHY with the S1 card, key field, Save Key, "Get a free key ↗", "Try Finer Gifs (no key)" | `App.svelte:310-316` (persisted slot, else GIPHY; Clips without a GIPHY key → GIPHY), `card` derivation `App.svelte:194-198`, `SetupCard.svelte:115,134,136` | ✓ |
+| Paste key → verified → saved | Real trending call, then Keychain; bad key → K2 | `services/settings.go:71-105` (trim, `validKey`, `NewClient().Trending`, `Keys.Set`, `Invalidate`+`Seed`, Clips Reset/Trigger, `providers:changed`). `TestSaveKeyVerifiesAndSeeds`, `TestSaveKeyRejectedKeepsOldKey`, `TestSaveKeyConcurrent`, `TestSaveKeyNeverLogsOrReturnsKey` pass | ✓ |
+| Or skip to the keyless provider | Try Finer switches to Finer Gifs | `tryFiner` `App.svelte:520-523` | ✓ |
+| Browse trending / search | Empty box → trending; typing → 450 ms debounce; virtualized animated grid | `DEBOUNCE_MS = 450` (`App.svelte:67`), `wanted()` 2+ code points (`App.svelte:397-400`), trending at once on short query (`:415`), `ResultGrid.svelte` | ✓ |
+| Any available provider | GIPHY, Clips (when approved), Klipy, Finer via ⌘1–⌘4 or pills; per-provider state | `providers.ts` SLOTS, `onMainKeydown` slot routing (`App.svelte:703-708`), `switchTo` persists via `setLastProvider` (`:476-488`), Clips pill `aria-disabled` (`ProviderTabs.svelte:23-29`) | ✓ |
+| Keyboard-driven | Arrows, Enter, ⌘Enter, Esc clears then hides, ⌘K, Tab bound | `grid.ts` `routeKey` (node tests pass), `App.svelte` escape case (`:655-660`), `'tab'` bound no effect (`:666`) | ✓ |
+| Enter copies the GIF | Download through the allowlist, stage, file URL on the pasteboard, hide 400 ms later | `effectiveAction` default `copy`; `HIDE_AFTER_COPY_MS` (`App.svelte:902-905`); `TestCopyTwiceKeepsOnlyLatest` passes. Klipy: Copy Link by default (RELS-04, see above) | ✓ (Klipy superseded by RELS-04) |
+| Attribution | Official GIPHY mark on GIPHY/Clips, "Search KLIPY" + "Powered by KLIPY", Finer credit | `Footer.svelte:42-49` (mark now follows the resolved theme), `providers.ts` placeholders, PNG hashes unchanged | ✓ |
+| Honest errors | Per-provider copy, no URL or key, one failing provider never blocks others | `errors.ts` (node tests pass), per-provider `states`, `MarshalError` (`main.go:131-135`) | ✓ |
+| **Outcome** | A stranger goes from nothing to a copied GIF without help | Every step holds at HEAD | ✓ |
 
 ## Goal Achievement
 
 ### Observable Truths: Roadmap Success Criteria (contract)
 
-| # | Truth | Status | Evidence |
-|---|-------|--------|----------|
-| SC1 | Trending with an empty box. Debounced search. The grid loads more on scroll or arrows. You can switch between Finer, GIPHY and Klipy, and the last provider is remembered. Results are never blended, reordered or filtered. | ✓ VERIFIED | `search.go` (TTL cache, `dedupe` skips Klipy). `TestNoDedupeKlipy`, `TestDedupeNonKlipy` and the smoke check `klipy-dup` appears twice all pass. The debounce probe above. `02-grid` and `02-keyboard` (ArrowDown loads page 2 and keeps the selection) pass. `SetLastProvider` is called on every switch (`App.svelte:252`), and `05-tabs` checks the reload. Klipy skips only items with no GIF rendition (logged). See override item 1. |
-| SC2 | Arrows move, Enter copies a file that pastes with ⌘V, and Esc closes. ⌘K is bound. | ✓ VERIFIED | `routeKey`/`move` tests. `02-keyboard` (arrows, caret fixed, ⌘K/Tab no effect, Esc clears). Native user approval covers Enter → ⌘V of an animated GIF and Esc hiding the panel. |
-| SC3 | First run opens on GIPHY with the card. The key is verified before it is saved, and a bad key is rejected clearly. Try Finer works without a key. Keys live in the Keychain and never appear in the UI, logs or errors. | ✓ VERIFIED | Desktop wiring: `wire_desktop.go` uses `KeyringStore{Service: com.kenscott.gifsmith}`. `SaveKey` returns `void` (binding). `Providers` returns booleans only. `TestSaveKeyNeverLogsOrReturnsKey` passes. Re-ran the leak grep on `bin/install-dev.log`: exit 1 (no `api_key=` and no `/api/v1/<key>/`). `05-setup` asserts the typed key never shows in page text. |
-| SC4 | "Powered by GIPHY" on GIPHY and Clips. The Klipy placeholder reads "Search KLIPY". | ✓ VERIFIED | `Footer.svelte:21-26` and `providers.ts:24`. `05-tabs`, `05-setup` (the mark shows under the setup card) and `06-clips` (Clips grid and C2) pass. |
-| SC5 | Clips appears only after its test call passes, otherwise C2 explains why. Rapid typing does not burn requests. A rate limit says when to retry. Network, timeout and provider errors are shown per provider, and the others stay usable. | ✓ VERIFIED | `clips.go` state machine with 13 tests that pass. `gifs.go:65-67` refuses Clips unless it is enabled. Smoke: the probe reaches `enabled` and Trending(clips) returns isClip. `06-clips-denied` shows C2. Native log `clips: checking → clips: disabled` (the user's key is not approved, so C2 shows). The debounce probe above plus the 5/10-minute caches. 429 block: `TestBlockKnownRetry`, `TestClipsShareGiphyBudget`. `03-states` covers E1 countdown, S9a, E3/E4/E5/E5f and S12a. |
+| # | Truth | Status | Evidence (HEAD) |
+|---|-------|--------|-----------------|
+| SC1 | Trending with an empty box; debounced search; grid loads more on scroll or arrows; switch Finer/GIPHY/Klipy, last provider remembered; never blended, reordered or filtered | ✓ VERIFIED | `search.go` TTL cache and `dedupe` skips Klipy (`search.go:184-189`); `TestNoDedupeKlipy`, `TestDedupeNonKlipy` pass. Debounce `App.svelte:67,415-417`. `setLastProvider` in `switchTo`. Klipy WR-04 skip unchanged (override 1). Library tabs (Phase 3) group by provider, never blended (03-VERIFICATION SC4). |
+| SC2 | Arrows move, Enter copies a file that pastes with ⌘V, Esc closes; ⌘K bound | ✓ VERIFIED | `grid.ts` + node tests; escape case `App.svelte:655-660`; Enter → primary action default `copy`. ⌘K now opens the Phase 3 menu (superset). Klipy Enter = Copy Link under RELS-04 (intentional). |
+| SC3 | First run on GIPHY with the card; key verified before save; bad key rejected; Try Finer works keyless; keys in Keychain, never in UI/logs/errors | ✓ VERIFIED | `wire_desktop.go` KeyringStore; `SaveKey` returns error only; log lines in `services/settings.go` name provider and kind only (lines 81-95, 163-196); `TestSaveKeyNeverLogsOrReturnsKey` passes. Settings shows last 4 only (SETT-02). |
+| SC4 | "Powered by GIPHY" on GIPHY and Clips; Klipy placeholder "Search KLIPY" | ✓ VERIFIED | `Footer.svelte:42-44`, `attribution` derived per slot (`App.svelte:188-190`), `providers.ts` Klipy placeholder `'Search KLIPY'`. |
+| SC5 | Clips only after its test call passes, else C2; debounce saves requests; rate limit gives retry time; per-provider errors, others stay usable | ✓ VERIFIED | `clips.go` state machine (tests pass: `TestClipsRecheckBeforeGifsSuccess`, `TestClipsRateLimitedRecheckKeepsReprobe`); `gifs.go` refuses Clips unless enabled; `ProbeClips` 401/403 → key_rejected (`giphy.go:112-121`). 429: `TestBlockKnownRetry`, `TestClipsShareGiphyBudget`; Phase 4 split `gen`/`keyGen` so a Params flush keeps the 429 block (`search.go:82-110`). `TestCancelNotCachedNotBlocked`, `TestInvalidateDropsInFlightResult` pass. |
 
 ### Observable Truths: Plan must-haves (89)
 
-| Plan | Truths | Verified | Notes |
-|------|--------|----------|-------|
-| 02-01 tracer | 15 | 15 | `MarshalError: provider.MarshalError` (main.go:86). httpx classification (`TestGetJSONClassification`, `TestRedaction`). fileid regex. Staging allowlist, magic bytes, cap, .part+rename, Sweep after CopyFile (`TestCopyTwiceKeepsOnlyLatest`, plus the redirect allowlist from fix 3f076fa). The sample-GIF spike path is gone: no sample asset, and 4 `NewService` calls stay untagged in main.go. SMOKE OK and 01-tracer UAT OK were re-run. |
-| 02-02 grid/keyboard | 16 | 16 | `createVirtualizer` (estimate 152, overscan 2, padding 16). Rows keyed by index. S5/S6/S12a rows. Shell: `HideOnEscape:false`, WindowClosing cancel+Hide, App+Edit menu only (`shell.go:42-72`). `02-grid` (fewer than 60 images mounted at the top, 60 then End of results, no duplicate-key error) and `02-keyboard` pass. Native Esc and ⌘W were user-checked. |
-| 02-03 states/cache | 17 | 17 | `search.Service` TTLs, `max(Retry-After, 60 s)` block, cancel not cached (`TestCancelNotCachedNotBlocked`). `latest()` cancels the CancellablePromise. Skeleton, S4, S7, S8, E1–E5f, S9a. The reduced-motion CSS is in `app.css:72-83` (static, checked by inspection). `03-states` passes, including that a superseded search never renders its error. |
-| 02-04 GIPHY/Klipy/keys | 16 | 15 + 1 uncertain | The GIPHY params (pg-13, messaging_non_clips, 50-rune q), flexInt, paging caps, 401/403→key_rejected. Klipy: key in the path (`PathEscape`, badKey), content_filter=medium, has_next, 401/403/404→key_rejected. SaveKey sanitizer, serialized (`TestSaveKeyConcurrent`), seed instead of a second request. Atomic 0600 prefs. The server build uses MemoryStore. **Uncertain:** the "only type gif mapped" truth was changed on purpose by WR-04 (override item 1). |
-| 02-05 tabs/setup | 14 | 13 + 1 uncertain | Pill geometry, placeholders, attribution per slot, aria-disabled Clips with its title, C1, the setup card S1/S1a/S1b/S1c/S13/K6, Tab cycle, Esc layering, `providers:changed` refresh. `05-tabs` and `05-setup` pass. **Uncertain:** the "Clips persisted → open on GIPHY" truth was changed on purpose by WR-02 (override item 2). |
-| 02-06 Clips/native | 11 | 11 | Probe after a GIFs success, once per launch, blocked during a 429, sharing the GIPHY budget (CR-01). States are reported via `Providers`. C2 copy plus a mailto constant. E8 on a Clips tile (`TestCopyClipRefused`, `06-clips`). Compliance posture is in PROJECT.md Key Decisions (line 72). Install log has tray and hotkey lines. Native session approved. Leak grep clean. **Both backstop truths** (long copy fits in light and dark, ≥4.5:1 contrast) have explicit evidence: `06-backstops.js` computes the overflow and contrast and prints UAT OK (re-run). |
+| Plan | Truths | Verified | Notes at HEAD |
+|------|--------|----------|---------------|
+| 02-01 tracer | 15 | 15 | `MarshalError` still first in the chain (`main.go:131-135`). httpx classification and redaction tests pass; `LooseInt` added for display-only numbers. Staging allowlist/magic/cap/.part+rename and Sweep: `TestCopyTwiceKeepsOnlyLatest` passes. Service count grew to 6 (`main.go:124-129`, Library and Update added in Phases 3-4), all untagged. |
+| 02-02 grid/keyboard | 16 | 16 | Virtualized `ResultGrid.svelte`; shell `HideOnEscape:false`, WindowClosing cancel+Hide, App/Edit menu (`shell.go:59-102`). ⌘K "no effect" superseded by the Phase 3 menu. |
+| 02-03 states/cache | 17 | 17 | TTLs and `max(Retry-After, 60 s)` block intact; Phase 4 `Flush` added without loosening the block. `latest()`/cancel path unchanged in intent; the acknowledged 18-backstops `CancelledRejectionError` flake lives here (accepted debt). |
+| 02-04 GIPHY/Klipy/keys | 16 | 16 (1 via override) | GIPHY q clamp 50 runes, `messaging_non_clips`, flexInt, offset caps 4999/499, 401/403 → key_rejected. Rating now `Params.Rating` default pg-13 (SRCH-09). Klipy path key + `PathEscape` + `badKey`, `content_filter=medium`, 401/403/404 → key_rejected. SaveKey serialized. Override 1 (WR-04) still matches `klipy.go:139-145`. |
+| 02-05 tabs/setup | 14 | 14 (1 via override) | Placeholders, per-slot attribution, aria-disabled Clips with title, setup card, Try Finer, `providers:changed` refresh (`App.svelte:294`). Override 2 (WR-02) still matches `App.svelte:312-315`. |
+| 02-06 Clips/native | 11 | 11 | Probe after a GIFs success, once per key, inside the GIPHY 429 budget. E8-on-Clip truth superseded by ACTN-09 (MP4 copy). Compliance row in PROJECT.md:79 still accurate. Backstop truths (long copy fits, ≥4.5:1 contrast) covered by `06-backstops.js` in the Phase 4 verifier's 35/35 run on identical code. |
 
-**Score:** 92/94 truths verified (0 present-but-behavior-unverified, 2 uncertain, 0 failed)
+**Score:** 94/94 truths verified (0 present-but-behavior-unverified, 0 uncertain, 0 failed; 2 via accepted overrides; 6 intentionally superseded by later-phase requirements, listed in frontmatter)
 
-Behavior-dependent truths (cancellation, 429 block, Clips state transitions, SaveKey serialization, Invalidate dropping in-flight answers) each have a named test that passes: `TestCancelNotCachedNotBlocked`, `TestBlockKnownRetry`, `TestClipsRecheckBeforeGifsSuccess`, `TestClipsRateLimitedRecheckKeepsReprobe`, `TestSaveKeyConcurrent`, `TestInvalidateDropsInFlightResult`. These ran as part of the one `go test -race` run. Native-only behaviors (panel focus, Esc/⌘W hide, real ⌘V paste, Keychain persistence after relaunch, WR-02/WR-03 relaunch and offline recovery) were watched and approved by the user on 2026-10-17, and `bin/install-dev.log` supports that.
-
-### Override suggestions (intentional deviations)
-
-**This looks intentional.** To accept, add to this file's frontmatter:
-
-```yaml
-overrides:
-  - must_have: "Klipy results map to Gif{...}; only items with type 'gif' are mapped and any other items are counted in a log line"
-    reason: "WR-04 fix 50824e1: Klipy's integration rules forbid filtering, so items with GIF renditions (including ads) stay in place; only items with no GIF rendition are skipped and logged. Ad labelling stays open as IN-09 pending developers@klipy.com."
-    accepted_by: "{name}"
-    accepted_at: "{ISO timestamp}"
-  - must_have: "at launch the panel opens on the persisted provider, on GIPHY when none is persisted (first run), and on GIPHY when the persisted provider is Clips but Clips is unavailable"
-    reason: "WR-02 fix e3501b7: a persisted Clips tab is restored when a GIPHY key exists and probes once behind the S2 skeleton (bootClips); without a GIPHY key it still opens on GIPHY. User observed 'Clips tab restored after relaunch' natively."
-    accepted_by: "{name}"
-    accepted_at: "{ISO timestamp}"
-```
+Behavior-dependent truths each have a named test that ran in my `go test -race` run: `TestCancelNotCachedNotBlocked`, `TestBlockKnownRetry`, `TestClipsShareGiphyBudget`, `TestClipsRecheckBeforeGifsSuccess`, `TestClipsRateLimitedRecheckKeepsReprobe`, `TestSaveKeyConcurrent`, `TestInvalidateDropsInFlightResult`.
 
 ### Required Artifacts
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `internal/provider/provider.go` | IDs, Gif, Page, Error, MarshalError | ✓ VERIFIED | URL-free `Error()`. Wired in main.go:86. |
+| `internal/provider/provider.go` | IDs, Gif, Page, Error, MarshalError (+ Params since Phase 4) | ✓ VERIFIED | Wired in `main.go:131-135`. |
 | `internal/provider/httpx/httpx.go` | GetJSON, Remap | ✓ VERIFIED | Used by all three clients. |
-| `internal/provider/{finergifs,giphy,klipy}/*.go` | clients + mappers | ✓ VERIFIED | Registered in `search.New` (main.go:52-57). |
-| `internal/provider/fakeapi/fakeapi.go` | fixture server | ✓ VERIFIED | Used only by `wire_server.go` (`//go:build server`). |
-| `internal/staging/staging.go` | Fetch/Sweep/VendorAllow | ✓ VERIFIED | Wired through ActionService (main.go:45-46). |
-| `internal/search/search.go`, `clips.go` | cache, 429 budget, dedupe, Clips probe | ✓ VERIFIED | GifService and SettingsService delegate to them. |
-| `internal/services/{gifs,settings,actions,panel}.go` | bound services | ✓ VERIFIED | 4 `application.NewService` calls, with generated bindings present. |
-| `internal/settings/settings.go` | KeyringStore, MemoryStore, Keys, Prefs | ✓ VERIFIED | Desktop uses Keyring, server uses Memory. |
-| `internal/shell/shell.go` | panel hooks, App/Edit menu | ✓ VERIFIED | `events.Common.WindowClosing` and `SetApplicationMenu` are present. |
-| `frontend/src/components/*.svelte` (6) | grid, tile, tabs, footer, setup card, state message | ✓ VERIFIED | All imported and rendered by App.svelte. |
-| `frontend/src/lib/{api,grid,errors,providers}.ts` | facade, key routing, copy rows, slots | ✓ VERIFIED | Imported by App.svelte and SetupCard. 23 node tests pass. |
-| `frontend/public/attribution/giphy-powered-{light,dark}.png` | official marks, 641x71 | ✓ VERIFIED | The sha256 values equal `Poweredby_640px-White_HorizText.png` / `Poweredby_640px-Black_HorizText.png` from media.giphy.com/giphy-attribution-marks.zip. |
-| `scripts/smoke-browser-loop.sh`, `scripts/uat/*.js` (9) | harness | ✓ VERIFIED | All re-run: SMOKE OK and 9/9 UAT OK. |
-| `.planning/PROJECT.md` compliance row | Phase 2 posture | ✓ VERIFIED | Line 72. Its wording "logged skip of Klipy non-gif items" is slightly stale after WR-04 (override item 1). |
+| `internal/provider/{finergifs,giphy,klipy}/*.go` | clients + mappers | ✓ VERIFIED | Registered in `search.New` (`main.go:74-79`) with `Params`. |
+| `internal/provider/fakeapi/fakeapi.go` | fixture server | ✓ VERIFIED | Server build only. |
+| `internal/staging/staging.go` | Fetch/Sweep/VendorAllow | ✓ VERIFIED | Wired through ActionService. |
+| `internal/search/search.go`, `clips.go` | cache, 429 budget, dedupe, Clips probe | ✓ VERIFIED | Tests pass. |
+| `internal/services/{gifs,settings,actions,panel}.go` | bound services | ✓ VERIFIED | `application.NewService` in `main.go:124-129`. |
+| `internal/settings/settings.go` | KeyringStore, MemoryStore, Keys, Prefs | ✓ VERIFIED | Tests pass. |
+| `internal/shell/shell.go` | panel hooks, App/Edit menu | ✓ VERIFIED | Lines 59-102. |
+| `frontend/src/components/*.svelte` (Phase 2's six) | grid, tile, tabs, footer, setup card, state message | ✓ VERIFIED | All rendered by App.svelte. |
+| `frontend/src/lib/{api,grid,errors,providers}.ts` | facade, key routing, copy rows, slots | ✓ VERIFIED | 103 node tests pass (suite grew from 23). |
+| `frontend/public/attribution/giphy-powered-{light,dark}.png` | official marks | ✓ VERIFIED | sha256 `8e8619ee…`/`73508f69…`, unchanged since the 2026-10-17 official-zip match. |
+| `scripts/smoke-browser-loop.sh`, `scripts/uat/*.js` (Phase 2's 9) | harness | ✓ VERIFIED | Not re-run here (instruction); Phase 4 verifier run 35/35 on identical code. |
 
 ### Key Link Verification
 
 | From | To | Via | Status |
 |------|----|-----|--------|
-| App.svelte | GifService.Search/Trending | `api.ts` search/trending inside `latest()` | ✓ WIRED (debounce probe saw a real `GifService.Search` call with `["finergifs","dwight",""]`) |
+| App.svelte | GifService.Search/Trending | `api.ts` `search`/`trending` in `load` (`App.svelte:528`) | ✓ WIRED |
 | gifs.go | search.Service | `s.Svc.Search/Trending` | ✓ WIRED |
 | providers | httpx | `httpx.GetJSON` in all three clients | ✓ WIRED |
-| main.go | provider.MarshalError | `MarshalError: provider.MarshalError` | ✓ WIRED (smoke shows `cause:{kind,provider,status}`) |
-| actions.go | staging | `a.Staging.Fetch(ctx, g)` then CopyFile then Sweep | ✓ WIRED |
-| App.svelte | PanelService.Hide | `setTimeout(hide, 400)` after a copy, and Esc on an empty query | ✓ WIRED |
-| App.svelte | grid.ts | `routeKey` → `move`/`nearEnd` | ✓ WIRED |
-| settings.go (svc) | candidate client → Keys.Set → Invalidate/Seed → Clips.Reset/Trigger | `SaveKey` | ✓ WIRED |
-| SetupCard | SettingsService.SaveKey | `saveKey(p, key)` | ✓ WIRED |
-| App.svelte | Providers / LastProvider / SetLastProvider / `providers:changed` | onMount and switchTo | ✓ WIRED |
-| App.svelte | GifService.CheckClips | `recheckClips` (via `bootClips`) | ✓ WIRED |
-| api.ts | Browser.OpenURL | `openExternal` allowlist of exactly three constants, including the mailto | ✓ WIRED |
+| main.go | provider.MarshalError | `MarshalError` chain | ✓ WIRED |
+| main.go | SettingsService.Params | `params` closure into every client (`main.go:71-95`) | ✓ WIRED (new in Phase 4) |
+| actions.go | staging | `Fetch` → CopyFile → Sweep | ✓ WIRED |
+| App.svelte | PanelService.Hide | `hideTimer` after copy; Esc on empty query | ✓ WIRED |
+| App.svelte | grid.ts | `routeKey` | ✓ WIRED |
+| SettingsService.SaveKey | candidate client → Keys.Set → Invalidate/Seed → Clips Reset/Trigger | `services/settings.go:71-105` | ✓ WIRED |
+| SetupCard | SettingsService.SaveKey | `saveKey(p, key)` (`SetupCard.svelte:52`) | ✓ WIRED |
+| App.svelte | Providers / LastProvider / SetLastProvider / `providers:changed` | onMount and `switchTo` | ✓ WIRED |
+| App.svelte | GifService.CheckClips | `recheckClips` via `bootClips` | ✓ WIRED |
 
 ### Data-Flow Trace (Level 4)
 
 | Artifact | Data | Source | Real data | Status |
 |----------|------|--------|-----------|--------|
-| ResultGrid/Tile | `cur.items` | `GifService.Search/Trending` → search.Service → vendor HTTP (desktop) or fakeapi (server) | Yes. The native session showed real GIPHY and Klipy grids. | ✓ FLOWING |
-| Footer center | `status` / selected title | copy result `r.message` and `items[selected].title` | Yes | ✓ FLOWING |
-| ProviderTabs/card | `statuses` | `GifService.Providers()` → Keys cache + Clips state | Yes | ✓ FLOWING |
-| StateMessage (errors) | `errView` | `providerError(e)` → `errorState` | Yes (typed cause) | ✓ FLOWING |
+| ResultGrid/Tile | `cur.items` | GifService → search.Service → vendor HTTP (desktop) / fakeapi (server) | Yes | ✓ FLOWING |
+| Footer | attribution, status | slot or selected item's provider; action results | Yes | ✓ FLOWING |
+| ProviderTabs/card | `statuses` | `GifService.Providers()` → Keys + Clips state | Yes | ✓ FLOWING |
+| StateMessage | `errView` | `errorState(cur.err, …)` | Yes | ✓ FLOWING |
 
-### Behavioral Spot-Checks (run by the verifier)
+### Behavioral Spot-Checks (run by this verifier, 2026-10-20)
 
 | Behavior | Command | Result | Status |
 |----------|---------|--------|--------|
-| Go vet | `go vet . ./internal/...` and `go vet -tags server .` | clean (only linker version warnings) | ✓ PASS |
-| Go tests | `go test -race -count=1 ./internal/...` (run once) | 11 packages ok, fakeapi has no tests | ✓ PASS |
-| Frontend types | `pnpm --dir frontend run check` | 160 files, 0 errors, 0 warnings | ✓ PASS |
-| Frontend unit | `pnpm --dir frontend run test` | 23 pass, 0 fail | ✓ PASS |
-| Bound-call smoke | `bash scripts/smoke-browser-loop.sh` | SMOKE OK (Search, media GIF8, Copy staged + 422 stub, disallowed URL refused, bad keys rejected without echo, Clips enabled, Klipy dup kept, settings.json, no key in logs) | ✓ PASS |
-| Headless UAT | `--uat` 01-tracer, 02-grid, 02-keyboard, 03-states, 05-setup, 05-tabs, 06-clips. `FAKE_CLIPS=denied --uat` 06-clips-denied, 06-backstops | UAT OK ×9 | ✓ PASS |
-| Debounce (verifier script, scratchpad) | 6 keys at about 80 ms, then a 1-character query | 0 calls inside the window. 1 call 453 ms after the last input. 1-character query: 0 calls, S8 shown. | ✓ PASS |
-| Key leak in native log | `grep -Eq 'api_key=\|api\.klipy\.com/api/v1/[^/]+/' bin/install-dev.log` | exit 1 (no match) | ✓ PASS |
-| Official GIPHY mark | sha256 of the repo PNGs compared with the official zip entries | identical | ✓ PASS |
-
-Ports 8089 and 9245 were free before and after. `go.sum`/`go.mod` are unchanged. Only processes started by the smoke script were stopped, by its own cleanup.
+| Go tests | `go test -race -count=1 ./internal/...` (once) | 14 packages ok, exit 0 (linker version warnings only) | ✓ PASS |
+| Go vet | `go vet . ./internal/...` | clean | ✓ PASS |
+| Frontend unit | `node --test src/lib/*.test.ts` | 103 pass, 0 fail | ✓ PASS |
+| Frontend types | `svelte-check --tsconfig ./tsconfig.json` | 191 files, 0 errors, 0 warnings | ✓ PASS |
+| Phase 2 named tests exist | grep for the 17 tests cited in the original report | 16 present; `TestCopyClipRefused` replaced by `TestCopyClipMP4`/`TestPasteClipMP4` (ACTN-09) | ✓ PASS |
+| Attribution PNGs | sha256 + `git diff c9ffb49 HEAD -- frontend/public/attribution` | unchanged | ✓ PASS |
+| Smoke + headless UAT | not run (shared ports, by instruction) | Phase 4 verifier: SMOKE OK, 35/35 UAT OK at 7e8792a; no code diff to HEAD | ? SKIP (covered by prior verifier run) |
 
 ### Probe Execution
 
-Step 7c: no `scripts/*/tests/probe-*.sh` exist and none are declared. The phase's runnable checks are the smoke/UAT harness above, which I re-ran myself.
+Step 7c: no `scripts/*/tests/probe-*.sh` exist and none are declared.
 
 ### Requirements Coverage
 
-| Requirement | Source Plans | Description | Status | Evidence |
-|-------------|--------------|-------------|--------|----------|
-| SRCH-01 | 02-01, 04, 05, 06 | Search GIPHY, Klipy and Finer. Switch provider. The last provider is remembered. | ✓ SATISFIED | SC1. 05-tabs reload. Smoke `SetLastProvider`. |
-| SRCH-02 | 02-06 | Clips only when the key passes the Clips test call, else an explanation | ✓ SATISFIED | SC5. clips.go, C2, native log `disabled`. |
-| SRCH-03 | 02-03, 04, 05 | Trending with an empty query | ✓ SATISFIED | `wanted()==''` → trending. Finer shows S8 (no trending). |
-| SRCH-04 | 02-02 | Animated grid that loads more on scroll or arrows | ✓ SATISFIED | 02-grid, 02-keyboard. |
-| SRCH-05 | 02-02, 06 | Keyboard navigation (arrows, Enter, ⌘K, Esc) | ✓ SATISFIED | ⌘K is bound with no effect. The menu is Phase 3, as SC2 states. |
-| SRCH-06 | 02-03 | Debounced. A rate limit shows a clear retry time. | ✓ SATISFIED | Debounce probe. E1 countdown. 429 block. |
-| SRCH-07 | 02-01, 03, 04 | Per-provider error messages. One failing provider never blocks the others. | ✓ SATISFIED | `states` per slot. 03-states. |
-| ONBD-01 | 02-05, 06 | First run opens on GIPHY with the card and Try Finer | ✓ SATISFIED | 05-setup. |
-| ONBD-02 | 02-04, 05, 06 | The key is checked with a test call before saving | ✓ SATISFIED | SaveKey. Smoke. Native. |
-| ONBD-03 | 02-01, 04, 05, 06 | Keychain, and the key is never in the UI, logs or errors | ✓ SATISFIED | SC3 evidence. |
-| ONBD-04 | 02-05, 06 | "Powered by GIPHY". "Search KLIPY". | ✓ SATISFIED | SC4. Official PNG hash. |
-| ONBD-05 | 02-01, 03, 04, 06 | Never blended, reordered or filtered (except same-page duplicates for non-Klipy) | ✓ SATISFIED (see override 1) | Klipy dedupe skipped (`TestNoDedupeKlipy`, smoke). Klipy items with no GIF rendition are skipped and logged, as documented in PROJECT.md. |
+| Requirement | Description | Status | Evidence at HEAD |
+|-------------|-------------|--------|------------------|
+| SRCH-01 | Search GIPHY, Klipy, Finer; switch; last provider remembered | ✓ SATISFIED | SC1. |
+| SRCH-02 | Clips only after the Clips test call, else an explanation | ✓ SATISFIED | SC5. |
+| SRCH-03 | Trending with an empty query | ✓ SATISFIED | `wanted()==''` → trending; Finer S8. |
+| SRCH-04 | Animated grid, loads more on scroll or arrows | ✓ SATISFIED | ResultGrid, `nearEnd`. |
+| SRCH-05 | Keyboard navigation (arrows, Enter, ⌘K, Esc) | ✓ SATISFIED | ⌘K now opens the Phase 3 menu. |
+| SRCH-06 | Debounced; rate limit shows retry time | ✓ SATISFIED | 450 ms; E1 countdown; 429 block tests. |
+| SRCH-07 | Per-provider errors; one failing never blocks others | ✓ SATISFIED | per-slot `states`; errors.ts tests. |
+| ONBD-01 | First run on GIPHY with card + Try Finer | ✓ SATISFIED | `App.svelte:310-316`, SetupCard. |
+| ONBD-02 | Key verified with a test call before saving | ✓ SATISFIED | `SaveKey`. |
+| ONBD-03 | Keychain; never in web UI, logs or errors | ✓ SATISFIED | Full key never leaves Go; Settings shows last 4 by design (SETT-02). |
+| ONBD-04 | "Powered by GIPHY"; "Search KLIPY" | ✓ SATISFIED | SC4. |
+| ONBD-05 | Never blended, reordered or filtered (except non-Klipy same-page dupes) | ✓ SATISFIED (override 1) | `dedupe` skips Klipy; library tabs grouped by provider. |
 
-The union of plan requirement IDs is exactly the 12 Phase 2 IDs in REQUIREMENTS.md. There are no orphaned requirements.
+All 12 Phase 2 IDs in REQUIREMENTS.md (lines 19-35, 115-128) are covered; none orphaned. SRCH-08 and SRCH-09 map to Phases 3 and 4.
 
-### Prohibitions (judgment-tier, non-authoritative LLM-judge verdicts, flagged for human review)
+### Prohibitions (judgment-tier, accepted 2026-10-17; re-checked at HEAD)
 
-| # | Prohibition (deduplicated) | Verdict | Evidence |
-|---|----------------------------|---------|----------|
-| P1 | No synthetic desktop input outside human checkpoints | No violation found | UAT runs only in headless dev-browser against 127.0.0.1:9245. There is no osascript, cliclick or CGEvent use in `scripts/`. Native steps were done by the user. |
-| P2 | Kill only processes you started | No violation found | The smoke script kills only its own recorded PIDs. Taskfile has `pkill -x gifsmith` only (allowed). |
-| P3 | No API key in the repo, logs, fixtures, tests or prompts | No violation found | Fixture keys only. The install-log grep is clean. `TestSaveKeyNeverLogsOrReturnsKey`. Latent risk IN-01: Wails at Debug log level would log bound-call args. |
-| P4 | No TCC changes | No violation found | No tccutil anywhere. RequestAccessibility runs only on a button click. |
-| P5 | No media or API responses on disk beyond the single staged copy file | No violation found | `search.Service` is memory-only. `Sweep` runs after a successful copy. IN-03: the last staged file survives quit (still one file; Phase 3 ACTN-10). |
-| P6 | No Raycast proxy, analytics or pingbacks | No violation found | grep is clean. The giphy test asserts no `random_id`. |
-| P7 | No `pnpm add` before the package checkpoint; no other npm package | No violation found | The only runtime dependency added is `@tanstack/svelte-virtual 3.13.47`. The order of approval is a SUMMARY claim. |
-| P8 | No requests the user did not cause (no launch prefetch of other providers, no auto-retry after an error, never into a 429 block) | No material violation. 3 bounded exceptions. | (a) The background Clips probe after a GIPHY success is the designed D-20 behavior. (b) `refreshProviders` auto re-probes once when the Trigger probe ends `unknown` while Clips is on screen (IN-08). (c) A launch on a persisted Clips tab fetches GIPHY trending (`bootClips`). A request into a 429 block is never made: `Guard` and `Blocked` are checked by tests. |
-| P9 | The response cache stays in memory, metadata only | No violation found | `search.go` holds a map of `provider.Page` only. |
-| P10 | Tests and scripts never touch the login Keychain | No violation found | `keyring.MockInit()` in `TestKeyringStoreErrors`. MemoryStore in the services tests and the server build. |
-| P11 | UAT never clicks OpenURL controls | No violation found | 05-setup and 06-clips-denied assert `href` only (comments and code). |
-| P12 | GIPHY attribution PNGs are official and unmodified | **Verified deterministically** | The sha256 values match the official zip entries. |
-
-Complete with 11 flagged judgment-tier prohibitions. Human review recommended (human item 3).
+| # | Prohibition | Verdict at HEAD | Note |
+|---|-------------|-----------------|------|
+| P1 | No synthetic desktop input outside human checkpoints | No violation found | I sent none; UAT not run. |
+| P2 | Kill only processes you started | No violation found | I started and stopped none. |
+| P3 | No API key in repo/logs/fixtures/tests | No violation found | Log lines name provider and kind only. |
+| P4 | No TCC changes | No violation found | |
+| P5 | No media on disk beyond the single staged copy | Superseded | Phase 3 added user-initiated Downloads and crop staging with eager cleanup (ACTN-10). |
+| P6 | No Raycast proxy, analytics, pingbacks | No violation found | Phase 4 updater talks to GitHub Releases only (RELS-05), not a provider. |
+| P7 | No unapproved npm packages | Out of Phase 2 scope now | Phase 3/4 packages were their phases' decisions. |
+| P8 | No provider requests the user did not cause | No material violation (3 bounded exceptions as accepted) | Params changes flush the cache but do not fetch. |
+| P9 | Response cache in memory, metadata only | No violation found | `search.go` holds `provider.Page` only. |
+| P10 | Tests never touch the login Keychain | No violation found | Tests passed with MemoryStore / `keyring.MockInit()`. |
+| P11 | UAT never clicks OpenURL controls | No violation found | |
+| P12 | Official, unmodified GIPHY PNGs | Verified deterministically | Hashes unchanged. |
 
 ### Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 |------|------|---------|----------|--------|
-| (all phase files) | n/a | TBD, FIXME, XXX, TODO, HACK, placeholder | None found | Debt-marker gate passes. |
-| `frontend/src/App.svelte` | 397 | hide-after-copy timer not cancelled when the panel re-shows (IN-07) | ℹ️ Info | Hides a re-shown panel only within a 400 ms window. |
-| `frontend/src/App.svelte` | 131, 243 | stale Clips error after Clips becomes enabled (IN-04) | ℹ️ Info | Recoverable with Try Again. |
-| `frontend/src/App.svelte` | 170 | failed initial `Providers()` leaves the content blank (IN-06) | ℹ️ Info | An in-process Go call, so very unlikely. |
-| `frontend/src/components/SetupCard.svelte` | 59-60 | `field.focus()` after a possible unmount (IN-05) | ℹ️ Info | A console error only. |
-| `internal/provider/httpx/httpx.go` | 73-81 | Retry-After not capped (IN-02) | ℹ️ Info | A hostile value causes a long block. |
-| `internal/provider/klipy/klipy.go` | 98-127 | unlabelled ads, and a page of only HTML ads ends paging (IN-09) | ℹ️ Info | Product and policy question with Klipy. |
-| `internal/search/search.go` | 186-189 | `Blocked` used only by tests (IN-11) | ℹ️ Info | Dead-ish export. |
+| Phase 2 code files at HEAD | n/a | TBD, FIXME, XXX, TODO, HACK | None found | Debt-marker gate passes. |
+| `frontend/src/components/SetupCard.svelte` | 95 | Step 3 hardcodes "Reopen Gifsmith with ⌃⌥⌘G", but Phase 4 (SETT-03) made the open hotkey rebindable and unbindable | ℹ️ Info | Stale instruction only for users who rebound the hotkey before adding a key. Not a Phase 2 must-have; new since Phase 4, not tracked elsewhere. |
+| `frontend/src/App.svelte` | search/cancel path | `CancelledRejectionError` unhandled on tab switch (18-backstops flake) | ℹ️ Info (accepted debt) | Recorded in Phase 4 deferred-items.md, acknowledged. |
+| `internal/provider/klipy/klipy.go` | 139-145 | unlabelled ads (IN-09) | ℹ️ Info | Open policy question with Klipy; RELS-04 gate also pending. |
+| `internal/provider/httpx/httpx.go` | 72 | not capped (IN-02) | ℹ️ Info | Unchanged from the original report. |
 
-There are no blockers. The code review's final iteration has 0 critical and 0 warning findings. All 11 open Info items were re-checked against the code, and none breaks a must-have.
+The IN-07 hide-timer item from the original report is fixed (`App.svelte:277`).
 
-### Deferred / later-phase items (informational, not gaps)
+### Deferred / later-phase items
 
-| Item | Addressed in |
-|------|--------------|
-| Copying Clips (MP4). Phase 2 shows E8. | Phase 3, ACTN-09 |
-| Temp-file lifecycle: sweep at launch and quit (IN-03) | Phase 3, ACTN-10 |
-| ⌘K action menu (bound here) | Phase 3 |
-| Klipy written clearance for temp-file copies; user content-rating control | Phase 4 |
+All four deferred items from the original report were delivered: Clips MP4 copy (Phase 3 ACTN-09), temp-file lifecycle (Phase 3 ACTN-10), ⌘K action menu (Phase 3), content rating control (Phase 4 SRCH-09). Klipy written clearance remains open and is now enforced as a gate (RELS-04).
 
 ### Human Verification Required
 
-#### 1. Override decision: Klipy item mapping (plan 02-04)
-**Test:** Read the WR-04 behavior in `internal/provider/klipy/klipy.go:98-121` and accept or reject the suggested override.
-**Expected:** Accept. Optionally align the "non-gif items are skipped" wording in PROJECT.md:72 and COVERAGE.md.
-**Why human:** This is an intentional deviation from the plan text, and only the user can accept it.
-
-#### 2. Override decision: persisted Clips tab at launch (plan 02-05)
-**Test:** Accept or reject the suggested override for the WR-02 launch behavior. You already watched it natively.
-**Expected:** Accept.
-**Why human:** This is an intentional deviation from the plan text, and only the user can accept it.
-
-#### 3. Prohibition review
-**Test:** Review P1–P11 in the Prohibitions table.
-**Expected:** Accept or reject each verdict. P8 lists 3 bounded exceptions that you may want to confirm as acceptable.
-**Why human:** Judgment-tier prohibitions are never passed silently (ADR-550).
-
-#### 4. MVP-mode discrepancy
-**Test:** Choose `/gsd-mvp-phase 2` to reformat the goal, or remove `**Mode:** mvp` from Phases 2–4 in ROADMAP.md.
-**Expected:** A recorded decision.
-**Why human:** This is a roadmap and process decision.
+None new. The four items from 2026-10-17 (two overrides, prohibition review, MVP-mode decision) were resolved by the user on 2026-10-17T23:04:59Z and still apply: both overrides match the current code.
 
 ### Gaps Summary
 
-There are no gaps. Every roadmap success criterion and every requirement ID is met in code. Each is backed by tests and UAT that I re-ran myself (Go race tests, svelte-check, node tests, SMOKE OK, 9/9 headless UAT, a separate debounce probe, the leak grep and the official-PNG hash) and by the user's approved native session with real keys. Status is `human_needed`, not `passed`, for four reasons: two plan truths were changed on purpose by recorded review fixes and need a formal override, the judgment-tier prohibitions must be reviewed by a human, and the MVP-mode format needs a decision. None of these is a defect in the delivered goal.
+There are no gaps. Every roadmap success criterion, plan truth group and Phase 2 requirement ID still holds at HEAD. Six Phase 2 details were intentionally changed by later-phase requirements (configurable GIPHY params, the ⌘K menu, Clips MP4 copy, configurable primary action with the Klipy file-action gate, extra user-initiated files on disk, a last-4 key display in Settings). Each traces to a recorded Phase 3 or 4 requirement or decision, and the Phase 2 goal survives each of them. I ran the Go race tests, go vet, the node tests and svelte-check myself. I did not re-run the browser smoke and UAT loop because of the shared ports. The Phase 4 verifier's 35/35 run covers it, on code identical to HEAD. One new Info item: the hardcoded hotkey in the setup card copy (`SetupCard.svelte:95`).
 
 ---
 
-_Verified: 2026-10-17T22:41:41Z_
+_Verified: 2026-10-20T19:19:58Z (re-verification after Phase 4; original 2026-10-17T22:41:41Z)_
 _Verifier: Claude (gsd-verifier)_
