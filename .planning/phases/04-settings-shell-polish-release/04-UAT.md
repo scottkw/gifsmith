@@ -8,10 +8,10 @@ updated: 2026-10-20T17:00:00Z
 
 ## Current Test
 
-number: 6
-name: Hotkeys — checklist C10–C14
+number: 7
+name: Downloads & grid — checklist D15–D18
 expected: |
-  See 04-HANDSON-CHECKLIST.md group C.
+  See 04-HANDSON-CHECKLIST.md group D.
 awaiting: user response
 
 ## Tests
@@ -38,7 +38,7 @@ result: pass — user on host (existing Keychain key; Test accepted, rating chan
 
 ### 6. Hotkeys — checklist C10–C14
 expected: rebind works across apps and in the tray; Favorites/Recents hotkeys; recording captures without firing and Esc/Tab/Shift+Tab cancel cleanly; hotkeys work after leaving a recording; clearing Open clears the tray shortcut and Reset to Default restores ⌃⌥⌘G.
-result: [pending]
+result: pass — user on host.
 
 ### 7. Downloads & grid — checklist D15–D18
 expected: folder sheet + privacy prompt, ⌘S saves there; hidden names gifsmith-{id}.gif then (2); Large/Small grids; right-click menu placement; Klipy ⌘S refusal.
@@ -51,9 +51,9 @@ result: [pending]
 ## Summary
 
 total: 8
-passed: 5
+passed: 6
 issues: 0
-pending: 3
+pending: 2
 skipped: 0
 blocked: 0
 
