@@ -5,7 +5,9 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net/http"
 	"sync"
+	"time"
 
 	"gifsmith/internal/update"
 )
@@ -30,6 +32,11 @@ type UpdateService struct {
 	Checker *update.Checker
 	Current string
 	Emit    func(name string, data ...any)
+	Dir     string       // the app cache's updates folder
+	Client  *http.Client // update.NewDownloadClient
+	Run     update.Runner
+	Open    func(string) error // platform OpenURL
+	Now     func() time.Time   // nil: time.Now
 
 	mu  sync.Mutex
 	st  UpdateStatus
@@ -100,4 +107,8 @@ func (u *UpdateService) Check(ctx context.Context) (UpdateStatus, error) {
 	}
 	u.rel = update.Release{}
 	return u.set(UpdateStatus{State: "current"}), nil
+}
+
+func (u *UpdateService) Download(ctx context.Context) (UpdateStatus, error) {
+	return UpdateStatus{}, nil
 }
