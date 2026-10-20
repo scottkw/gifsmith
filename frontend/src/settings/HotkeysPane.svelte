@@ -14,7 +14,9 @@
   const ROWS = (['open', 'favorites', 'recents'] as const).map((slot) => ({ slot, label: SLOT_LABELS[slot] }));
   const TEST_MS = 5000;
 
-  let hk = $derived({ ...initial.hotkeys }); // SettingsApp's snapshot: current after settings:changed and on show
+  // Only SettingsApp's snapshot (settings:changed, and a re-read on show), never a call's result:
+  // responses are not ordered against events, so a late one could show an older binding.
+  const hk = $derived(initial.hotkeys);
   let msg = $state<Record<string, { text: string; tone: 'secondary' | 'success' | 'error' }>>({});
   let listening = $state<Slot | null>(null);
   let listenTimer: ReturnType<typeof setTimeout> | undefined;
@@ -31,10 +33,6 @@
 
   const say = (slot: Slot, text: string, tone: 'secondary' | 'success' | 'error' = 'secondary') => (msg[slot] = { text, tone });
 
-  function saved(s: SettingsSnapshot) {
-    hk = { ...s.hotkeys };
-  }
-
   // '' clears the row's message (a recording started or succeeded); otherwise H1–H4b under the row.
   // The field keeps its combo either way.
   function fail(slot: Slot, kind: string, accel: string, other = '') {
@@ -46,7 +44,7 @@
     stopListening();
     say(slot, '');
     try {
-      saved(await setHotkey(slot, accel));
+      await setHotkey(slot, accel); // a change arrives as settings:changed
     } catch (err) {
       const se = settingsError(err);
       fail(slot, se?.kind ?? 'hotkey_register_failed', accel, se?.slot);
@@ -101,7 +99,6 @@
         label={r.label}
         value={hk[r.slot] ?? ''}
         describedby="hk-{r.slot}-msg"
-        onsaved={saved}
         onfail={(kind, accel, other) => fail(r.slot, kind, accel, other)}
       />
       <button class="btn-secondary" aria-label="Test {r.label} shortcut" disabled={!hk[r.slot]} onclick={() => test(r.slot)}>Test</button>

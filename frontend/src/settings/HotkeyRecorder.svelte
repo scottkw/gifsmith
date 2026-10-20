@@ -2,7 +2,7 @@
   // Click-to-record shortcut field (UI-SPEC "Recorder field"). Gifsmith's hotkeys are suspended for
   // the whole recording so the current combo is captured, not fired; every way out resumes them.
   // The field shows a new combo only after Go registered it.
-  import { resumeHotkeys, setHotkey, settingsError, suspendHotkeys, type SettingsSnapshot } from '../lib/api';
+  import { resumeHotkeys, setHotkey, settingsError, suspendHotkeys } from '../lib/api';
   import { accelFromEvent, canonical, DENYLIST, glyphs, spoken, type Slot } from '../lib/hotkeys';
 
   let {
@@ -10,14 +10,12 @@
     label,
     value,
     describedby,
-    onsaved,
     onfail,
   }: {
     slot: Slot;
     label: string;
     value: string; // canonical accelerator, '' = not set
     describedby: string;
-    onsaved: (s: SettingsSnapshot) => void;
     onfail: (kind: string, accel: string, otherSlot: string) => void; // '' kind clears the row's message
   } = $props();
 
@@ -56,7 +54,7 @@
   async function save(accel: string) {
     saving = true;
     try {
-      onsaved(await setHotkey(slot, accel));
+      await setHotkey(slot, accel); // the new value arrives as settings:changed
       onfail('', '', '');
     } catch (err) {
       const se = settingsError(err);
