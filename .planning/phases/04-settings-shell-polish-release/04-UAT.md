@@ -8,10 +8,10 @@ updated: 2026-10-20T17:00:00Z
 
 ## Current Test
 
-number: 4
-name: Settings window — checklist A1–A6
+number: 5
+name: Keys & Search — checklist B7–B9
 expected: |
-  See 04-HANDSON-CHECKLIST.md group A.
+  See 04-HANDSON-CHECKLIST.md group B.
 awaiting: user response
 
 ## Tests
@@ -30,7 +30,7 @@ result: pass — fresh macOS 15.7.7 Tart VM, Gatekeeper enabled, draft DMG e2a8b
 
 ### 4. Settings window — checklist A1–A6
 expected: activation and typing, ⌘W/red button hide and restore the previous app, theme switch without flash, login item on/off, Login Items change reflected on reopen, Accessibility grant shows ✓ On.
-result: [pending]
+result: pass — user on host (~/Applications copy of rebuilt 1.0.0). A1/A3/A6 yes. A2: user accepts current behavior (panel hides when Settings activates, by design). A4: macOS "background item added" notice on enable, none on disable (normal). A5: unchecked after close+reopen as specified; does not refresh live while Settings is open → deferred to 1.0.1 (user decision).
 
 ### 5. Keys & Search — checklist B7–B9
 expected: real GIPHY key saves and tests OK; content rating changes trending; 48 per page fills and paginates.
@@ -51,13 +51,15 @@ result: [pending]
 ## Summary
 
 total: 8
-passed: 3
+passed: 4
 issues: 0
-pending: 5
+pending: 4
 skipped: 0
 blocked: 0
 
 ## Gaps
+
+Deferred to 1.0.1 (user, 2026-10-20): General pane login-item checkbox should re-read status when Settings regains focus, not only on reopen.
 
 Checklist detail: 04-HANDSON-CHECKLIST.md.
 Phase 1 carry-over (not blocking v1.0.0): 21 PENDING cells in 01-PASTE-MATRIX.md (notarized column; Slack/Discord/Telegram/browser rows).
