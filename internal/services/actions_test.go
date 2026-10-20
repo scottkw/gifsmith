@@ -218,9 +218,9 @@ func TestPasteWithoutAccessibility(t *testing.T) {
 	if !r.Copied || !r.NeedsAccessibility || r.Pasted || r.Message == "" {
 		t.Errorf("result = %+v, want Copied+NeedsAccessibility with a message", r)
 	}
-	// Point at the button, not a Settings path (macOS 27 has no Privacy & Security › Accessibility).
-	if !strings.Contains(r.Message, "Enable Automatic Paste…") || strings.Contains(r.Message, "System Settings") {
-		t.Errorf("message = %q, want it to name the Enable Automatic Paste… button and no Settings path", r.Message)
+	// T5a (P14): the T1 text; the Enable Automatic Paste… button beside it carries the call to action.
+	if r.Message != "Copied — press ⌘V to paste" {
+		t.Errorf("message = %q, want the T5a text", r.Message)
 	}
 	// App.svelte shows "Enable Automatic Paste…" off this exact JSON key (models.ts Result).
 	if b, _ := json.Marshal(r); !strings.Contains(string(b), `"needsAccessibility":true`) {
@@ -560,7 +560,7 @@ func TestPasteTextTrusted(t *testing.T) {
 func TestPasteTextWithoutAccessibility(t *testing.T) {
 	f := &platform.Fake{}
 	r, err := vendorService(f).PasteText(context.Background(), giphyGif, "link")
-	if err != nil || !r.Copied || r.Pasted || !r.NeedsAccessibility || !strings.Contains(r.Message, "Enable Automatic Paste…") {
+	if err != nil || !r.Copied || r.Pasted || !r.NeedsAccessibility || r.Message != "Copied — press ⌘V to paste" {
 		t.Errorf("%+v, %v; want copied only with the T5a message", r, err)
 	}
 	if slices.Contains(f.Calls, "hide") || slices.Contains(f.Calls, "PasteShortcut") {
