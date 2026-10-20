@@ -8,23 +8,21 @@ updated: 2026-10-20T17:00:00Z
 
 ## Current Test
 
-number: 1
-name: Release workflow dry run on main (split build/sign jobs)
+number: 3
+name: Clean-VM install of the rebuilt DMG
 expected: |
-  After Phase 4 is merged and pushed, `gh workflow run release.yml --ref main` runs build, pauses for the
-  required-reviewer approval, then sign passes: both notarizations Accepted, RELEASE VERIFY OK (notarized),
-  TestRealDMG PASS, "dry run: no release created"; releases still only the v1.0.0 draft.
-awaiting: user response
+  Gatekeeper prompt only, menu bar/no Dock, hotkey, copy/paste animated GIF, ⌘↵ copy-only + Enable Automatic Paste…, About 1.0.0 + up to date.
+awaiting: GIPHY key on VM clipboard (steps 1–3 passed)
 
 ## Tests
 
 ### 1. Release workflow dry run on main (SC7, RELS-07)
 expected: split build/sign workflow passes end to end on Actions after the reviewer approves; no release or tag created.
-result: [pending]
+result: pass — run 39473181660 on main ae3d0cd: build ok, reviewer approved, both notarizations Accepted, RELEASE VERIFY OK (notarized), TestRealDMG PASS, "dry run: no release created"; releases still only the v1.0.0 draft. CI run 39473179525 green.
 
 ### 2. Rebuild 1.0.0 from HEAD and replace the draft's assets (SC4, RELS-01)
 expected: `wails3 task darwin:release` → RELEASE VERIFY OK (notarized); draft DMG + .sha256 replaced; TestRealDMG and TestReleaseJSON pass against the new draft.
-result: [pending]
+result: pass — local build from ae3d0cd tree: 2× Accepted, RELEASE VERIFY OK (notarized); draft assets replaced, DMG sha256 e2a8b510f7fb0b1bfb0b184d6b1dc180d91ff42ad745a51ce1dc3d3544d67429; TestRealDMG + TestReleaseJSON PASS against the draft's JSON.
 
 ### 3. Clean-VM install of the rebuilt DMG (RELS-02, RELS-03)
 expected: same 6 steps as the 2026-10-20 VM test (Gatekeeper prompt only, menu bar/no Dock, hotkey, copy/paste animated GIF, ⌘↵ copy-only + Enable Automatic Paste…, About 1.0.0 + up to date).
@@ -53,9 +51,9 @@ result: [pending]
 ## Summary
 
 total: 8
-passed: 0
+passed: 2
 issues: 0
-pending: 8
+pending: 6
 skipped: 0
 blocked: 0
 
