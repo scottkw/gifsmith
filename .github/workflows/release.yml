@@ -77,6 +77,13 @@ jobs:
           fi
           spctl --status 2>&1 | grep -q 'assessments enabled' || { echo "::error::Gatekeeper assessments are disabled on this runner"; exit 1; }
 
+      # Dependency install and the frontend/Go build run before any credential exists, so their
+      # code never runs while the Developer ID identity is unlocked.
+      - name: Build (no credentials)
+        run: |
+          mkdir -p bin
+          wails3 task darwin:release:app 2>&1 | tee bin/build.log
+
       # The only step that sees credentials. The profile name and identity match the local Mac,
       # so build/darwin/Taskfile.yml runs unchanged (D-37, D-39). Never echo a variable here.
       - name: Signing keychain and notary profile
@@ -117,12 +124,13 @@ jobs:
             exit 1
           fi
 
-      - name: Build, sign, notarize, verify
+      - name: Sign, notarize, verify
         run: |
-          mkdir -p bin
-          wails3 task darwin:release 2>&1 | tee bin/release.log
+          wails3 task darwin:release:sign 2>&1 | tee bin/release.log
           grep -qF 'RELEASE VERIFY OK (notarized)' bin/release.log || { echo "::error::no 'RELEASE VERIFY OK (notarized)'"; exit 1; }
           grep -qF 'source=Notarized Developer ID' bin/release.log || { echo "::error::no 'source=Notarized Developer ID'"; exit 1; }
+          # Nothing after this step signs: drop the identity before go test compiles anything.
+          security delete-keychain "$RELEASE_KEYCHAIN"
 
       - name: Updater accepts the DMG
         env:

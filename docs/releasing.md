@@ -31,7 +31,10 @@ it by hand. Pushes and pull requests to `main` run the test suite (`.github/work
 
 The job refuses before touching any credential when the tag is not `vMAJOR.MINOR.PATCH`, does not
 match the version sources, has no release notes, is not on `main`, or already has a release.
-`v1.0.0` is excluded from the tag trigger.
+`v1.0.0` is excluded from the tag trigger. It builds the app (`wails3 task darwin:release:app`,
+which installs dependencies) before the signing keychain exists, then signs, notarizes and
+verifies it (`darwin:release:sign`) and deletes the keychain before anything else runs. Locally,
+`wails3 task darwin:release` runs both.
 
 ## Dry run
 
