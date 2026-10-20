@@ -8,10 +8,10 @@ updated: 2026-10-20T17:00:00Z
 
 ## Current Test
 
-number: 5
-name: Keys & Search — checklist B7–B9
+number: 6
+name: Hotkeys — checklist C10–C14
 expected: |
-  See 04-HANDSON-CHECKLIST.md group B.
+  See 04-HANDSON-CHECKLIST.md group C.
 awaiting: user response
 
 ## Tests
@@ -34,7 +34,7 @@ result: pass — user on host (~/Applications copy of rebuilt 1.0.0). A1/A3/A6 y
 
 ### 5. Keys & Search — checklist B7–B9
 expected: real GIPHY key saves and tests OK; content rating changes trending; 48 per page fills and paginates.
-result: [pending]
+result: pass — user on host (existing Keychain key; Test accepted, rating change, 48/page + pagination).
 
 ### 6. Hotkeys — checklist C10–C14
 expected: rebind works across apps and in the tray; Favorites/Recents hotkeys; recording captures without firing and Esc/Tab/Shift+Tab cancel cleanly; hotkeys work after leaving a recording; clearing Open clears the tray shortcut and Reset to Default restores ⌃⌥⌘G.
@@ -51,9 +51,9 @@ result: [pending]
 ## Summary
 
 total: 8
-passed: 4
+passed: 5
 issues: 0
-pending: 4
+pending: 3
 skipped: 0
 blocked: 0
 
