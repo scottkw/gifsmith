@@ -158,7 +158,7 @@ func (a *ActionService) paste(put func() error, okMsg string) (Result, error) {
 	}
 	if !a.Platform.AccessibilityTrusted(false) {
 		log.Printf("paste: accessibility not trusted, copied only (UI shows Enable Automatic Paste…)")
-		return Result{Copied: true, NeedsAccessibility: true, Message: "Copied — press ⌘V to paste. To paste automatically, click Enable Automatic Paste… and turn on Gifsmith."}, nil
+		return Result{Copied: true, NeedsAccessibility: true, Message: "Copied — press ⌘V to paste"}, nil // T5a: the button's title explains
 	}
 	sleep := a.Sleep
 	if sleep == nil {

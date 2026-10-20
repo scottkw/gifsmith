@@ -14,6 +14,7 @@
     actionLabel,
     actionHint,
     onaction,
+    onback,
   }: {
     attribution: 'giphy' | 'klipy' | 'finer' | ''; // '' = nothing to attribute (empty library tab)
     hints?: 'provider' | 'library' | 'details';
@@ -24,6 +25,7 @@
     actionLabel?: string;
     actionHint?: string;
     onaction?: () => void;
+    onback?: () => void; // Details: the Esc Back hint is a button doing what Esc does
   } = $props();
 
   // The mark follows the resolved theme (a manual Light/Dark included), never a media query.
@@ -42,23 +44,28 @@
       GIFs from The Finer Gifs Club
     {/if}
   </span>
-  <span class="center {tone}">
-    <span class="msg">
-      {#if tone === 'success'}
-        <svg class="check" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" /></svg>
-      {/if}
-      {text}
-    </span>
+  <!-- P13: toasts (Undo, errors, downloads) are announced. -->
+  <span class="center {tone}" role="status" aria-live="polite">
+    <span class="msg"
+      >{#if tone === 'success'}<svg class="check" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" /></svg
+        >{/if}{text}</span
+    >
     {#if actionLabel && onaction}
       <button class="link" onclick={onaction}>{actionLabel}</button>
       {#if actionHint}<span class="hint">{actionHint}</span>{/if}
     {/if}
   </span>
   {#if needsAccessibility}
-    <button class="secondary" onclick={onenable}>Enable Automatic Paste…</button>
+    <button class="secondary" title="Turn on Accessibility for Gifsmith so pastes happen automatically" onclick={onenable}
+      >Enable Automatic Paste…</button
+    >
   {:else if hints === 'details'}
     <!-- Details: "↵ Copy   ⌘K Actions   Esc Back" -->
-    <span class="hints"><b>↵</b> Copy&nbsp;&nbsp;&nbsp;<b>⌘K</b> Actions&nbsp;&nbsp;&nbsp;<b>Esc</b> Back</span>
+    <span class="hints"
+      ><b>↵</b> Copy&nbsp;&nbsp;&nbsp;<b>⌘K</b> Actions&nbsp;&nbsp;&nbsp;<button class="back" aria-label="Close Details (Esc)" onclick={onback}
+        ><b>Esc</b> Back</button
+      ></span
+    >
   {:else if hints === 'library'}
     <span class="hints"><b>↵</b> Copy&nbsp;&nbsp;&nbsp;<b>⌘K</b> Actions&nbsp;&nbsp;&nbsp;<b>⌘⌫</b> Remove</span>
   {:else}
@@ -132,6 +139,7 @@
   .check {
     width: 12px;
     height: 12px;
+    margin-right: 4px; /* P21: the gap is a margin, not a whitespace text node */
     vertical-align: -2px;
     fill: none;
     stroke: currentColor;
@@ -146,6 +154,17 @@
   }
   button {
     font: var(--label);
+  }
+  /* P16: Esc Back looks like the other hints; underline on hover, shared focus ring. */
+  .back {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+  }
+  .back:hover {
+    text-decoration: underline;
   }
   /* P2: secondary compact button. */
   .secondary {

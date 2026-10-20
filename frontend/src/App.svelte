@@ -1106,6 +1106,10 @@
     actionLabel={toastAction?.label}
     actionHint={toastAction?.hint}
     onaction={runToastAction}
+    onback={() => {
+      detailsOpen = false; // the Esc path: selection kept
+      input.focus();
+    }}
   />
 </main>
 

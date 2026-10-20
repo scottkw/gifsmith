@@ -89,8 +89,7 @@
     border-radius: 4px;
     background: var(--scrim);
     color: #fff;
-    font-size: 12px;
-    line-height: 16px;
+    font: var(--label);
   }
   .meta {
     width: 340px;
