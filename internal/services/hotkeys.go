@@ -33,6 +33,7 @@ type Hotkeys struct {
 
 	mu        sync.Mutex
 	bound     settings.Hotkeys     // canonical; what is registered unless suspended
+	failed    settings.Hotkeys     // stored combos macOS refused at Start; cleared when the slot is rebound
 	armed     map[string]time.Time // slot → Test deadline
 	suspended bool
 }
@@ -111,10 +112,12 @@ func (h *Hotkeys) Start(b settings.Hotkeys) {
 			log.Printf("hotkey for %s not registered: %s", slot, err)
 			continue
 		}
-		*slotOf(&h.bound, slot) = c
-		if h.register(slot, c) == nil {
-			log.Printf("hotkey registered: %s", c)
+		if h.register(slot, c) != nil {
+			*slotOf(&h.failed, slot) = c // not bound; the Hotkeys pane shows it
+			continue
 		}
+		*slotOf(&h.bound, slot) = c
+		log.Printf("hotkey registered: %s", c)
 	}
 }
 
@@ -139,7 +142,11 @@ func (h *Hotkeys) Bind(slot, accel string) error {
 			}
 		}
 	}
-	return h.rebind(slot, c)
+	if err := h.rebind(slot, c); err != nil {
+		return err
+	}
+	*slotOf(&h.failed, slot) = ""
+	return nil
 }
 
 // Revert puts slot back to old, the value Bindings reported before a Bind the caller could not store.
@@ -228,4 +235,11 @@ func (h *Hotkeys) Bindings() settings.Hotkeys {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.bound
+}
+
+// State is Bindings plus the stored combos macOS refused, which are not bound.
+func (h *Hotkeys) State() (bound, failed settings.Hotkeys) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.bound, h.failed
 }

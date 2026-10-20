@@ -82,9 +82,14 @@ export interface Snapshot {
     "klipyCountry": string;
 
     /**
-     * canonical; Open always set
+     * canonical; what is registered ("" = none)
      */
     "hotkeys": settings$0.Hotkeys;
+
+    /**
+     * stored combos macOS refused to register
+     */
+    "hotkeysFailed": settings$0.Hotkeys;
 
     /**
      * The download folder: full path for display and title only, its name, whether it is the

@@ -249,6 +249,48 @@ func TestStartRegistersStored(t *testing.T) {
 	}
 }
 
+func TestStartFailureIsNotBound(t *testing.T) {
+	reg := &fakeReg{fail: map[string]bool{"Cmd+Ctrl+Option+F": true}}
+	h := &Hotkeys{Reg: reg, Actions: map[string]func(){}, Now: time.Now}
+	h.Start(settings.Hotkeys{Favorites: "Cmd+Ctrl+Option+F"})
+	bound, failed := h.State()
+	if bound != (settings.Hotkeys{Open: DefaultOpenHotkey}) || failed != (settings.Hotkeys{Favorites: "Cmd+Ctrl+Option+F"}) {
+		t.Fatalf("State = %+v, %+v; want favorites failed, not bound", bound, failed)
+	}
+	wantSettingsErr(t, h.ArmTest("favorites"), "hotkey_invalid")
+	reg.fail = nil // the clash went away: recording the same combo binds it
+	if err := h.Bind("favorites", "Cmd+Ctrl+Option+F"); err != nil {
+		t.Fatal(err)
+	}
+	if bound, failed = h.State(); bound.Favorites != "Cmd+Ctrl+Option+F" || failed != (settings.Hotkeys{}) {
+		t.Errorf("State = %+v, %+v; want favorites bound, nothing failed", bound, failed)
+	}
+}
+
+func TestSetHotkeyStoredComboThatFailedAtLaunch(t *testing.T) {
+	f := newSettings(t, "")
+	if _, err := f.svc.Store.Update(func(p *settings.Prefs) error { p.Hotkeys.Open = "Cmd+Ctrl+Option+H"; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	reg := &fakeReg{fail: map[string]bool{"Cmd+Ctrl+Option+H": true}}
+	f.svc.Hotkeys = &Hotkeys{Reg: reg, Actions: map[string]func(){}, Now: time.Now}
+	f.svc.Hotkeys.Start(f.svc.Store.Get().Hotkeys)
+	ctx := context.Background()
+	if s := f.svc.Snapshot(ctx); s.Hotkeys.Open != "" || s.HotkeysFailed.Open != "Cmd+Ctrl+Option+H" {
+		t.Fatalf("snapshot hotkeys %+v, failed %+v", s.Hotkeys, s.HotkeysFailed)
+	}
+	var tray []string
+	f.svc.OnOpenHotkey = func(a string) { tray = append(tray, a) }
+	reg.fail = nil
+	snap, err := f.svc.SetHotkey(ctx, "open", "Cmd+Ctrl+Option+H") // the store already holds it
+	if err != nil || snap.Hotkeys.Open != "Cmd+Ctrl+Option+H" || snap.HotkeysFailed.Open != "" {
+		t.Fatalf("SetHotkey = %+v, %+v, %v", snap.Hotkeys, snap.HotkeysFailed, err)
+	}
+	if !reflect.DeepEqual(tray, []string{"Cmd+Ctrl+Option+H"}) || len(*f.events) != 1 {
+		t.Errorf("tray %v, events %v; want both updated", tray, *f.events)
+	}
+}
+
 // settingsWithHotkeys is the SettingsService fixture with a started Hotkeys on a fake Registrar.
 func settingsWithHotkeys(t *testing.T) (settingsFixture, *fakeReg) {
 	t.Helper()

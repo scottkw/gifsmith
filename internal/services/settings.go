@@ -214,11 +214,12 @@ type Autostarter interface {
 type Snapshot struct {
 	Theme         string           `json:"theme"`
 	LaunchAtLogin bool             `json:"launchAtLogin"`
-	GiphyRating   string           `json:"giphyRating"`  // resolved: never ""
-	PageSize      int              `json:"pageSize"`     // resolved: never 0
-	GiphyLang     string           `json:"giphyLang"`    // "" = Match System
-	KlipyCountry  string           `json:"klipyCountry"` // "" = Match System
-	Hotkeys       settings.Hotkeys `json:"hotkeys"`      // canonical; Open always set
+	GiphyRating   string           `json:"giphyRating"`   // resolved: never ""
+	PageSize      int              `json:"pageSize"`      // resolved: never 0
+	GiphyLang     string           `json:"giphyLang"`     // "" = Match System
+	KlipyCountry  string           `json:"klipyCountry"`  // "" = Match System
+	Hotkeys       settings.Hotkeys `json:"hotkeys"`       // canonical; what is registered ("" = none)
+	HotkeysFailed settings.Hotkeys `json:"hotkeysFailed"` // stored combos macOS refused to register
 	// The download folder: full path for display and title only, its name, whether it is the
 	// default Downloads folder, and whether it is missing now.
 	DownloadDir        string `json:"downloadDir"`
@@ -319,8 +320,9 @@ func (s *SettingsService) snapshotOf(p settings.Prefs) Snapshot {
 	prm := s.paramsOf(p)
 	dir, _ := filepath.Abs(cmp.Or(p.DownloadDir, s.DefaultDownloads))
 	fi, statErr := os.Stat(dir)
+	hk, failed := s.Hotkeys.State()
 	return Snapshot{Theme: p.Theme, LaunchAtLogin: on && err == nil, GiphyRating: prm.Rating, PageSize: prm.PageSize,
-		GiphyLang: p.GiphyLang, KlipyCountry: p.KlipyCountry, Hotkeys: s.Hotkeys.Bindings(),
+		GiphyLang: p.GiphyLang, KlipyCountry: p.KlipyCountry, Hotkeys: hk, HotkeysFailed: failed,
 		DownloadDir: dir, DownloadDirName: filepath.Base(dir), DownloadDirDefault: p.DownloadDir == "",
 		DownloadDirMissing: statErr != nil || !fi.IsDir(), HideFilenames: p.HideFilenames,
 		PrimaryAction: cmp.Or(p.PrimaryAction, settings.DefaultPrimary), SecondaryAction: cmp.Or(p.SecondaryAction, settings.DefaultSecondary),
@@ -539,7 +541,7 @@ func (s *SettingsService) SetHotkey(ctx context.Context, slot, accel string) (Sn
 	s.hkMu.Lock()
 	defer s.hkMu.Unlock()
 	s.Hotkeys.Resume()
-	before := s.Hotkeys.Bindings()
+	was := s.Hotkeys.Bindings()
 	if err := s.Hotkeys.Bind(slot, accel); err != nil {
 		return s.Snapshot(ctx), err
 	}
@@ -558,10 +560,12 @@ func (s *SettingsService) SetHotkey(ctx context.Context, slot, accel string) (Sn
 	})
 	switch {
 	case errors.Is(err, errUnchanged):
-		return s.snapshotOf(p), nil
+		if b == was {
+			return s.snapshotOf(p), nil
+		} // the stored combo registered now (it had failed at launch): update the tray and webviews
 	case err != nil:
 		log.Printf("settings write failed: hotkeys.%s", slot)
-		if err := s.Hotkeys.Revert(slot, *slotOf(&before, slot)); err != nil { // registered = stored again
+		if err := s.Hotkeys.Revert(slot, *slotOf(&was, slot)); err != nil { // registered = stored again
 			log.Printf("hotkey rollback failed: %s", slot)
 		}
 		return s.snapshotOf(p), errPrefsWriteFailed

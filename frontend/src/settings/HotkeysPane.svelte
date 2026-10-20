@@ -21,6 +21,11 @@
   let offTest: (() => void) | undefined;
 
   onMount(() => {
+    // A stored combo macOS refused at launch is not bound (the row shows Not set): say why (H4b).
+    for (const { slot } of ROWS) {
+      const refused = initial.hotkeysFailed[slot];
+      if (refused) say(slot, hotkeyErrorText('hotkey_register_failed_new', refused, ''), 'error');
+    }
     const off = Events.On('settings:changed', (e) => (hk = { ...(e.data as SettingsSnapshot).hotkeys }));
     return () => {
       off();
