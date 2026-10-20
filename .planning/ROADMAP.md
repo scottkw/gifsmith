@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Native Spike & Signed Dev Loop** - Hard go/no-go gate: hotkey panel → copy GIF file → paste into TextEdit, from signed and notarized builds (completed 2026-10-17)
 - [x] **Phase 2: Providers, Search UI & First Run** - Vertical slice: search/trending → animated grid → copy, across Finer Gifs, GIPHY, Klipy (and Clips), with key setup and attribution (completed 2026-10-17)
 - [x] **Phase 3: Action Pipeline & Library** - Every extension action (link, Markdown, download, square crop, ⌘K menu) plus favorites, recents, details, and recent searches (completed 2026-10-18)
-- [ ] **Phase 4: Settings, Shell Polish & Release** - Settings window, rebindable hotkeys, launch at login, then a signed, notarized DMG that installs on a clean Mac
+- [x] **Phase 4: Settings, Shell Polish & Release** - Settings window, rebindable hotkeys, launch at login, then a signed, notarized DMG that installs on a clean Mac (completed 2026-10-20)
 
 ## Phase Details
 
@@ -150,7 +150,7 @@ Plans:
   6. The app checks GitHub Releases for a newer version, alerts the user, and Settings has a "Check for Updates…" button; if the user accepts, it downloads the new DMG, verifies its checksum, Developer ID signature and notarization, and opens it (no self-replacement). (added 2026-10-18)
   7. GitHub Actions tests every push to main and every PR without secrets, and pushing a vX.Y.Z tag (from v1.0.1; v1.0.0 ships from the local notarized build) builds, Developer ID-signs, notarizes, staples and verifies the DMG and creates a draft GitHub Release with the DMG, its .sha256 and the release notes; a dry run of the release workflow is green before the first tag. (added 2026-10-20)
 
-**Plans:** 8/8 plans executed
+**Plans:** 8/8 plans complete
 
 Plans:
 
@@ -194,4 +194,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Native Spike & Signed Dev Loop | 4/4 | Complete    | 2026-10-17 |
 | 2. Providers, Search UI & First Run | 6/6 | Complete    | 2026-10-17 |
 | 3. Action Pipeline & Library | 8/8 | Complete    | 2026-10-18 |
-| 4. Settings, Shell Polish & Release | 8/8 | In Progress | - |
+| 4. Settings, Shell Polish & Release | 8/8 | Complete    | 2026-10-20 |
