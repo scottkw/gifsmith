@@ -104,9 +104,10 @@ func New(app *application.App, plat platform.Platform, trayIcon []byte) *Shell {
 	tray.SetTemplateIcon(trayIcon)
 	menu := app.NewMenu()
 	s.openItem = menu.Add("Open Gifsmith").OnClick(func(*application.Context) { s.Show() })
-	menu.Add("Settings…").OnClick(func(*application.Context) { s.OpenSettings() })
+	// Key equivalents are display only: a tray menu takes keys only while it is open.
+	menu.Add("Settings…").SetAccelerator("CmdOrCtrl+,").OnClick(func(*application.Context) { s.OpenSettings() })
 	menu.AddSeparator()
-	menu.Add("Quit Gifsmith").OnClick(func(*application.Context) { app.Quit() })
+	menu.Add("Quit Gifsmith").SetAccelerator("CmdOrCtrl+Q").OnClick(func(*application.Context) { app.Quit() })
 	tray.SetMenu(menu)
 	log.Printf("tray menu ready")
 

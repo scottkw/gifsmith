@@ -16,7 +16,7 @@ const openPane = async () => {
 };
 await openPane();
 
-const open = B.getByRole("button", { name: "Open Gifsmith shortcut" });
+const open = B.getByRole("button", { name: "Open Gifsmith shortcut", exact: true });
 const reset = B.getByRole("button", { name: "Reset to Default" });
 const text = async (loc) => (await loc.innerText()).trim();
 const waitText = async (loc, want, ms = 5000) => {
@@ -61,6 +61,54 @@ await waitText(open, "⌃⌥⌘H");
 await reset.click();
 await waitText(open, "⌃⌥⌘G");
 if (!(await reset.isDisabled())) fail("Reset to Default enabled after reset");
+
+// Backspace in a recording Open field is ignored: it keeps recording (Open can only be reset).
+await open.click();
+await B.keyboard.press("Backspace");
+await waitText(open, "Type shortcut…");
+await B.keyboard.press("Escape");
+await waitText(open, "⌃⌥⌘G");
+
+// Favorites and Recents start unset, with Test and Clear disabled.
+const fav = B.getByRole("button", { name: "Open Favorites shortcut", exact: true });
+const rec = B.getByRole("button", { name: "Open Recents shortcut", exact: true });
+const favTest = B.getByRole("button", { name: "Test Open Favorites shortcut" });
+const favClear = B.getByRole("button", { name: "Clear Open Favorites shortcut" });
+await waitText(fav, "Not set");
+await waitText(rec, "Not set");
+for (const b of [favTest, favClear, B.getByRole("button", { name: "Test Open Recents shortcut" }), B.getByRole("button", { name: "Clear Open Recents shortcut" })]) {
+  if (!(await b.isDisabled())) fail("Test/Clear enabled on an unset row");
+}
+
+await fav.click();
+await B.keyboard.press("Control+Alt+Meta+KeyF");
+await waitText(fav, "⌃⌥⌘F");
+if ((await favTest.isDisabled()) || (await favClear.isDisabled())) fail("Favorites Test/Clear disabled once set");
+
+// Duplicate inside Gifsmith (H2) and a macOS shortcut (H3): Recents stays unset.
+await rec.click();
+await B.keyboard.press("Control+Alt+Meta+KeyF");
+await B.getByText("⌃⌥⌘F is already used for Open Favorites.").waitFor({ timeout: 5000 });
+await waitText(rec, "Not set");
+await rec.click();
+await B.keyboard.press("Meta+KeyQ");
+await B.getByText("⌘Q is a macOS shortcut. Choose another one.").waitFor({ timeout: 5000 });
+await waitText(rec, "Not set");
+await saveScreenshot(await B.screenshot(), "gifsmith-17-hotkeys-errors.png");
+
+// Test: the server build's fake never fires, so the row reports H7 after 5 s. Esc cancels listening.
+await favTest.click();
+await B.getByText("Press ⌃⌥⌘F now…").waitFor({ timeout: 3000 });
+await B.keyboard.press("Escape");
+await B.getByText("Press ⌃⌥⌘F now…").waitFor({ state: "detached", timeout: 3000 });
+await favTest.click();
+await B.getByText("Press ⌃⌥⌘F now…").waitFor({ timeout: 3000 });
+await saveScreenshot(await B.screenshot(), "gifsmith-17-hotkeys-test.png");
+await B.getByText("Nothing happened. Another app may be using ⌃⌥⌘F. Try a different shortcut.").waitFor({ timeout: 7000 });
+
+await favClear.click();
+await waitText(fav, "Not set");
+if (!(await favClear.isDisabled())) fail("Clear enabled after clearing");
 
 if (errors.length) fail("page errors: " + errors.join("; "));
 console.log("UAT OK");

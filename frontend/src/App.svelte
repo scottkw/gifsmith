@@ -273,6 +273,12 @@
     Events.On('panel:status', (e) => setStatus(String(e.data)));
     Events.On('providers:changed', refreshProviders);
     Events.On('settings:changed', (e) => onSettings(e.data as SettingsSnapshot));
+    // Open Favorites / Open Recents hotkeys: show that tab, or hide when it was already showing.
+    Events.On('panel:open-tab', (e) => {
+      const { tab, wasVisible } = e.data as { tab: LibraryId; wasVisible: boolean };
+      if (wasVisible && libTab === tab) hide();
+      else switchLib(tab);
+    });
     const [list, last] = await Promise.all([providers(), lastProvider()]);
     const st = byId(list);
     // Persisted slot; first run (or Clips without a GIPHY key) opens on GIPHY. Set with statuses in one step.

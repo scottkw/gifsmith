@@ -13,7 +13,7 @@ await B.goto("http://127.0.0.1:9245/settings.html");
 await B.getByRole("tab", { name: "Hotkeys" }).click();
 await B.getByRole("heading", { name: "Hotkeys" }).waitFor({ timeout: 10000 });
 
-const open = B.getByRole("button", { name: "Open Gifsmith shortcut" });
+const open = B.getByRole("button", { name: "Open Gifsmith shortcut", exact: true });
 const text = async () => (await open.innerText()).trim();
 if ((await text()) !== "⌃⌥⌘G") fail("Open shows " + (await text()));
 

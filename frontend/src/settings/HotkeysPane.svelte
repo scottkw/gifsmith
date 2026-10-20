@@ -1,42 +1,95 @@
 <script lang="ts">
   // Hotkeys pane (UI-SPEC "Hotkeys"): one stacked row per global shortcut. Go owns validation and
-  // registration; a row shows a new combo only once Go accepted it.
+  // registration; a row shows a new combo only once Go accepted it. Test listens 5 s for the
+  // hotkey:test event Go emits when that hotkey's callback fires (the only way to see a clash).
   import { Events } from '@wailsio/runtime';
   import { onMount, untrack } from 'svelte';
-  import { setHotkey, settingsError, type SettingsSnapshot } from '../lib/api';
+  import { setHotkey, settingsError, testHotkey, type SettingsSnapshot } from '../lib/api';
   import { hotkeyErrorText } from '../lib/errors';
-  import { canonical, DEFAULT_OPEN, SLOT_LABELS, type Slot } from '../lib/hotkeys';
+  import { canonical, DEFAULT_OPEN, glyphs, SLOT_LABELS, type Slot } from '../lib/hotkeys';
   import HotkeyRecorder from './HotkeyRecorder.svelte';
 
   let { initial }: { initial: SettingsSnapshot } = $props();
 
-  const ROWS: { slot: Slot; label: string }[] = [{ slot: 'open', label: SLOT_LABELS.open }];
+  const ROWS = (['open', 'favorites', 'recents'] as const).map((slot) => ({ slot, label: SLOT_LABELS[slot] }));
+  const TEST_MS = 5000;
 
   let hk = $state(untrack(() => ({ ...initial.hotkeys })));
   let msg = $state<Record<string, { text: string; tone: 'secondary' | 'success' | 'error' }>>({});
+  let listening = $state<Slot | null>(null);
+  let listenTimer: ReturnType<typeof setTimeout> | undefined;
+  let offTest: (() => void) | undefined;
 
-  onMount(() => Events.On('settings:changed', (e) => (hk = { ...(e.data as SettingsSnapshot).hotkeys })));
+  onMount(() => {
+    const off = Events.On('settings:changed', (e) => (hk = { ...(e.data as SettingsSnapshot).hotkeys }));
+    return () => {
+      off();
+      stopListening();
+    };
+  });
+
+  const say = (slot: Slot, text: string, tone: 'secondary' | 'success' | 'error' = 'secondary') => (msg[slot] = { text, tone });
 
   function saved(s: SettingsSnapshot) {
     hk = { ...s.hotkeys };
   }
 
-  // '' clears the row's message; otherwise H1–H4b under the row. The field keeps its combo either way.
+  // '' clears the row's message (a recording started or succeeded); otherwise H1–H4b under the row.
+  // The field keeps its combo either way.
   function fail(slot: Slot, kind: string, accel: string, other = '') {
-    const text = kind ? hotkeyErrorText(kind, accel, SLOT_LABELS[other as Slot] ?? '') : '';
-    msg[slot] = { text, tone: kind ? 'error' : 'secondary' };
+    if (!kind) stopListening(); // hotkeys are suspended while recording: a Test would report H7 falsely
+    say(slot, kind ? hotkeyErrorText(kind, accel, SLOT_LABELS[other as Slot] ?? '') : '', kind ? 'error' : 'secondary');
   }
 
-  async function reset() {
-    msg.open = { text: '', tone: 'secondary' };
+  async function change(slot: Slot, accel: string) {
+    stopListening();
+    say(slot, '');
     try {
-      saved(await setHotkey('open', DEFAULT_OPEN));
+      saved(await setHotkey(slot, accel));
     } catch (err) {
       const se = settingsError(err);
-      fail('open', se?.kind ?? 'hotkey_register_failed', DEFAULT_OPEN, se?.slot);
+      fail(slot, se?.kind ?? 'hotkey_register_failed', accel, se?.slot);
     }
   }
+
+  function stopListening() {
+    clearTimeout(listenTimer);
+    offTest?.();
+    offTest = undefined;
+    if (listening) say(listening, '');
+    listening = null;
+  }
+
+  // H5 while listening, then H6 when Go reports the press, else H7 after 5 s.
+  async function test(slot: Slot) {
+    stopListening();
+    const accel = hk[slot] ?? '';
+    try {
+      await testHotkey(slot);
+    } catch {
+      return say(slot, hotkeyErrorText('test_failed', accel, ''), 'error');
+    }
+    listening = slot;
+    say(slot, `Press ${glyphs(accel)} now…`);
+    offTest = Events.On('hotkey:test', (e) => {
+      if (e.data !== slot) return;
+      stopListening();
+      say(slot, 'It works.', 'success');
+    });
+    listenTimer = setTimeout(() => {
+      stopListening();
+      say(slot, hotkeyErrorText('test_failed', accel, ''), 'error');
+    }, TEST_MS);
+  }
+
+  function onkeydown(e: KeyboardEvent) {
+    if (e.key !== 'Escape' || !listening) return;
+    e.preventDefault();
+    stopListening();
+  }
 </script>
+
+<svelte:window {onkeydown} />
 
 {#each ROWS as r, i (r.slot)}
   <div class="settings-section">
@@ -50,8 +103,16 @@
         onsaved={saved}
         onfail={(kind, accel, other) => fail(r.slot, kind, accel, other)}
       />
+      <button class="btn-secondary" aria-label="Test {r.label} shortcut" disabled={!hk[r.slot]} onclick={() => test(r.slot)}>Test</button>
       {#if r.slot === 'open'}
-        <button class="btn-secondary" disabled={canonical(hk.open || DEFAULT_OPEN) === DEFAULT_OPEN} onclick={reset}>Reset to Default</button>
+        <button
+          class="btn-secondary"
+          aria-label="Reset to Default, {r.label} shortcut"
+          disabled={canonical(hk.open || DEFAULT_OPEN) === DEFAULT_OPEN}
+          onclick={() => change('open', DEFAULT_OPEN)}>Reset to Default</button
+        >
+      {:else}
+        <button class="btn-secondary" aria-label="Clear {r.label} shortcut" disabled={!hk[r.slot]} onclick={() => change(r.slot, '')}>Clear</button>
       {/if}
     </div>
     <p class="msg {msg[r.slot]?.tone ?? 'secondary'}" id="hk-{r.slot}-msg" role={msg[r.slot]?.tone === 'error' ? 'alert' : 'status'}>
