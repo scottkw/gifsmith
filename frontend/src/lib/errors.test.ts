@@ -267,6 +267,7 @@ test('hotkeyErrorText: H1, H2, H3, H4, H4b and H7 with the combo as glyphs', () 
   assert.equal(hotkeyErrorText('hotkey_system', 'Cmd+Q', ''), '⌘Q is a macOS shortcut. Choose another one.');
   assert.equal(hotkeyErrorText('hotkey_register_failed', 'Cmd+Ctrl+Option+J', ''), "macOS couldn't register ⌃⌥⌘J. Your previous shortcut still works.");
   assert.equal(hotkeyErrorText('hotkey_register_failed_new', 'Cmd+Ctrl+Option+J', ''), "macOS couldn't register ⌃⌥⌘J. Try a different shortcut.");
+  assert.equal(hotkeyErrorText('record_failed', '', ''), "Couldn't start recording. Try again.");
   assert.equal(
     hotkeyErrorText('hotkey_register_failed_lost', 'Cmd+Ctrl+Option+J', ''),
     "macOS couldn't register ⌃⌥⌘J, and your previous shortcut stopped working. Choose another one.",

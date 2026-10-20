@@ -165,7 +165,7 @@
         href={keyUrl}
         onclick={(e) => {
           e.preventDefault();
-          openExternal(keyUrl);
+          openExternal(keyUrl).catch(() => {});
         }}>Get a free key ↗</a
       >
     </div>

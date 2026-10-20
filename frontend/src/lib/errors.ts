@@ -174,6 +174,8 @@ export function hotkeyErrorText(kind: string, accel: string, otherSlotLabel: str
       return `macOS couldn't register ${combo}. Try a different shortcut.`;
     case 'hotkey_register_failed_lost':
       return `macOS couldn't register ${combo}, and your previous shortcut stopped working. Choose another one.`;
+    case 'record_failed':
+      return "Couldn't start recording. Try again.";
     case 'test_failed':
       return `Nothing happened. Another app may be using ${combo}. Try a different shortcut.`;
   }

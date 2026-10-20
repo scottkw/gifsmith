@@ -30,14 +30,19 @@
     recording = true;
     held = '';
     onfail('', '', '');
-    suspendHotkeys();
+    // If Go did not suspend them, the current combo would fire instead of being recorded.
+    suspendHotkeys().catch(() => {
+      if (!recording) return;
+      stop();
+      onfail('record_failed', '', '');
+    });
   }
 
   function stop() {
     if (!recording) return;
     recording = false;
     held = '';
-    resumeHotkeys();
+    resumeHotkeys().catch(() => {}); // Go also resumes them when Settings hides or loses focus
   }
 
   async function save(accel: string) {

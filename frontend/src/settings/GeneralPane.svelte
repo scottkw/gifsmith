@@ -78,7 +78,9 @@
 
   onMount(() => {
     readAX();
-    updateStatus().then((st) => (upd = st));
+    updateStatus()
+      .then((st) => (upd = st))
+      .catch(() => {}); // stays idle; update:status still arrives
     const offUpdate = Events.On('update:status', (e) => (upd = e.data as UpdateStatus));
     const offReveal = Events.On('settings:reveal', revealUpdates);
     if (pendingReveal.updates) revealUpdates();

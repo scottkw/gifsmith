@@ -299,7 +299,7 @@
       const st = e.data as UpdateStatus;
       if (st.state !== 'available' || st.latest === announcedUpdate) return;
       announcedUpdate = st.latest;
-      setStatus(updateToastText(st.latest), '', { label: 'View', hint: '', run: revealUpdates }, 0);
+      setStatus(updateToastText(st.latest), '', { label: 'View', hint: '', run: () => revealUpdates().catch(() => {}) }, 0);
     });
     // Open Favorites / Open Recents hotkeys: show that tab, or hide when it was already showing.
     Events.On('panel:open-tab', (e) => {
@@ -701,7 +701,7 @@
     // ⌘, from any panel context (search, setup card key field, action menu): Go hides the panel first.
     if (a === 'settings') {
       e.preventDefault();
-      openSettings();
+      openSettings().catch(() => {}); // nothing to show: the tray's Settings… still works
     } else if (a.startsWith('slot')) {
       e.preventDefault();
       const n = Number(a.slice(4));

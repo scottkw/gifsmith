@@ -23,14 +23,17 @@
   let ratings = $state<Option[]>([]);
   let langs = $state<Option[]>([]);
   let countries = $state<Option[]>([]);
+  let loadError = $state('');
 
   onMount(() => {
-    choices().then((c) => {
-      sizes = (c.pageSizes ?? []).map((n) => ({ value: String(n), label: String(n) }));
-      ratings = (c.ratings ?? []).map((r) => ({ value: r, label: ratingLabel(r) }));
-      langs = languageOptions(c.languages ?? [], c.systemLanguage);
-      countries = countryOptions(c.countries ?? [], c.systemCountry);
-    });
+    choices()
+      .then((c) => {
+        sizes = (c.pageSizes ?? []).map((n) => ({ value: String(n), label: String(n) }));
+        ratings = (c.ratings ?? []).map((r) => ({ value: r, label: ratingLabel(r) }));
+        langs = languageOptions(c.languages ?? [], c.systemLanguage);
+        countries = countryOptions(c.countries ?? [], c.systemCountry);
+      })
+      .catch(() => (loadError = "Couldn't load these options. Open Search again to retry."));
   });
 
   async function choose(name: Name, v: string) {
@@ -79,7 +82,7 @@
   <SettingRow
     label="GIFs per page"
     id="pagesize-label"
-    error={errors.pageSize}
+    error={errors.pageSize || loadError}
     helper="Bigger pages use fewer requests. Free GIPHY and Klipy keys allow 100 per hour."
   >
     {@render picker('pageSize', 'pagesize-label', sizes)}
