@@ -46,8 +46,10 @@ type ActionService struct {
 	Previous func() platform.App
 	Sleep    func(time.Duration)         // nil means time.Sleep
 	After    func(time.Duration, func()) // nil means time.AfterFunc
-	// DownloadsDir is the download destination (desktop ~/Downloads; Phase 4's picker replaces it).
+	// DownloadsDir is the download folder, read at each Download (SettingsService.DownloadDir).
 	DownloadsDir func() string
+	// HideFilenames names downloads gifsmith-{id} instead of the title slug; nil means off.
+	HideFilenames func() bool
 	// Recents records every successful copy or paste (D-07); nil records nothing.
 	Recents      interface{ Touch(provider.Gif) error }
 	busy         sync.Mutex    // one action at a time: no racing pasteboard writes, no double ⌘V

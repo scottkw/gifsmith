@@ -1307,3 +1307,25 @@ func TestRecentsErrorDoesNotFailAction(t *testing.T) {
 		t.Errorf("copy with failing Recents: %+v, %v, touches %q", r, err, rec.keys)
 	}
 }
+
+func TestDownloadHideFilenames(t *testing.T) {
+	s, fx, dl := downloadService(t, &platform.Fake{})
+	s.HideFilenames = func() bool { return true }
+	for _, want := range []string{"gifsmith-office-1.gif", "gifsmith-office-1 (2).gif"} {
+		r, err := s.Download(context.Background(), fx.gif)
+		if err != nil || r.Name != want || !exists(filepath.Join(dl, want)) {
+			t.Fatalf("Download with hidden names = %+v, %v; want %s saved", r, err, want)
+		}
+	}
+}
+
+func TestDownloadDeletedFolder(t *testing.T) {
+	s, fx, dl := downloadService(t, &platform.Fake{})
+	if err := os.Remove(dl); err != nil {
+		t.Fatal(err)
+	}
+	r, err := s.Download(context.Background(), fx.gif)
+	if actionKind(err) != "folder_unwritable" || r != (DownloadResult{}) {
+		t.Errorf("Download into a deleted folder = %+v, %v; want folder_unwritable and an empty result", r, err)
+	}
+}

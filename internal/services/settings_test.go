@@ -1362,3 +1362,17 @@ func TestSnapshotDownloadDirMissing(t *testing.T) {
 		t.Errorf("Snapshot after the folder was deleted = %+v, want missing Later", snap)
 	}
 }
+
+func TestSetPrefHideFilenames(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	snap, err := f.svc.SetPref(ctx, "hideFilenames", "true")
+	if err != nil || !snap.HideFilenames || !f.svc.HideFilenames() {
+		t.Fatalf("SetPref(hideFilenames, true) = %+v, %v; HideFilenames() %v", snap, err, f.svc.HideFilenames())
+	}
+	_, err = f.svc.SetPref(ctx, "hideFilenames", "yes")
+	wantSettingsErr(t, err, "invalid_value")
+	if snap, err := f.svc.SetPref(ctx, "hideFilenames", "false"); err != nil || snap.HideFilenames || f.svc.HideFilenames() {
+		t.Errorf("SetPref(hideFilenames, false) = %+v, %v", snap, err)
+	}
+}

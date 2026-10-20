@@ -447,3 +447,23 @@ func TestStoreNormalizeHotkeys(t *testing.T) {
 		}
 	}
 }
+
+func TestStoreNormalizeDownloadDir(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(`{"downloadDir":"bin/somewhere"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := OpenStore(dir).Get().DownloadDir; got != "" {
+		t.Errorf("relative DownloadDir kept as %q, want reset to \"\"", got)
+	}
+	if !strings.Contains(buf.String(), "reset downloadDir") {
+		t.Errorf("log %q does not name downloadDir", buf.String())
+	}
+	ok := Prefs{DownloadDir: "/Users/someone/GIFs"}
+	if p := ok; len(p.Normalize()) != 0 || p != ok {
+		t.Errorf("absolute DownloadDir %+v was reset", ok)
+	}
+}

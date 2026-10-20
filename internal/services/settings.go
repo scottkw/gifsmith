@@ -224,6 +224,7 @@ type Snapshot struct {
 	DownloadDirName    string `json:"downloadDirName"`
 	DownloadDirDefault bool   `json:"downloadDirDefault"`
 	DownloadDirMissing bool   `json:"downloadDirMissing"`
+	HideFilenames      bool   `json:"hideFilenames"`
 }
 
 // Choices are the allowed Search-pane values, with what Match System resolves to now.
@@ -532,6 +533,9 @@ func (s *SettingsService) TestHotkey(ctx context.Context, slot string) error {
 func (s *SettingsService) DownloadDir() string {
 	return cmp.Or(s.Store.Get().DownloadDir, s.DefaultDownloads)
 }
+
+// HideFilenames reports the Hide original file names choice.
+func (s *SettingsService) HideFilenames() bool { return false }
 
 // ChooseDownloadDir shows the folder picker and saves the picked folder only if
 // ValidateDownloadDir accepts it; a cancel changes nothing. It takes no path from the webview.
