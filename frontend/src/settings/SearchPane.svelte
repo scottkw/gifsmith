@@ -9,8 +9,10 @@
 
   let { initial }: { initial: SettingsSnapshot } = $props();
 
-  type Name = 'pageSize' | 'giphyRating' | 'giphyLang' | 'klipyCountry';
+  type Name = 'pageSize' | 'giphyRating' | 'giphyLang' | 'klipyCountry' | 'gridSearch' | 'gridTrending';
   const valuesOf = (s: SettingsSnapshot): Record<Name, string> => ({
+    gridSearch: s.gridSearch,
+    gridTrending: s.gridTrending,
     pageSize: String(s.pageSize),
     giphyRating: s.giphyRating,
     giphyLang: s.giphyLang,
@@ -46,6 +48,17 @@
   }
 </script>
 
+{#snippet sizes3(name: Name, labelId: string)}
+  <div class="radios" role="radiogroup" aria-labelledby={labelId}>
+    {#each ['small', 'medium', 'large'] as v (v)}
+      <label>
+        <input type="radio" name={name} value={v} checked={values[name] === v} onchange={() => choose(name, v)} />
+        {v[0].toUpperCase() + v.slice(1)}
+      </label>
+    {/each}
+  </div>
+{/snippet}
+
 {#snippet picker(name: Name, labelId: string, opts: Option[])}
   <!-- selected per option: the options arrive after mount, so a select-level value would not stick -->
   <select aria-labelledby={labelId} onchange={(e) => choose(name, e.currentTarget.value)}>
@@ -54,6 +67,15 @@
     {/each}
   </select>
 {/snippet}
+
+<div class="settings-section">
+  <SettingRow label="Search results" id="gridsearch-label" error={errors.gridSearch}>
+    {@render sizes3('gridSearch', 'gridsearch-label')}
+  </SettingRow>
+  <SettingRow label="Trending" id="gridtrending-label" error={errors.gridTrending} helper="Small fits 5 GIFs per row, Medium 4, Large 3.">
+    {@render sizes3('gridTrending', 'gridtrending-label')}
+  </SettingRow>
+</div>
 
 <div class="settings-section">
   <SettingRow
@@ -82,6 +104,20 @@
 </div>
 
 <style>
+  .radios {
+    display: flex;
+    gap: 16px;
+  }
+  label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font: var(--body);
+    color: var(--text);
+  }
+  input {
+    margin: 0;
+  }
   select {
     min-width: 160px;
     max-width: 272px;

@@ -67,6 +67,9 @@
       Hide original file names
     </label>
   </SettingRow>
+  {#if !snap.klipyFileActions}
+    <p class="section-helper">Klipy GIFs can't be downloaded yet.</p>
+  {/if}
 </div>
 
 <style>
@@ -100,6 +103,12 @@
   }
   .check input {
     margin: 0;
+  }
+  /* Section helper (D4): helper type, aligned with the control column (144px label + 16px gap). */
+  .section-helper {
+    margin: 8px 0 0 160px;
+    font: var(--label);
+    color: var(--text-secondary);
   }
   .buttons {
     display: flex;
