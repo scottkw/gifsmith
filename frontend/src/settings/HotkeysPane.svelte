@@ -109,7 +109,7 @@
         <button
           class="btn-secondary"
           aria-label="Reset to Default, {r.label} shortcut"
-          disabled={canonical(hk.open || DEFAULT_OPEN) === DEFAULT_OPEN}
+          disabled={!!hk.open && canonical(hk.open) === DEFAULT_OPEN}
           onclick={() => change('open', DEFAULT_OPEN)}>Reset to Default</button
         >
       {:else}
