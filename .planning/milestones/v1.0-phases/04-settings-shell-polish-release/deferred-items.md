@@ -6,3 +6,4 @@
 - Where: section (d) of the script, page A (the panel). The script searches "dwight" on Finer Gifs and then switches to GIPHY with ⌘1. The likely cause is an in-flight search binding call that `cancel(...)` in `frontend/src/App.svelte` (first:/page: keys) cancels on the tab switch. Its rejection reaches the page as unhandled.
 - Impact: none visible to the user, since an unhandled rejection only shows in the webview console. It makes the UAT flaky about 1 run in 4.
 - Owner: the search/cancel path (Phase 2, App.svelte). Fix: swallow `CancelledRejectionError` where the search promise is cancelled. Do not loosen the UAT's page-error check.
+  status: acknowledged
