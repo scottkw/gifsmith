@@ -24,14 +24,15 @@ it by hand. Pushes and pull requests to `main` run the test suite (`.github/work
    git push origin vX.Y.Z
    ```
 
-6. Approve the `sign` job (Actions, the Release run, Review deployments). The `release`
-   environment must have you as a required reviewer (see Protecting the signing secrets).
+6. The run pauses before the `sign` job until you approve it: Actions, the Release run, Review
+   deployments, `release`, Approve and deploy (see Protecting the signing secrets).
 7. When the run is green, open the draft on GitHub (Releases), check the DMG, its `.sha256` and
    the notes, then publish. Installed copies see the update once it is published.
 
 The `build` job refuses, before any credential is touched, when the tag is not
 `vMAJOR.MINOR.PATCH`, does not match the version sources, has no release notes, is not on `main`,
-or already has a release. `v1.0.0` is excluded from the tag trigger. The run has two jobs on separate runners:
+or already has a release. `v1.0.0` is excluded from the tag trigger. The run has two jobs on
+separate runners:
 
 - `build` has no environment, no secrets and a read-only token. It installs dependencies, builds
   the app (`wails3 task darwin:release:app`) and uploads it as an artifact.
@@ -55,20 +56,25 @@ gate refuses before touching any credential when the ref is not on `main`, as lo
 gh workflow run release.yml --repo scottkw/gifsmith --ref main
 ```
 
-The log ends with `dry run: no release created`.
+A dry run pauses before `sign` for your approval, like a tag run. The log ends with
+`dry run: no release created`.
 
 ## Protecting the signing secrets
 
 The gate in `release.yml` (version, `main` ancestry, no existing release) guards against mistakes,
 not attacks. Both a tag push and `workflow_dispatch` run the `release.yml` of the ref being built,
 so a tag or branch that carries an edited workflow can drop the gate and still reach the `release`
-environment. The real protection lives in the repository settings, outside any workflow file:
+environment. The real protection lives in the repository settings, outside any workflow file
+(both applied 2026-10-20):
 
-- A tag ruleset (Settings, Rules, Rulesets, New tag ruleset) targeting `v*` that restricts
-  creating, updating and deleting matching tags to the maintainer (bypass list: you only).
-- The `release` environment (Settings, Environments, release) with you as a required reviewer
-  and "Prevent self-review" off, so every run that would read the secrets waits for your approval.
-  Its deployment branches and tags are limited to `main` and `v*` tags.
+- Tag ruleset "Release tags: maintainer only" (Settings, Rules, Rulesets), active: creating,
+  updating and deleting `refs/tags/v*` is blocked for everyone except repository admins (the
+  bypass list is the Repository admin role, always). Keep the admin role to the maintainer.
+- The `release` environment (Settings, Environments, release) has `scottkw` as a required
+  reviewer, so every tag or dispatch run pauses before the `sign` job, the only job that can read
+  the secrets, until you approve it in the Actions UI. Its deployment branches and tags stay
+  limited to `main` and `v*` tags. Leave "Prevent self-review" off, or you cannot approve your own
+  runs.
 
 Before approving a run, check that its commit is on `main` and that `.github/workflows/release.yml`
 at that commit is the one on `main`.
