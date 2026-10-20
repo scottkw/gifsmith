@@ -67,6 +67,7 @@
   const CROP_BUSY_MS = 300; // a square crop shows its busy state only if it is still running then (D-16)
   const LIBRARY_SKELETON_MS = 300; // a library read slower than this shows the S2 skeleton
   const FAVORITE_TOAST_MS = 2000;
+  const FAVORITES_MAX = 1000; // library.FavoritesMax
   const UNDO_TOAST_MS = 5000;
   const AX_FAILED = "Couldn't ask macOS for Accessibility access. Try again.";
 
@@ -767,10 +768,18 @@
     if (!g || !library) return;
     const k = keyOf(g);
     const on = !favKeys.has(k) && libTab !== 'favorites';
+    const full = library.favorites.length >= FAVORITES_MAX; // Go drops the oldest to make room (P23)
     const lib = await mutate(() => setFavorite(g, on), 'favorites', on ? k : undefined);
+    if (on && lib) setStatus(full ? 'Added to Favorites. Oldest favorite removed (limit 1,000).' : 'Added to Favorites', 'success', null, FAVORITE_TOAST_MS);
+    else removed(lib, 'Removed from Favorites', 'favorites', k);
+  }
+
+  // A removal offers Undo; one that changed nothing (canUndo false: Go held no such item, WR-03) has
+  // cleared Go's Undo slot, so an earlier Undo toast would restore nothing: clear it (P24, IN-06).
+  function removed(lib: Library | null, text: string, list: LibraryId, k: string) {
     if (!lib) return;
-    if (on) setStatus('Added to Favorites', 'success', null, FAVORITE_TOAST_MS);
-    else if (lib.canUndo) undoToast('Removed from Favorites', 'favorites', k); // false: Go held no such favorite (WR-03)
+    if (lib.canUndo) undoToast(text, list, k);
+    else if (toastAction?.label === 'Undo') setStatus('');
   }
 
   // ⌘⌫ on a library tab: Remove from Recents, or unfavorite on the Favorites tab. No confirmation.
@@ -778,11 +787,11 @@
     const g = items[selected];
     if (!g || !libTab) return;
     if (libTab === 'favorites') return toggleFavorite();
-    if ((await mutate(() => removeRecent(g), 'recents'))?.canUndo) undoToast('Removed from Recents', 'recents', keyOf(g));
+    removed(await mutate(() => removeRecent(g), 'recents'), 'Removed from Recents', 'recents', keyOf(g));
   }
 
   async function clearAll() {
-    if ((await mutate(clearRecents, 'recents'))?.canUndo) undoToast('Cleared Recents', 'recents', '');
+    removed(await mutate(clearRecents, 'recents'), 'Cleared Recents', 'recents', '');
   }
 
   // T8–T10: Undo restores the latest removal and reselects it ('' = the first item, after Clear Recents).
@@ -810,14 +819,14 @@
 
   // Go builds the text from the selected item; the webview only names the kind.
   function textAction(kind: TextKind, pasteIt = false) {
-    if (pasteIt && kind !== 'page') act((g) => pasteText(g, kind), true);
-    else act((g) => copyText(g, kind), false); // there is no Paste Page Link
+    if (pasteIt && kind !== 'page') act((g) => pasteText(g, kind), true, false, 'text');
+    else act((g) => copyText(g, kind), false, false, 'text'); // there is no Paste Page Link
   }
 
   // One copy or paste of the selected item at a time. A copy confirms in the footer and hides the
   // panel; a paste has hidden it already, unless it fell back to copying.
   // A square crop shows the overlay and `Cropping…` only if it is still running after 300 ms.
-  async function act(call: (g: Gif) => Promise<Result>, pasteIt: boolean, crop = false) {
+  async function act(call: (g: Gif) => Promise<Result>, pasteIt: boolean, crop = false, failAs: 'copy' | 'text' = 'copy') {
     const g = items[selected];
     if (copying || !g) return;
     copying = true;
@@ -842,7 +851,7 @@
         keepStatus = r.copied && !r.pasted && !r.needsAccessibility;
       }
     } catch (err) {
-      actionFailed(err, g);
+      actionFailed(err, g, failAs);
     } finally {
       clearTimeout(busyTimer);
       copying = overlay = false;
@@ -856,7 +865,7 @@
   }
 
   // Fixed copy keyed by Go's error kind, never the error's text. A busy refusal is silently ignored.
-  function actionFailed(err: unknown, g: Gif, action: 'copy' | 'download' = 'copy') {
+  function actionFailed(err: unknown, g: Gif, action: 'copy' | 'download' | 'text' = 'copy') {
     const kind = actionError(err)?.kind ?? '';
     if (kind === 'busy') setStatus('');
     else setStatus(actionErrorText(kind, g, action, downloadFolder), 'error');
@@ -1098,7 +1107,7 @@
 
   <Footer
     {attribution}
-    hints={detail ? 'details' : libTab ? 'library' : 'provider'}
+    hints={detail ? 'details' : libTab ? (items[selected] ? 'library' : 'none') : 'provider'}
     text={footerCenter}
     {tone}
     {needsAccessibility}

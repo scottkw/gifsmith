@@ -17,7 +17,7 @@
     onback,
   }: {
     attribution: 'giphy' | 'klipy' | 'finer' | ''; // '' = nothing to attribute (empty library tab)
-    hints?: 'provider' | 'library' | 'details';
+    hints?: 'provider' | 'library' | 'details' | 'none'; // none: a library tab with nothing selected (P18)
     text: string;
     tone: '' | 'success' | 'error';
     needsAccessibility: boolean;
@@ -68,7 +68,7 @@
     >
   {:else if hints === 'library'}
     <span class="hints"><b>↵</b> Copy&nbsp;&nbsp;&nbsp;<b>⌘K</b> Actions&nbsp;&nbsp;&nbsp;<b>⌘⌫</b> Remove</span>
-  {:else}
+  {:else if hints === 'provider'}
     <span class="hints"><b>↵</b> Copy&nbsp;&nbsp;&nbsp;<b>⌘↵</b> Paste&nbsp;&nbsp;&nbsp;<b>⌘K</b> Actions</span>
   {/if}
 </footer>

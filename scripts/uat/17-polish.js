@@ -29,6 +29,13 @@ const tertiary = await page.evaluate(() => {
 });
 if (tertiary !== "rgb(115, 115, 120)") fail("--text-tertiary " + tertiary);
 
+// P18: an empty Favorites tab shows no key hints (nothing is selected for them to act on).
+await page.keyboard.press("Meta+5");
+await page.waitForFunction("document.querySelector('input[role=combobox]').placeholder === 'Search Favorites'", null, { timeout: 5000 });
+await page.waitForTimeout(300);
+const footerText = await page.locator("footer").innerText();
+if (footerText.includes("⌘⌫") || (await page.locator("footer .hints").count())) fail("empty Favorites footer shows hints: " + footerText);
+
 await page.keyboard.press("Meta+4");
 await page.waitForFunction("document.querySelector('input[role=combobox]').placeholder === 'Search The Finer Gifs Club'", null, { timeout: 5000 });
 await input.fill("dwight");
