@@ -19,6 +19,7 @@
     reduced = false,
     onselect,
     oncopy,
+    onmenu,
     onneedmore,
     onretrypage,
   }: {
@@ -34,6 +35,7 @@
     reduced?: boolean; // prefers-reduced-motion: only the selected tile animates
     onselect: (i: number) => void;
     oncopy: (i: number) => void;
+    onmenu: (i: number) => void;
     onneedmore: () => void;
     onretrypage: () => void;
   } = $props();
@@ -90,6 +92,7 @@
                 favorite={favorites.has(`${g.provider}:${g.id}`)}
                 {onselect}
                 {oncopy}
+                {onmenu}
               />
             {/each}
           </div>

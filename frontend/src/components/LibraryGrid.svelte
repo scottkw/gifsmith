@@ -18,6 +18,7 @@
     reduced = false,
     onselect,
     oncopy,
+    onmenu,
   }: {
     sections: Section[];
     cols: number; // 3, 4 or 5 (the Search results grid size)
@@ -29,6 +30,7 @@
     reduced?: boolean; // prefers-reduced-motion: only the selected tile animates
     onselect: (i: number) => void;
     oncopy: (i: number) => void;
+    onmenu: (i: number) => void;
   } = $props();
 
   let scrollEl: HTMLDivElement;
@@ -78,6 +80,7 @@
                 favorite={badges && favorites.has(`${g.provider}:${g.id}`)}
                 {onselect}
                 {oncopy}
+                {onmenu}
               />
             {/each}
           </div>

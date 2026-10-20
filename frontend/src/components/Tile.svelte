@@ -11,6 +11,7 @@
     still = false,
     onselect,
     oncopy,
+    onmenu,
   }: {
     gif: Gif;
     index: number;
@@ -21,6 +22,7 @@
     still?: boolean; // Reduce Motion: a first-frame still instead of the animated preview
     onselect: (i: number) => void;
     oncopy: (i: number) => void;
+    onmenu: (i: number) => void; // right-click: select and open the action menu (P15)
   } = $props();
 
   // Keyed by src so a tile reused for another result after a new search loads again.
@@ -76,6 +78,10 @@
     (favorite ? ', favorite' : '')}
   onclick={() => onselect(index)}
   ondblclick={() => oncopy(index)}
+  oncontextmenu={(e) => {
+    e.preventDefault();
+    onmenu(index);
+  }}
 >
   {#if broken}
     <svg class="broken" viewBox="0 0 16 16" aria-hidden="true">

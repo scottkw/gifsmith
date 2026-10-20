@@ -9,7 +9,9 @@ test('opens right of the tile when tile.right + 8 + 320 <= 712, else left of it'
   assert.deepEqual(placeMenu(tile(538, 100), 280), { left: 210, top: 100 });
   assert.equal(placeMenu(tile(190, 100), 280).left, 364);
   assert.equal(placeMenu(tile(364, 100), 280).left, 36);
-  assert.equal(placeMenu(tile(234, 100), 280).left, 408); // right edge 400
+  // The boundary: right edge 384 fits exactly (384 + 8 + 320 = 712); right edge 400 does not.
+  assert.equal(placeMenu(tile(218, 100), 280).left, 392);
+  assert.equal(placeMenu(tile(234, 100), 280).left, 8);
 });
 
 test('3 columns: a tile whose right edge is 600 opens left at tile.left − 328, clamped >= 8', () => {

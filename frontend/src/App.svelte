@@ -722,10 +722,16 @@
       menu!.focus();
       return;
     }
-    // Library sections restart the column count at each section's first tile.
-    const col = (selected - (libSections.findLast((s) => s.start <= selected)?.start ?? 0)) % cols;
-    menuAt = placeMenu(tile.getBoundingClientRect(), col, menu!.height(), { w: innerWidth, h: innerHeight });
+    menuAt = placeMenu(tile.getBoundingClientRect(), menu!.height(), { w: innerWidth, h: innerHeight });
     menu!.focus();
+  }
+
+  // P15: right-click on a tile selects it and opens the menu beside it (Details: in its Details spot).
+  async function contextMenu(i: number) {
+    if (menuOpen) closeMenu();
+    if (i >= 0) select(i);
+    await tick();
+    toggleMenu();
   }
 
   function closeMenu() {
@@ -984,6 +990,7 @@
           favorited={favKeys.has(keyOf(detail))}
           onopenpage={() => openItem(detail, openPage)}
           onopensource={() => openItem(detail, openSource)}
+          onmenu={() => contextMenu(-1)}
         />
       </div>
     {/if}
@@ -1030,6 +1037,7 @@
               badges={libTab !== 'favorites'}
               reduced={reducedMotion}
               onselect={select}
+              onmenu={contextMenu}
               oncopy={(i) => {
                 select(i);
                 run('copy');
@@ -1100,6 +1108,7 @@
             pagingNote={pageView?.note}
             pagingRetry={pageView?.state?.tryAgain ?? true}
             onselect={select}
+            onmenu={contextMenu}
             oncopy={(i) => {
               select(i);
               run('copy');
