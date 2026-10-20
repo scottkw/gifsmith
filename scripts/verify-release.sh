@@ -7,7 +7,7 @@ set -euo pipefail
 
 IDENTITY='Developer ID Application: Ken Scott (S2K7P43927)'
 TEAM_ID='S2K7P43927'
-VERSION='1.0.0'
+VERSION='1.0.1'
 
 fail() {
   echo "RELEASE VERIFY FAIL: $*" >&2

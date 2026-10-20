@@ -21,7 +21,7 @@ await B.getByRole("heading", { name: "General" }).waitFor({ timeout: 10000 });
 
 const row = B.locator(".row").filter({ has: B.locator("#updates") });
 await B.getByRole("button", { name: "Check for Updates…", exact: true }).click();
-await row.getByText("Gifsmith 1.0.0 is up to date.", { exact: true }).waitFor({ timeout: 5000 });
+await row.getByText("Gifsmith 1.0.1 is up to date.", { exact: true }).waitFor({ timeout: 5000 });
 if (await B.getByRole("button", { name: "Download and Open…", exact: true }).count()) fail("Download and Open… shown when up to date");
 if (await row.locator("[role=alert]").count()) fail("error: " + (await row.locator("[role=alert]").innerText()));
 await A.waitForTimeout(2000);

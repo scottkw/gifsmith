@@ -17,7 +17,7 @@ import (
 
 // Version is this build's version. 04-05's version_test keeps it equal to Info.plist
 // CFBundleShortVersionString.
-const Version = "1.0.0"
+const Version = "1.0.1"
 
 // UpdateStatus is what the Updates row renders. State: idle | checking | current | available |
 // downloading | verifying | opened.

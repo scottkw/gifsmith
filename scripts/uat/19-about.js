@@ -20,7 +20,7 @@ const openAbout = async () => {
 await openAbout();
 
 const COPY = [
-  "Version 1.0.0",
+  "Version 1.0.1",
   "Search GIFs from the menu bar and copy or paste them into any app.",
   "Gifsmith is a port of the GIF Search extension for Raycast by Joseph Schmitt and contributors: tm.wrnr, j3lte, samuelkraft, ridemountainpig, spookywy, seanparkross, YourMCGeek, thomas, tim_gailey, clins1994, 0xdhrv, Olli0103 and alexi.build. Used under the MIT License, © 2021 Raycast.",
   "Search by GIPHY and KLIPY. GIFs also from The Finer Gifs Club.",
