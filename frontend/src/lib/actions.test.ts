@@ -5,7 +5,7 @@ import type { Gif } from './api';
 
 const gif = (o: Partial<Gif> = {}): Gif =>
   ({ id: '1', provider: 'giphy', title: 't', previewUrl: 'p', downloadUrl: 'd', isClip: false, ...o }) as Gif;
-const ctx = (g: Gif): ActionCtx => ({ gif: g, tab: 'provider', inDetails: false, favorited: false });
+const ctx = (g: Gif): ActionCtx => ({ gif: g, tab: 'provider', inDetails: false, favorited: false, gated: false, primary: 'copy', secondary: 'paste' });
 const giphy = buildActions(ctx(gif({ pageUrl: 'https://giphy.com/gifs/x' })));
 
 test('GIPHY item lists every row in the locked order with hints and groups', () => {
@@ -126,4 +126,24 @@ test('Show Details follows the favorite row and is omitted in Details', () => {
   assert.deepEqual(rows[i + 1], { id: 'details', label: 'Show Details', hint: '⌘I', keys: 'Meta+I', group: 5, destructive: false });
   const inDetails = buildActions({ ...ctx(gif()), inDetails: true }).map((r) => r.id);
   assert.ok(!inDetails.includes('details'));
+});
+
+test('gated Klipy items omit the five file rows (never greyed)', () => {
+  const rows = buildActions({ ...ctx(gif({ provider: 'klipy' })), gated: true, primary: 'copyLink', secondary: 'pasteLink' });
+  const ids = rows.map((r) => r.id);
+  for (const id of ['copy', 'paste', 'download', 'copySquare', 'pasteSquare'] as const) assert.ok(!ids.includes(id), id);
+  assert.deepEqual(ids, ['copyLink', 'pasteLink', 'copyMarkdown', 'pasteMarkdown', 'favorite', 'details']);
+  assert.deepEqual(rows.slice(0, 2).map((r) => [r.hint, r.keys]), [['↵', 'Enter'], ['⌘↵', 'Meta+Enter']]);
+  // Not gated, or not Klipy: every file row stays.
+  assert.ok(buildActions({ ...ctx(gif()), gated: true }).some((r) => r.id === 'download'));
+});
+
+test('↵ and ⌘↵ hints sit on the chosen rows; other rows keep their own shortcut', () => {
+  const rows = buildActions({ ...ctx(gif()), primary: 'copyLink', secondary: 'download' });
+  const hint = (id: string) => rows.find((r) => r.id === id)!;
+  assert.deepEqual([hint('copyLink').hint, hint('copyLink').keys], ['↵', 'Enter']);
+  assert.deepEqual([hint('download').hint, hint('download').keys], ['⌘↵', 'Meta+Enter']);
+  assert.deepEqual([hint('copy').hint, hint('copy').keys], ['', '']);
+  assert.deepEqual([hint('paste').hint, hint('paste').keys], ['', '']);
+  assert.equal(hint('copyMarkdown').hint, '⌘⇧M');
 });

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { countryOptions, languageOptions, ratingLabel } from './prefs.ts';
+import { countryOptions, DEFAULT_ACTIONS, effectiveAction, languageOptions, ratingLabel, shortLabel } from './prefs.ts';
+import type { Gif } from './api';
 
 test('languageOptions puts Match System first, then languages by English name', () => {
   assert.deepEqual(languageOptions(['de', 'en'], 'en'), [
@@ -33,4 +34,30 @@ test('countryOptions sorts by English region name with Match System first', () =
 
 test('ratingLabel upper-cases the GIPHY rating', () => {
   assert.deepEqual(['g', 'pg', 'pg-13', 'r'].map(ratingLabel), ['G', 'PG', 'PG-13', 'R']);
+});
+
+const item = (o: Partial<Gif> = {}): Gif => ({ id: '1', provider: 'giphy', title: 't', previewUrl: 'p', downloadUrl: 'd', isClip: false, ...o }) as Gif;
+const prefs = (primaryAction: string, secondaryAction = 'paste', klipyFileActions = false) => ({ primaryAction, secondaryAction, klipyFileActions });
+
+test('effectiveAction maps file actions on gated Klipy items to Copy Link / Paste Link', () => {
+  const klipy = item({ provider: 'klipy' });
+  assert.equal(effectiveAction(item(), 'primary', prefs('copy')), 'copy');
+  assert.equal(effectiveAction(klipy, 'primary', prefs('copy')), 'copyLink');
+  assert.equal(effectiveAction(klipy, 'secondary', prefs('copy')), 'pasteLink');
+  assert.equal(effectiveAction(klipy, 'primary', prefs('download')), 'copyLink');
+  assert.equal(effectiveAction(klipy, 'primary', prefs('copyMarkdown')), 'copyMarkdown');
+  assert.equal(effectiveAction(klipy, 'primary', prefs('copy', 'paste', true)), 'copy');
+  assert.equal(effectiveAction(item({ provider: 'clips', isClip: true }), 'primary', prefs('copy')), 'copy');
+  assert.equal(effectiveAction(undefined, 'secondary', prefs('copy', 'pasteMarkdown')), 'pasteMarkdown');
+});
+
+test('DEFAULT_ACTIONS lists the seven choices in Settings order; shortLabel names them for the footer', () => {
+  assert.deepEqual(
+    DEFAULT_ACTIONS.map((a) => a.label),
+    ['Copy GIF', 'Paste GIF', 'Copy Link', 'Paste Link', 'Copy Markdown', 'Paste Markdown', 'Download GIF'],
+  );
+  assert.deepEqual(
+    DEFAULT_ACTIONS.map((a) => shortLabel(a.id)),
+    ['Copy', 'Paste', 'Copy Link', 'Paste Link', 'Copy Markdown', 'Paste Markdown', 'Download'],
+  );
 });

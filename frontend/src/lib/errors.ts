@@ -134,6 +134,9 @@ export function folderErrorText(kind: string, folder: string): string {
   return "Couldn't save this setting. Try again.";
 }
 
+// T11: ⌘S (or any file action reaching Go) on a Klipy item while file actions are gated.
+export const klipyGatedText = '';
+
 // T6: a finished download names the folder by display name only.
 export const downloadedText = (folder: string) => `Downloaded to ${folder}`;
 

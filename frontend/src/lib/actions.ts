@@ -17,7 +17,16 @@ export type ActionId =
   | 'details'
   | 'removeRecent'
   | 'clearRecents';
-export type ActionCtx = { gif: Gif; tab: 'provider' | 'favorites' | 'recents'; inDetails: boolean; favorited: boolean };
+// gated: Klipy file actions are not cleared (RELS-04); primary/secondary: the already-effective ↵/⌘↵ actions.
+export type ActionCtx = {
+  gif: Gif;
+  tab: 'provider' | 'favorites' | 'recents';
+  inDetails: boolean;
+  favorited: boolean;
+  gated: boolean;
+  primary: ActionId;
+  secondary: ActionId;
+};
 export type ActionRow = { id: ActionId; label: string; hint: string; keys: string; group: number; destructive: boolean };
 
 type Row = Omit<ActionRow, 'label' | 'destructive'> & {

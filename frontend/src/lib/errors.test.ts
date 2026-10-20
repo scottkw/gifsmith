@@ -4,6 +4,7 @@ import {
   actionErrorText,
   downloadedText,
   folderErrorText,
+  klipyGatedText,
   libraryErrorText,
   errorState,
   pagingMessage,
@@ -287,4 +288,8 @@ test('T6 and F4 use the folder display name, never a path', () => {
   const f4 = actionErrorText('folder_unwritable', g, 'download', 'GIFs');
   assert.equal(f4, "Couldn't save to GIFs. Check that the folder exists and that Gifsmith can write to it.");
   assert.ok(!f4.includes('/'));
+});
+
+test('T11: a gated Klipy download', () => {
+  assert.equal(klipyGatedText, "Klipy GIFs can't be downloaded yet.");
 });
