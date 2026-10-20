@@ -45,6 +45,14 @@
     resumeHotkeys().catch(() => {}); // Go also resumes them when Settings hides or loses focus
   }
 
+  // Esc, Tab and blur cancel: the previous value stays, with no message (an H1 from this recording
+  // goes too). stop() alone keeps the message, for the errors that end a recording.
+  function cancel() {
+    if (!recording) return;
+    onfail('', '', '');
+    stop();
+  }
+
   async function save(accel: string) {
     saving = true;
     try {
@@ -68,10 +76,10 @@
       return;
     }
     const mods = e.metaKey || e.ctrlKey || e.altKey || e.shiftKey;
-    if (e.key === 'Tab' && !mods) return stop(); // focus moves on
+    if (e.key === 'Tab' && !mods) return cancel(); // focus moves on
     e.preventDefault();
     if (saving) return;
-    if (e.key === 'Escape' && !mods) return stop();
+    if (e.key === 'Escape' && !mods) return cancel();
     if ((e.key === 'Backspace' || e.key === 'Delete') && !mods) {
       if (slot !== 'open') save(''); // Open Gifsmith can only be reset, never cleared
       return;
@@ -102,7 +110,7 @@
   onclick={start}
   {onkeydown}
   {onkeyup}
-  onblur={stop}
+  onblur={cancel}
 >
   {#if recording}{held || 'Type shortcut…'}{:else}{value ? glyphs(value) : 'Not set'}{/if}
 </div>

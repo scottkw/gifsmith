@@ -33,6 +33,15 @@ if (!(await reset.isDisabled())) fail("Reset to Default enabled on the default")
 await B.getByText("macOS doesn't warn when another app uses the same shortcut. Use Test to check yours.").waitFor();
 await saveScreenshot(await B.screenshot(), "gifsmith-17-hotkeys-default.png");
 
+// Esc cancels: the old combo stays, and an H1 from that recording goes with it.
+await open.click();
+await waitText(open, "Type shortcut…");
+await B.keyboard.press("KeyH");
+await B.getByText("Include ⌘, ⌥ or ⌃ in the shortcut.").waitFor({ timeout: 3000 });
+await B.keyboard.press("Escape");
+await waitText(open, "⌃⌥⌘G");
+if (await B.getByText("Include ⌘, ⌥ or ⌃ in the shortcut.").count()) fail("H1 still shown after Esc cancelled the recording");
+
 // Record ⌃⌥⌘H: the field shows the new combo only after Go accepted it.
 await open.click();
 await waitText(open, "Type shortcut…");
