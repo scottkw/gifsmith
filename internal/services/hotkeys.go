@@ -137,8 +137,9 @@ func (h *Hotkeys) Bind(slot, accel string) error {
 		if c, err = h.Canonical(accel); err != nil {
 			return err
 		}
+		// A combo macOS refused at launch is still stored for its slot, so it counts as taken too.
 		for _, other := range hotkeySlots {
-			if other != slot && *slotOf(&h.bound, other) == c {
+			if other != slot && (*slotOf(&h.bound, other) == c || *slotOf(&h.failed, other) == c) {
 				return &SettingsError{Kind: "hotkey_duplicate", Slot: other}
 			}
 		}

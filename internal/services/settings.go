@@ -588,6 +588,17 @@ func (s *SettingsService) SetHotkey(ctx context.Context, slot, accel string) (Sn
 	c := *slotOf(&b, slot)
 	p, err := s.Store.Update(func(p *settings.Prefs) error {
 		before := p.Hotkeys
+		// What is stored is the truth: never save a combo another slot stores (Normalize would
+		// silently drop one of them), even one Hotkeys does not have registered.
+		for _, other := range hotkeySlots {
+			stored := *slotOf(&p.Hotkeys, other)
+			if other == "open" {
+				stored = cmp.Or(stored, DefaultOpenHotkey)
+			}
+			if other != slot && c != "" && stored == c {
+				return &SettingsError{Kind: "hotkey_duplicate", Slot: other}
+			}
+		}
 		*slotOf(&p.Hotkeys, slot) = c
 		if slot == "open" {
 			p.Hotkeys.Open = defaultAsEmpty(c, DefaultOpenHotkey)
@@ -597,11 +608,17 @@ func (s *SettingsService) SetHotkey(ctx context.Context, slot, accel string) (Sn
 		}
 		return nil
 	})
+	var dup *SettingsError
 	switch {
 	case errors.Is(err, errUnchanged):
 		if b == was {
 			return s.snapshotOf(p), nil
 		} // the stored combo registered now (it had failed at launch): update the tray and webviews
+	case errors.As(err, &dup):
+		if err := s.Hotkeys.Revert(slot, *slotOf(&was, slot)); err != nil { // registered = stored again
+			log.Printf("hotkey rollback failed: %s", slot)
+		}
+		return s.snapshotOf(p), dup
 	case err != nil:
 		werr := writeFailed("hotkeys."+slot, err)
 		if err := s.Hotkeys.Revert(slot, *slotOf(&was, slot)); err != nil { // registered = stored again
