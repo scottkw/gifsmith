@@ -42,7 +42,7 @@
     type SettingsSnapshot,
     type TextKind,
   } from './lib/api';
-  import { actionErrorText, errorState, libraryErrorText, pagingMessage, providerName, revokedMessage } from './lib/errors';
+  import { actionErrorText, downloadedText, errorState, libraryErrorText, pagingMessage, providerName, revokedMessage } from './lib/errors';
   import { buildActions, type ActionId, type ActionRow } from './lib/actions';
   import { COLS, move, nearEnd, routeKey } from './lib/grid';
   import { flatItems, moveSectioned, sections } from './lib/library';
@@ -112,6 +112,7 @@
   let params = untrack(() => paramsOf(initial));
   function onSettings(s: SettingsSnapshot) {
     applyTheme(s.theme);
+    downloadFolder = s.downloadDirName;
     if (paramsOf(s) === params) return;
     params = paramsOf(s);
     for (const st of Object.values(states)) st.stale = st.status !== 'idle'; // results on screen stay until then
@@ -138,7 +139,7 @@
   let copying = $state(false); // one Copy/Paste in flight; a second Enter would paste twice
   let overlay = $state(false); // the selected tile's busy overlay; for a crop it waits CROP_BUSY_MS
   let needsAccessibility = $state(false);
-  let downloadFolder: string | undefined; // display name from the last download, for F4
+  let downloadFolder = untrack(() => initial.downloadDirName); // the download folder's display name, for F4
   // Paste hides the panel before ⌘V; a copied-only fallback message must survive to the next show.
   let keepStatus = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -884,10 +885,9 @@
     setStatus('Downloading…');
     try {
       const r = await download(g);
-      downloadFolder = r.folder;
       // A Finder failure is logged in Go; the toast simply clears (UI-SPEC has no copy for it).
       const reveal = () => void showDownload().catch(() => {});
-      setStatus(`Downloaded to ${r.folder}`, 'success', { label: 'Show in Finder', hint: '⌘R', run: reveal }, DOWNLOAD_TOAST_MS);
+      setStatus(downloadedText(r.folder), 'success', { label: 'Show in Finder', hint: '⌘R', run: reveal }, DOWNLOAD_TOAST_MS);
     } catch (err) {
       actionFailed(err, g, 'download');
     } finally {

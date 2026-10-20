@@ -121,11 +121,21 @@ export function actionErrorText(kind: string, g: Gif, action: 'copy' | 'download
 
 // Downloads pane D5–D8 under Save to, keyed by Go's SettingsError kind; `folder` is the display name.
 export function folderErrorText(kind: string, folder: string): string {
-  return '';
+  switch (kind) {
+    case 'folder_fat':
+      return `Gifsmith can't save safely to ${folder} (exFAT or FAT drive). Choose a folder on a Mac-formatted drive.`;
+    case 'folder_network':
+      return `${folder} is on a network drive. Choose a folder on this Mac.`;
+    case 'folder_unwritable':
+      return `Gifsmith can't write to ${folder}. Choose another folder.`;
+    case 'folder_missing':
+      return 'This folder no longer exists. Choose another folder or reset to Downloads.';
+  }
+  return "Couldn't save this setting. Try again.";
 }
 
 // T6: a finished download names the folder by display name only.
-export const downloadedText = (folder: string) => '';
+export const downloadedText = (folder: string) => `Downloaded to ${folder}`;
 
 // F5: a library write failed (favorite, remove, Clear Recents, Undo); the list keeps its pre-change state.
 export function libraryErrorText(list: 'favorites' | 'recents'): string {

@@ -50,6 +50,20 @@ await saveScreenshot(await B.screenshot(), "gifsmith-18-downloads.png");
 await A.bringToFront();
 await downloadsTo("uat-picked");
 
+// Hide original file names: the toast still names the folder (the gifsmith-{id} name is checked by the smoke run).
+const hide = B.getByRole("checkbox", { name: "Hide original file names" });
+if (await hide.isChecked()) fail("Hide original file names is on by default");
+await B.locator("text=Name downloads gifsmith-{id}.gif instead of using the GIF's title.").waitFor({ timeout: 3000 });
+await hide.check();
+await B.waitForTimeout(300);
+await A.bringToFront();
+await downloadsTo("uat-picked");
+await B.reload();
+await B.getByRole("tab", { name: "Downloads", exact: true }).click();
+if (!(await B.getByRole("checkbox", { name: "Hide original file names" }).isChecked())) fail("Hide original file names did not persist");
+await B.getByRole("checkbox", { name: "Hide original file names" }).uncheck();
+await B.waitForTimeout(300);
+
 await reset.click();
 await display("uat-downloads").waitFor({ timeout: 3000 });
 if (!(await reset.isDisabled())) fail("Reset to Downloads is enabled after resetting");
