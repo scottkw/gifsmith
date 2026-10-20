@@ -1,18 +1,14 @@
 ---
-status: testing
+status: complete
 phase: 04-settings-shell-polish-release
 source: [04-VERIFICATION.md]
 started: 2026-10-20T17:00:00Z
-updated: 2026-10-20T17:00:00Z
+updated: 2026-10-20T19:30:00Z
 ---
 
 ## Current Test
 
-number: 8
-name: Motion, About, Updates — checklist E19–E21
-expected: |
-  See 04-HANDSON-CHECKLIST.md group E.
-awaiting: user response
+[testing complete]
 
 ## Tests
 
@@ -46,14 +42,14 @@ result: pass — user on host.
 
 ### 8. Motion, About, Updates — checklist E19–E21
 expected: Reduce motion stills; About links and GIPHY mark in both themes; Updates section in both themes.
-result: [pending]
+result: pass — user on host.
 
 ## Summary
 
 total: 8
-passed: 7
+passed: 8
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 
