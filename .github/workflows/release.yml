@@ -41,6 +41,9 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
+      # Guards against mistakes, not attacks: it is defined by the ref it gates, so a ref carrying an
+      # edited release.yml skips it. The v* tag ruleset and the release environment's required
+      # reviewer are the real control (docs/releasing.md, Protecting the signing secrets).
       - name: Gate (version, main ancestry, no existing release)
         id: gate
         env:

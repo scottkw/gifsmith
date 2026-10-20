@@ -24,8 +24,8 @@ it by hand. Pushes and pull requests to `main` run the test suite (`.github/work
    git push origin vX.Y.Z
    ```
 
-6. If the `release` environment has a required reviewer, approve the run (Actions, the Release
-   run, Review deployments).
+6. Approve the `sign` job (Actions, the Release run, Review deployments). The `release`
+   environment must have you as a required reviewer (see Protecting the signing secrets).
 7. When the run is green, open the draft on GitHub (Releases), check the DMG, its `.sha256` and
    the notes, then publish. Installed copies see the update once it is published.
 
@@ -47,8 +47,9 @@ whose stamp does not match `HEAD` and its contents, such as one left by `install
 
 ## Dry run
 
-Builds, signs, notarizes and verifies on a runner without creating a release. Like a tag run, it
-refuses before touching any credential when the ref is not on `main`:
+Builds, signs, notarizes and verifies on a runner without creating a release. Like a tag run, its
+gate refuses before touching any credential when the ref is not on `main`, as long as the ref's own
+`release.yml` is unedited (see Protecting the signing secrets):
 
 ```sh
 gh workflow run release.yml --repo scottkw/gifsmith --ref main
@@ -56,10 +57,27 @@ gh workflow run release.yml --repo scottkw/gifsmith --ref main
 
 The log ends with `dry run: no release created`.
 
+## Protecting the signing secrets
+
+The gate in `release.yml` (version, `main` ancestry, no existing release) guards against mistakes,
+not attacks. Both a tag push and `workflow_dispatch` run the `release.yml` of the ref being built,
+so a tag or branch that carries an edited workflow can drop the gate and still reach the `release`
+environment. The real protection lives in the repository settings, outside any workflow file:
+
+- A tag ruleset (Settings, Rules, Rulesets, New tag ruleset) targeting `v*` that restricts
+  creating, updating and deleting matching tags to the maintainer (bypass list: you only).
+- The `release` environment (Settings, Environments, release) with you as a required reviewer
+  and "Prevent self-review" off, so every run that would read the secrets waits for your approval.
+  Its deployment branches and tags are limited to `main` and `v*` tags.
+
+Before approving a run, check that its commit is on `main` and that `.github/workflows/release.yml`
+at that commit is the one on `main`.
+
 ## Secrets
 
 Five secrets live in the GitHub environment `release` (Settings, Environments, release), which
-deploys only from `main` and `v*` tags. Only the release workflow's keychain step reads them.
+deploys only from `main` and `v*` tags and needs your approval (see Protecting the signing
+secrets). Only the release workflow's keychain step reads them.
 
 | Secret | Holds |
 |--------|-------|
