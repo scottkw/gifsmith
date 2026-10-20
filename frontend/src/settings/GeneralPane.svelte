@@ -81,7 +81,12 @@
     updateStatus()
       .then((st) => (upd = st))
       .catch(() => {}); // stays idle; update:status still arrives
-    const offUpdate = Events.On('update:status', (e) => (upd = e.data as UpdateStatus));
+    const offUpdate = Events.On('update:status', (e) => {
+      upd = e.data as UpdateStatus;
+      // A new attempt (automatic ones too) retires the last error. Not on available: Go's failure
+      // path emits a restored available before the call rejects, which would race the new error.
+      if (upd.state === 'checking' || upd.state === 'downloading') updError = '';
+    });
     const offReveal = Events.On('settings:reveal', revealUpdates);
     if (pendingReveal.updates) revealUpdates();
     const offShow = Events.On('settings:show', () => {
