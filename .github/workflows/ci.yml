@@ -54,6 +54,10 @@ jobs:
             exit 1
           fi
 
+      # Every native build runs go mod tidy; an untidy go.sum dirties the tree and trips release:app.
+      - name: go mod tidy
+        run: go mod tidy -diff
+
       - name: go vet
         run: go vet . ./internal/...
 
