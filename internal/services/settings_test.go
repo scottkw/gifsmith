@@ -488,6 +488,30 @@ func TestSetPrefRejectsInvalid(t *testing.T) {
 	}
 }
 
+func TestSettingsChangedEndsWithTheStore(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	var wg sync.WaitGroup
+	for i := range 40 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if i%2 == 0 {
+				_, _ = f.svc.SetPref(ctx, "theme", []string{"dark", "light"}[i/2%2])
+			} else {
+				_, _ = f.svc.SetPref(ctx, "hideFilenames", []string{"true", "false"}[i/2%2])
+			}
+		}()
+	}
+	wg.Wait()
+	// Webviews show the last settings:changed they get, so it must match what was stored last.
+	last, ok := (*f.data)[len(*f.data)-1].(Snapshot)
+	p := f.svc.Store.Get()
+	if !ok || last.Theme != p.Theme || last.HideFilenames != p.HideFilenames {
+		t.Errorf("last event %+v, store %+v", last, p)
+	}
+}
+
 func TestSetPrefWriteFailure(t *testing.T) {
 	logs := captureLog(t)
 	f := newSettings(t, "")

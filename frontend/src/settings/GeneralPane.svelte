@@ -27,7 +27,9 @@
   let { initial }: { initial: SettingsSnapshot } = $props();
 
   // These follow the snapshot SettingsApp keeps current (settings:changed, and a re-read on every
-  // show); a change below overrides one until the next snapshot.
+  // show); a change below overrides one until the next snapshot. A call's own result is never
+  // shown: responses can arrive out of order, Go's settings:changed events cannot. A failure
+  // reverts to the last snapshot.
   let theme = $derived(initial.theme);
   let launchAtLogin = $derived(initial.launchAtLogin);
   let actions = $derived({ primaryAction: initial.primaryAction, secondaryAction: initial.secondaryAction });
@@ -108,13 +110,12 @@
   });
 
   async function chooseTheme(v: string) {
-    const prev = theme;
     theme = v;
     themeError = '';
     try {
-      theme = (await setPref('theme', v)).theme;
+      await setPref('theme', v);
     } catch {
-      theme = prev;
+      theme = initial.theme;
       themeError = "Couldn't save this setting. Try again.";
     }
   }
@@ -123,9 +124,9 @@
     const on = launchAtLogin; // bind:checked already flipped it
     loginError = '';
     try {
-      launchAtLogin = (await setLaunchAtLogin(on)).launchAtLogin;
+      await setLaunchAtLogin(on);
     } catch (e) {
-      launchAtLogin = !on;
+      launchAtLogin = initial.launchAtLogin;
       loginError =
         settingsError(e)?.kind === 'not_in_applications'
           ? 'Move Gifsmith to the Applications folder, then try again.'
@@ -133,12 +134,11 @@
     }
   }
 
-  // Go swaps the two when one key takes the other's action, so read both back.
+  // Go swaps the two when one key takes the other's action; settings:changed brings both back.
   async function chooseAction(name: 'primaryAction' | 'secondaryAction', box: HTMLSelectElement) {
     actionError = '';
     try {
-      const s = await setPref(name, box.value);
-      actions = { primaryAction: s.primaryAction, secondaryAction: s.secondaryAction };
+      await setPref(name, box.value);
     } catch {
       box.value = actions[name];
       actionError = "Couldn't save this setting. Try again.";
@@ -167,9 +167,9 @@
     const on = autoCheck; // bind:checked already flipped it
     autoError = '';
     try {
-      autoCheck = (await setPref('updateCheck', String(on))).updateCheck;
+      await setPref('updateCheck', String(on));
     } catch {
-      autoCheck = !on;
+      autoCheck = initial.updateCheck;
       autoError = "Couldn't save this setting. Try again.";
     }
   }

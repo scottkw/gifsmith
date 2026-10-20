@@ -36,14 +36,15 @@
       .catch(() => (loadError = "Couldn't load these options. Open Search again to retry."));
   });
 
+  // Shown values come only from snapshots (settings:changed is ordered; call results are not), so
+  // a late response never reverts this or another control. A failure reverts to the last snapshot.
   async function choose(name: Name, v: string) {
-    const prev = values[name];
     values = { ...values, [name]: v };
     errors[name] = '';
     try {
-      values = valuesOf(await setPref(name, v));
+      await setPref(name, v);
     } catch {
-      values = { ...values, [name]: prev };
+      values = { ...values, [name]: valuesOf(initial)[name] };
       errors[name] = "Couldn't save this setting. Try again.";
     }
   }

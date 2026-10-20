@@ -45,8 +45,9 @@ type SettingsService struct {
 	DefaultDownloads string // ~/Downloads (bin/uat-downloads in the UAT build)
 	KlipyFileActions bool   // main sets it from KlipyFileActionsCleared; never a pref
 
-	mu   sync.Mutex // serializes SaveKey, TestKey and RemoveKey end to end: the Keychain ends in the last call's state
-	hkMu sync.Mutex // serializes SetHotkey: the Store ends with what is registered
+	mu     sync.Mutex // serializes SaveKey, TestKey and RemoveKey end to end: the Keychain ends in the last call's state
+	hkMu   sync.Mutex // serializes SetHotkey: the Store ends with what is registered
+	emitMu sync.Mutex // orders settings:changed events (changed)
 }
 
 // validKey bounds what a key may contain: Klipy puts it in a URL path, GIPHY in a query.
@@ -195,6 +196,17 @@ func (s *SettingsService) RemoveKey(ctx context.Context, p string) error {
 	log.Printf("key removed for %s", id)
 	s.emit("providers:changed")
 	return nil
+}
+
+// changed emits settings:changed with the settings as they are now. The snapshot is taken under
+// emitMu, so events leave in write order and the last one a webview gets is never older than the
+// store: webviews show what this event says, not what their own call returned.
+func (s *SettingsService) changed() Snapshot {
+	s.emitMu.Lock()
+	defer s.emitMu.Unlock()
+	snap := s.Snapshot(context.Background())
+	s.emit("settings:changed", snap)
+	return snap
 }
 
 func (s *SettingsService) emit(name string, data ...any) {
@@ -440,11 +452,7 @@ func (s *SettingsService) SetPref(ctx context.Context, name, value string) (Snap
 	for _, id := range flush {
 		s.Svc.Flush(id)
 	}
-	snap := s.snapshotOf(p)
-	if s.Emit != nil {
-		s.Emit("settings:changed", snap)
-	}
-	return snap, nil
+	return s.changed(), nil
 }
 
 // defaultAsEmpty stores the default as "", so choosing it when nothing is stored is a no-op.
@@ -500,11 +508,7 @@ func (s *SettingsService) SetLaunchAtLogin(ctx context.Context, on bool) (Snapsh
 		log.Printf("settings write failed: launchAtLogin")
 		return s.snapshotOf(p), errPrefsWriteFailed
 	}
-	snap := s.snapshotOf(p)
-	if s.Emit != nil {
-		s.Emit("settings:changed", snap)
-	}
-	return snap, nil
+	return s.changed(), nil
 }
 
 // ApplyStartup runs once at launch: when the pref is on and the OS reports the login item off,
@@ -543,14 +547,13 @@ func (s *SettingsService) SetHotkey(ctx context.Context, slot, accel string) (Sn
 	s.Hotkeys.Resume()
 	was := s.Hotkeys.Bindings()
 	if err := s.Hotkeys.Bind(slot, accel); err != nil {
-		snap := s.Snapshot(ctx)
-		if snap.Hotkeys != was { // the old combo did not come back either: the slot is unbound now
+		if s.Hotkeys.Bindings() != was { // the old combo did not come back either: the slot is unbound now
 			if slot == "open" && s.OnOpenHotkey != nil {
 				s.OnOpenHotkey("")
 			}
-			s.emit("settings:changed", snap)
+			return s.changed(), err
 		}
-		return snap, err
+		return s.Snapshot(ctx), err
 	}
 	b := s.Hotkeys.Bindings()
 	c := *slotOf(&b, slot)
@@ -580,9 +583,7 @@ func (s *SettingsService) SetHotkey(ctx context.Context, slot, accel string) (Sn
 	if slot == "open" && s.OnOpenHotkey != nil {
 		s.OnOpenHotkey(c)
 	}
-	snap := s.snapshotOf(p)
-	s.emit("settings:changed", snap)
-	return snap, nil
+	return s.changed(), nil
 }
 
 // SuspendHotkeys unregisters every Gifsmith hotkey while a recorder is capturing keys.
@@ -650,7 +651,5 @@ func (s *SettingsService) setDownloadDir(dir string) (Snapshot, error) {
 		log.Printf("settings write failed: downloadDir")
 		return s.snapshotOf(p), errPrefsWriteFailed
 	}
-	snap := s.snapshotOf(p)
-	s.emit("settings:changed", snap)
-	return snap, nil
+	return s.changed(), nil
 }

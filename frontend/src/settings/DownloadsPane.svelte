@@ -7,7 +7,9 @@
 
   let { initial }: { initial: SettingsSnapshot } = $props();
 
-  let snap = $derived(initial); // SettingsApp's: current after settings:changed and on every show
+  // SettingsApp's snapshot: current after settings:changed and on every show. A call's own result
+  // is never shown (responses can arrive out of order; settings:changed cannot).
+  let snap = $derived(initial);
   let folderError = $state(''); // D5–D7 from the last Choose…; the old folder stays saved
   let hideError = $state('');
 
@@ -17,7 +19,7 @@
   async function change(f: () => Promise<SettingsSnapshot>) {
     folderError = '';
     try {
-      snap = await f();
+      await f();
     } catch (e) {
       const c = settingsError(e);
       folderError = folderErrorText(c?.kind ?? '', c?.folder ?? '');
@@ -27,7 +29,7 @@
   async function toggleHide(box: HTMLInputElement) {
     hideError = '';
     try {
-      snap = await setPref('hideFilenames', String(box.checked));
+      await setPref('hideFilenames', String(box.checked));
     } catch {
       box.checked = snap.hideFilenames;
       hideError = "Couldn't save this setting. Try again.";
