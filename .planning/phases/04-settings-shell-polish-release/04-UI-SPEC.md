@@ -593,7 +593,7 @@ Contrast notes (measured): `--text-secondary` on `--surface` 4.54 / 5.42; `--suc
 | Surface | Contract |
 |---------|----------|
 | DMG file | `Gifsmith-1.0.0-arm64.dmg`, volume name `Gifsmith` |
-| DMG window | 540×380 (the Taskfile's dimensions). **Replace the template `build/darwin/dmg-background.png`** (it carries the Wails logo): flat `#F2F2F7`, a 2px `#86868B` right-pointing arrow centered between the icon slots, and the line `Drag Gifsmith to Applications` (14px system font, `#6E6E73`) centered 48px from the bottom. Provide @1x 540×380 and @2x 1080×760. App icon centered at (135, 170), Applications alias at (405, 170), icon size 128 (if `wails3 tool package` cannot place icons, the planner picks the tool that can) |
+| DMG window | 540×380 (the Taskfile's dimensions). **Replace the template `build/darwin/dmg-background.png`** (it carries the Wails logo): flat `#F2F2F7`, a 2px `#86868B` right-pointing arrow centered between the icon slots, and the line `Drag Gifsmith to Applications` (14px system font, `#6E6E73`) centered 48px from the bottom. Provide @1x 540×380 and @2x 1080×760 (combined into a two-representation TIFF at build time). Wails' fixed layout: app icon centered at (151,164), Applications alias at (388,164), icon size 96; the background is drawn to match. Amended in 04-05 per D-22 (`wails3 tool package --format dmg` places icons at width×28% / width×72%, height/2−26, 96 px; the earlier (135,170)/(405,170)/128 target is withdrawn) |
 | Info.plist | `CFBundleName` / display name `Gifsmith`, `CFBundleShortVersionString` `1.0.0`, `LSMinimumSystemVersion` `13.0`, `LSUIElement` true (already) |
 | GitHub Release | Title `Gifsmith 1.0.0`; assets: the DMG and `Gifsmith-1.0.0-arm64.dmg.sha256`; notes list requirements (macOS 13+, Apple Silicon), install steps, and the provider attribution lines |
 | README attribution | Contains `Powered By GIPHY` (with the official mark), states the Klipy search box reads `Search KLIPY`, credits The Finer Gifs Club, and repeats the A2 credit with a link to the extension |
@@ -647,7 +647,7 @@ Applicable state considerations resolved: 33 covered, 7 backstop, 1 unresolved (
 | reduced-motion | Grid tiles | 🧪 backstop | With `prefers-reduced-motion: reduce` emulated, only the selected tile has an animated `<img>`; others are stills or canvases. Verify in headless UAT with media emulation; native Reduce Motion is user-verified |
 | native | Theme override, Settings activation, ⌘V in key field, launch at login, hotkey Test clash, folder picker | 🧪 backstop | Cannot be exercised headlessly: user-verified at the phase's native checkpoint on a signed install (and the clean-account install test, RELS-02) |
 | native | Real GitHub check, verified DMG opening, tray update item | 🧪 backstop | The signed install's launch check and Check for Updates… reach GitHub; the notarized DMG passes the verifier and opens in Finder (env-gated test the user runs); the tray item renders once a newer release exists (04-07 human-checks) |
-| native | DMG window layout | ⚠ unresolved | Whether `wails3 tool package --format dmg` can position icons is not yet known; the planner researches the tool and treats the icon coordinates as the target |
+| native | DMG window layout | ✅ resolved (D-22) | `wails3 tool package --format dmg` positions icons at fixed coordinates: app (151,164), Applications (388,164), 96 px at 540×380; the background is drawn to that layout (Release Surfaces, amended in 04-05) |
 
 ---
 
