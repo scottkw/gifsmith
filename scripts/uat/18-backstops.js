@@ -120,7 +120,7 @@ const where = () =>
     if (a?.getAttribute("role") === "tab") return "tab:" + a.textContent.trim();
     return a && document.querySelector("[role=tabpanel]")?.contains(a) ? desc(a) : "out";
   })()`);
-const PANES = ["General", "Keys", "Hotkeys", "Search", "Downloads"];
+const PANES = ["General", "Keys", "Hotkeys", "Search", "Downloads", "About"];
 await B.getByRole("tab", { name: "General", exact: true }).click();
 await B.getByRole("tab", { name: "General", exact: true }).focus();
 for (const [i, name] of PANES.entries()) {
