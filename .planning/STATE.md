@@ -5,16 +5,16 @@ milestone_name: Gifsmith MVP
 current_phase: 4
 current_phase_name: Settings, Shell Polish & Release
 status: executing
-stopped_at: Completed 04-05-PLAN.md
-last_updated: "2026-10-20T03:01:55.452Z"
+stopped_at: Completed 04-06-PLAN.md
+last_updated: "2026-10-20T13:54:19.560Z"
 last_activity: 2026-10-18
 last_activity_desc: Phase 4 execution started
-state_head: 39d2758101ccd20ae3e5541f9f8018e4a96306fe
+state_head: 1368868ca5f5b1c61d6bdf542403465ce29af984
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 25
-  completed_plans: 24
+  total_plans: 26
+  completed_plans: 25
 ---
 
 # Project State
@@ -83,6 +83,7 @@ Progress: [████████░░] 75% (3/4 phases; 18/18 planned plans 
 | Phase 04 P04 | 32min | 9 tasks | 46 files |
 | Phase 04 P07 | 19 min | 4 tasks | 31 files |
 | Phase 04 P05 | 12 min | 4 tasks | 27 files |
+| Phase 4 P06 | 25min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -173,6 +174,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Release DMG background: committed @1x/@2x PNGs combined into a two-representation TIFF at build time
 - [Phase 04]: darwin:release signs once with --hardened-runtime --notarize instead of sign then re-sign
 - [Phase 04]: Unreferenced Wails template public assets deleted (wails.png, svelte.svg, Inter-Medium.ttf, style.css, bg-*.jpg)
+- [Phase 4]: RELS-02 clean-machine install was run in a fresh Tart VM (macOS 15.7.7) from the quarantined notarized DMG: PASSED
+- [Phase 4]: Draft release v1.0.0 targets main; Phase 4 must be merged to main before the user publishes (tag is created at publish time)
 
 ### Pending Todos
 
@@ -206,6 +209,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-20T03:01:55.247Z
-Stopped at: Completed 04-05-PLAN.md
+Last session: 2026-10-20T13:54:19.341Z
+Stopped at: Completed 04-06-PLAN.md
 Resume file: None
