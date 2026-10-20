@@ -1,5 +1,5 @@
 // Grid selection math and key routing. No Svelte or DOM imports so node --test can load it.
-export const COLS = 4;
+// cols is the grid's column count (lib/prefs colsFor: 3, 4 or 5).
 
 export type Direction = 'left' | 'right' | 'up' | 'down';
 export type KeyAction =
@@ -29,7 +29,7 @@ export type KeyAction =
 
 // ← → wrap across rows and clamp at the ends; ↑ on the first row stays; ↓ with no tile directly
 // below goes to the last tile when it sits on a later row.
-export function move(index: number, key: Direction, count: number): number {
+export function move(index: number, key: Direction, count: number, cols: number): number {
   if (count <= 0) return 0;
   const last = count - 1;
   switch (key) {
@@ -38,16 +38,16 @@ export function move(index: number, key: Direction, count: number): number {
     case 'right':
       return Math.min(last, index + 1);
     case 'up':
-      return index >= COLS ? index - COLS : index;
+      return index >= cols ? index - cols : index;
     case 'down':
-      if (index + COLS <= last) return index + COLS;
-      return Math.floor(index / COLS) < Math.floor(last / COLS) ? last : index;
+      if (index + cols <= last) return index + cols;
+      return Math.floor(index / cols) < Math.floor(last / cols) ? last : index;
   }
 }
 
 // The next page loads once the selection is within the last 2 rows.
-export function nearEnd(index: number, count: number): boolean {
-  return index >= count - 2 * COLS;
+export function nearEnd(index: number, count: number, cols: number): boolean {
+  return index >= count - 2 * cols;
 }
 
 const ARROWS: Record<string, Direction> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };

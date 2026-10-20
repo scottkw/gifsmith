@@ -1,6 +1,6 @@
 <script lang="ts">
   // Favorites / Recents grid (UI-SPEC "Favorites and Recents tabs"): virtual rows of two heights,
-  // a 32px provider header per section, then 152px tile rows. Tiles carry their flat index.
+  // a 32px provider header per section, then tile rows (tile + 8 px). Tiles carry their flat index.
   import { createVirtualizer } from '@tanstack/svelte-virtual';
   import { untrack } from 'svelte';
   import { rows as toRows, type Section } from '../lib/library';
@@ -9,6 +9,8 @@
 
   let {
     sections,
+    cols,
+    tile,
     selected,
     overlay,
     favorites,
@@ -18,6 +20,8 @@
     oncopy,
   }: {
     sections: Section[];
+    cols: number; // 3, 4 or 5 (the Search results grid size)
+    tile: number; // tile height
     selected: number;
     overlay: boolean;
     favorites: Set<string>; // provider:id keys
@@ -28,7 +32,7 @@
   } = $props();
 
   let scrollEl: HTMLDivElement;
-  const rows = $derived(toRows(sections));
+  const rows = $derived(toRows(sections, cols, tile + 8));
 
   // Sizes are read when the count changes; App remounts this grid when the row layout changes.
   const virt = createVirtualizer<HTMLDivElement, HTMLDivElement>({
@@ -61,7 +65,7 @@
           {@const s = sections[row.section]}
           <div class="header" role="presentation">{s.label} <span class="count">· {s.items.length}</span></div>
         {:else}
-          <div class="tiles">
+          <div class="tiles" style="--cols: {cols}; --tile: {tile}px">
             {#each row.items as g, c (c)}
               {@const i = row.start + c}
               <Tile
@@ -113,8 +117,8 @@
     box-sizing: border-box;
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(4, 166px);
-    grid-auto-rows: 144px;
+    grid-template-columns: repeat(var(--cols), 1fr);
+    grid-auto-rows: var(--tile);
     gap: 8px;
     padding: 0 16px;
   }

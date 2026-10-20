@@ -44,10 +44,10 @@
   } from './lib/api';
   import { actionErrorText, downloadedText, errorState, klipyGatedText, libraryErrorText, pagingMessage, providerName, revokedMessage } from './lib/errors';
   import { buildActions, type ActionId, type ActionRow } from './lib/actions';
-  import { COLS, move, nearEnd, routeKey } from './lib/grid';
+  import { move, nearEnd, routeKey } from './lib/grid';
   import { flatItems, moveSectioned, sections } from './lib/library';
   import { placeInDetails, placeMenu } from './lib/popover';
-  import { effectiveAction, shortLabel } from './lib/prefs';
+  import { colsFor, effectiveAction, shortLabel, skeletonCount, tileHeight } from './lib/prefs';
   import { CHIP_MAX, SAVE_IDLE_MS, chipsVisible, shouldSave } from './lib/searches';
   import { applyTheme } from './lib/theme';
   import { CLIPS_ACCESS_MAILTO, LIBRARY_TABS, SLOTS, libraryTab, slotById, type LibraryId, type SlotId } from './lib/providers';
@@ -159,6 +159,11 @@
 
   // Favorites / Recents (⌘5 / ⌘6) replace the provider grid while libTab is set; not persisted (D-22).
   let libTab = $state<LibraryId | null>(null);
+  // Grid size (D-09): Trending's size for a provider's trending list, Search results' for searches
+  // and the library tabs. A change remounts the grid (keys below); the selection index is kept.
+  const gridSize = $derived(libTab || cur.q ? prefs.gridSearch : prefs.gridTrending);
+  const cols = $derived(colsFor(gridSize));
+  const tile = $derived(tileHeight(gridSize));
   let library = $state<Library | null>(null); // null until the first load answers
   let libSlow = $state(false); // the load has not answered within LIBRARY_SKELETON_MS
   let libSeq = 0;
@@ -593,18 +598,18 @@
         // In Details ← → step through the grid's items (clamped) and the pane follows; ↑ ↓ do nothing.
         if (detail && (a === 'up' || a === 'down')) return;
         // ↑ from the grid's first row, or ↓ with no grid, selects the first chip.
-        if (chips.length && !detail && ((a === 'up' && gridShown && selected < COLS) || (a === 'down' && !gridShown))) {
+        if (chips.length && !detail && ((a === 'up' && gridShown && selected < cols) || (a === 'down' && !gridShown))) {
           chip = 0;
           select(-1);
           return;
         }
         if (!items.length) return;
         if (libTab) {
-          select(moveSectioned(selected, a, libSections.map((s) => s.items.length)));
+          select(moveSectioned(selected, a, libSections.map((s) => s.items.length), cols));
           return;
         }
-        select(move(selected, a, items.length));
-        if (nearEnd(selected, items.length)) loadMore();
+        select(move(selected, a, items.length, cols));
+        if (nearEnd(selected, items.length, cols)) loadMore();
         return;
       case 'favorite':
       case 'details':
@@ -718,7 +723,7 @@
       return;
     }
     // Library sections restart the column count at each section's first tile.
-    const col = (selected - (libSections.findLast((s) => s.start <= selected)?.start ?? 0)) % COLS;
+    const col = (selected - (libSections.findLast((s) => s.start <= selected)?.start ?? 0)) % cols;
     menuAt = placeMenu(tile.getBoundingClientRect(), col, menu!.height(), { w: innerWidth, h: innerHeight });
     menu!.focus();
   }
@@ -989,8 +994,8 @@
       {#if libTab}
         {#if !library}
           {#if libSlow}
-            <div class="skeleton" aria-hidden="true">
-              {#each Array(8), i (i)}
+            <div class="skeleton" aria-hidden="true" style="--cols: {cols}; --tile: {tile}px">
+              {#each Array(skeletonCount(gridSize)), i (i)}
                 <div></div>
               {/each}
             </div>
@@ -1014,9 +1019,11 @@
           <StateMessage heading="No matches" body="Nothing in {libName} matches “{query.trim()}”. Press Esc to clear the search." />
         {:else}
           <!-- Remounted when the row layout changes: the virtualizer reads row sizes only on a count change. -->
-          {#key `${libTab}:${libSections.map((s) => s.items.length).join(',')}`}
+          {#key `${libTab}:${gridSize}:${libSections.map((s) => s.items.length).join(',')}`}
             <LibraryGrid
               sections={libSections}
+              {cols}
+              {tile}
               {selected}
               {overlay}
               favorites={favKeys}
@@ -1069,8 +1076,8 @@
           onbutton={() => switchTo('giphy')}
         />
       {:else if active === 'clips' && !clipsEnabled && cur.status !== 'error'}
-        <div class="skeleton" aria-hidden="true">
-          {#each Array(8), i (i)}
+        <div class="skeleton" aria-hidden="true" style="--cols: {cols}; --tile: {tile}px">
+          {#each Array(skeletonCount(gridSize)), i (i)}
             <div></div>
           {/each}
         </div>
@@ -1080,9 +1087,11 @@
           body="The Finer Gifs Club has no trending list. Type at least 2 characters to search."
         />
       {:else if cur.items.length}
-        {#key `${active}:${cur.seq}`}
+        {#key `${active}:${cur.seq}:${gridSize}`}
           <ResultGrid
             items={cur.items}
+            {cols}
+            {tile}
             {selected}
             {overlay}
             favorites={favKeys}
@@ -1100,8 +1109,8 @@
           />
         {/key}
       {:else if cur.status === 'loading'}
-        <div class="skeleton" aria-hidden="true">
-          {#each Array(8), i (i)}
+        <div class="skeleton" aria-hidden="true" style="--cols: {cols}; --tile: {tile}px">
+          {#each Array(skeletonCount(gridSize)), i (i)}
             <div></div>
           {/each}
         </div>
@@ -1213,11 +1222,11 @@
     inset: 0;
     z-index: 1;
   }
-  /* S2: 8 skeleton tiles (2 rows) in grid geometry. */
+  /* S2: two rows of skeleton tiles in the current grid geometry. */
   .skeleton {
     display: grid;
-    grid-template-columns: repeat(4, 166px);
-    grid-auto-rows: 144px;
+    grid-template-columns: repeat(var(--cols), 1fr);
+    grid-auto-rows: var(--tile);
     gap: 8px;
     padding: 16px;
   }

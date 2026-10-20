@@ -50,6 +50,13 @@ export function effectiveAction(g: Gif | undefined, which: 'primary' | 'secondar
 export const shortLabel = (id: ActionId): string => DEFAULT_ACTIONS.find((a) => a.id === id)?.short ?? id;
 
 // Grid size (UI-SPEC "Grid size"): columns, tile height and skeleton tiles; '' or unknown = medium.
-export const colsFor = (size: string): number => 4;
-export const tileHeight = (size: string): number => 144;
-export const skeletonCount = (size: string): number => 8;
+const GRID: Record<string, { cols: number; tile: number }> = {
+  small: { cols: 5, tile: 112 },
+  medium: { cols: 4, tile: 144 },
+  large: { cols: 3, tile: 192 },
+};
+const grid = (size: string) => GRID[size] ?? GRID.medium;
+export const colsFor = (size: string): number => grid(size).cols;
+export const tileHeight = (size: string): number => grid(size).tile;
+// S2: two rows of skeleton tiles.
+export const skeletonCount = (size: string): number => 2 * grid(size).cols;
