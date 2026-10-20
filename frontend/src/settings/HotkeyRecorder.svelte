@@ -76,7 +76,7 @@
       return;
     }
     const mods = e.metaKey || e.ctrlKey || e.altKey || e.shiftKey;
-    if (e.key === 'Tab' && !mods) return cancel(); // focus moves on
+    if (e.key === 'Tab' && !e.metaKey && !e.ctrlKey && !e.altKey) return cancel(); // Tab, Shift+Tab: focus moves on
     e.preventDefault();
     if (saving) return;
     if (e.key === 'Escape' && !mods) return cancel();
