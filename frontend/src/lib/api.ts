@@ -69,6 +69,8 @@ export const updateStatus = () => UpdateService.Status();
 export const checkForUpdates = () => UpdateService.Check();
 // Downloads, verifies and opens the available release's DMG; nothing is installed in place.
 export const downloadUpdate = () => UpdateService.Download();
+// Opens Settings at General → Updates (the panel toast's View action).
+export const revealUpdates = () => UpdateService.Reveal();
 export const updateError = (e: unknown): { kind: string } | null => providerError(e);
 // Re-probes Clips once when its result is unknown; resolves to the state, rejects with the probe's cause.
 export const checkClips = () => GifService.CheckClips();

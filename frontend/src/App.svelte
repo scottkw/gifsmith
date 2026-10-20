@@ -26,6 +26,7 @@
     removeRecent,
     removeSearch,
     requestAccessibility,
+    revealUpdates,
     saveSearch,
     search,
     setFavorite,
@@ -41,7 +42,9 @@
     type Result,
     type SettingsSnapshot,
     type TextKind,
+    type UpdateStatus,
   } from './lib/api';
+  import { updateToastText } from './lib/update';
   import { actionErrorText, downloadedText, errorState, klipyGatedText, libraryErrorText, pagingMessage, providerName, revokedMessage } from './lib/errors';
   import { buildActions, type ActionId, type ActionRow } from './lib/actions';
   import { move, nearEnd, routeKey } from './lib/grid';
@@ -141,6 +144,7 @@
   type ToastAction = { label: string; hint: string; run: () => void };
   let toastAction = $state<ToastAction | null>(null);
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
+  let announcedUpdate = ''; // the release the T12 toast already announced this launch
   let copying = $state(false); // one Copy/Paste in flight; a second Enter would paste twice
   let overlay = $state(false); // the selected tile's busy overlay; for a crop it waits CROP_BUSY_MS
   let needsAccessibility = $state(false);
@@ -289,6 +293,14 @@
     Events.On('panel:status', (e) => setStatus(String(e.data)));
     Events.On('providers:changed', refreshProviders);
     Events.On('settings:changed', (e) => onSettings(e.data as SettingsSnapshot));
+    // T12: once per version per launch; an action toast survives panel:show, so one set while the
+    // panel is hidden is seen at the next open and clears on the next keystroke (D-29).
+    Events.On('update:status', (e) => {
+      const st = e.data as UpdateStatus;
+      if (st.state !== 'available' || st.latest === announcedUpdate) return;
+      announcedUpdate = st.latest;
+      setStatus(updateToastText(st.latest), '', { label: 'View', hint: '', run: revealUpdates }, 0);
+    });
     // Open Favorites / Open Recents hotkeys: show that tab, or hide when it was already showing.
     Events.On('panel:open-tab', (e) => {
       const { tab, wasVisible } = e.data as { tab: LibraryId; wasVisible: boolean };

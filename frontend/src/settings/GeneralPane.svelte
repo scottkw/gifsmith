@@ -1,3 +1,8 @@
+<script lang="ts" module>
+  // Set by SettingsApp when settings:reveal arrives before this pane is mounted.
+  export const pendingReveal = { updates: false };
+</script>
+
 <script lang="ts">
   // General pane (UI-SPEC "General"): every change applies at once, no Save button.
   import { Events } from '@wailsio/runtime';
@@ -16,6 +21,7 @@
     type UpdateStatus,
   } from '../lib/api';
   import { DEFAULT_ACTIONS } from '../lib/prefs';
+  import { updateErrorText, updateText } from '../lib/update';
   import SettingRow from './SettingRow.svelte';
 
   let { initial }: { initial: SettingsSnapshot } = $props();
@@ -33,31 +39,14 @@
   let axTimer: ReturnType<typeof setInterval> | undefined;
   let upd = $state<UpdateStatus>({ state: 'idle', current: '', latest: '', done: 0, total: 0 });
   let updError = $state('');
-  const updBusy = $derived(upd.state === 'checking' || upd.state === 'downloading' || upd.state === 'verifying');
+  let autoCheck = $state(untrack(() => initial.updateCheck));
+  let autoError = $state('');
 
-  function updText(st: UpdateStatus): string {
-    switch (st.state) {
-      case 'checking':
-        return 'Checking for updates…';
-      case 'current':
-        return `Gifsmith ${st.current} is up to date.`;
-      case 'available':
-        return `Gifsmith ${st.latest} is available. You have ${st.current}.`;
-      case 'downloading':
-        return `Downloading Gifsmith ${st.latest}…` + (st.total > 0 ? ` ${Math.floor((st.done * 100) / st.total)}%` : '');
-      case 'verifying':
-        return "Checking the download's signature…";
-      case 'opened':
-        return `The Gifsmith ${st.latest} disk image is open. Quit Gifsmith, then drag the new Gifsmith to Applications and choose Replace.`;
-    }
-    return '';
+  function revealUpdates() {
+    pendingReveal.updates = false;
+    document.getElementById('updates')?.scrollIntoView({ block: 'nearest' });
   }
-
-  const UPDATE_ERRORS: Record<string, (st: UpdateStatus) => string> = {
-    update_download_failed: (st) => `Couldn't download Gifsmith ${st.latest}. Check your connection, then try again.`,
-    update_verify_failed: () => "The download didn't pass the signature check, so Gifsmith deleted it. Nothing was opened.",
-    update_open_failed: () => "Gifsmith couldn't open the downloaded disk image. Try again.",
-  };
+  const updBusy = $derived(upd.state === 'checking' || upd.state === 'downloading' || upd.state === 'verifying');
 
   const THEMES = [
     { value: '', label: 'System' },
@@ -78,15 +67,19 @@
     readAX();
     updateStatus().then((st) => (upd = st));
     const offUpdate = Events.On('update:status', (e) => (upd = e.data as UpdateStatus));
+    const offReveal = Events.On('settings:reveal', revealUpdates);
+    if (pendingReveal.updates) revealUpdates();
     const offShow = Events.On('settings:show', readAX);
     const offChanged = Events.On('settings:changed', (e) => {
       const s = e.data as SettingsSnapshot;
       theme = s.theme;
       launchAtLogin = s.launchAtLogin;
       actions = { primaryAction: s.primaryAction, secondaryAction: s.secondaryAction };
+      autoCheck = s.updateCheck;
     });
     return () => {
       offUpdate();
+      offReveal();
       offShow();
       offChanged();
       clearInterval(axTimer);
@@ -135,8 +128,8 @@
     updError = '';
     try {
       upd = await checkForUpdates();
-    } catch {
-      updError = "Couldn't check for updates. Check your connection, then try again.";
+    } catch (e) {
+      updError = updateErrorText(updateError(e)?.kind ?? '', upd);
     }
   }
 
@@ -145,8 +138,18 @@
     try {
       upd = await downloadUpdate();
     } catch (e) {
-      const text = UPDATE_ERRORS[updateError(e)?.kind ?? ''] ?? UPDATE_ERRORS.update_download_failed;
-      updError = text(upd);
+      updError = updateErrorText(updateError(e)?.kind ?? 'update_download_failed', upd);
+    }
+  }
+
+  async function toggleAutoCheck() {
+    const on = autoCheck; // bind:checked already flipped it
+    autoError = '';
+    try {
+      autoCheck = (await setPref('updateCheck', String(on))).updateCheck;
+    } catch {
+      autoCheck = !on;
+      autoError = "Couldn't save this setting. Try again.";
     }
   }
 
@@ -228,11 +231,11 @@
 
 <div class="settings-section">
   <SettingRow label="Updates" id="updates" error={updError}>
-    {#if updText(upd)}
+    {#if updateText(upd)}
       <p class="update-status {upd.state}" role="status">
         {#if upd.state === 'checking'}<span class="spinner" aria-hidden="true"></span>{/if}
         {#if upd.state === 'current'}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" /></svg>{/if}
-        {updText(upd)}
+        {updateText(upd)}
       </p>
     {/if}
     {#if upd.state === 'downloading'}
@@ -242,6 +245,17 @@
       <button class="btn-primary" disabled={updBusy} onclick={download}>Download and Open…</button>
     {/if}
     <button class="btn-secondary" disabled={updBusy} onclick={check}>Check for Updates…</button>
+  </SettingRow>
+  <SettingRow
+    label=""
+    id="update-auto-label"
+    error={autoError}
+    helper="Gifsmith asks GitHub for the latest release at launch and once a day. Nothing about you or your Mac is sent."
+  >
+    <label>
+      <input type="checkbox" bind:checked={autoCheck} onchange={toggleAutoCheck} />
+      Check for updates automatically
+    </label>
   </SettingRow>
 </div>
 

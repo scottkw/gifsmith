@@ -5,7 +5,7 @@
   import { onMount, tick, untrack } from 'svelte';
   import type { SettingsSnapshot } from '../lib/api';
   import DownloadsPane from './DownloadsPane.svelte';
-  import GeneralPane from './GeneralPane.svelte';
+  import GeneralPane, { pendingReveal } from './GeneralPane.svelte';
   import HotkeysPane from './HotkeysPane.svelte';
   import KeysPane from './KeysPane.svelte';
   import SearchPane from './SearchPane.svelte';
@@ -25,7 +25,18 @@
   let snap = $state(untrack(() => initial)); // a pane mounts with the latest snapshot
   const tabs: HTMLButtonElement[] = [];
 
-  onMount(() => Events.On('settings:changed', (e) => (snap = e.data as SettingsSnapshot)));
+  onMount(() => {
+    const offChanged = Events.On('settings:changed', (e) => (snap = e.data as SettingsSnapshot));
+    // The update alerts open Settings at General → Updates; a mounted General scrolls itself.
+    const offReveal = Events.On('settings:reveal', () => {
+      if (active !== 0) pendingReveal.updates = true;
+      active = 0;
+    });
+    return () => {
+      offChanged();
+      offReveal();
+    };
+  });
 
   // ↑ ↓ move between panes and show them at once, clamped; the selected tab is the only tab stop.
   async function onkeydown(e: KeyboardEvent) {
