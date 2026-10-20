@@ -1,175 +1,136 @@
 ---
 phase: 03-action-pipeline-library
-verified: 2026-10-18T18:05:00Z
+verified: 2026-10-20T19:20:49Z
 status: passed
-score: 15/19 must-haves verified
-covered_files: [".planning/phases/03-action-pipeline-library/03-01-PLAN.md",".planning/phases/03-action-pipeline-library/03-01-SUMMARY.md",".planning/phases/03-action-pipeline-library/03-02-PLAN.md",".planning/phases/03-action-pipeline-library/03-02-SUMMARY.md",".planning/phases/03-action-pipeline-library/03-03-PLAN.md",".planning/phases/03-action-pipeline-library/03-03-SUMMARY.md",".planning/phases/03-action-pipeline-library/03-04-PLAN.md",".planning/phases/03-action-pipeline-library/03-04-SUMMARY.md",".planning/phases/03-action-pipeline-library/03-05-PLAN.md",".planning/phases/03-action-pipeline-library/03-05-SUMMARY.md",".planning/phases/03-action-pipeline-library/03-06-PLAN.md",".planning/phases/03-action-pipeline-library/03-06-SUMMARY.md",".planning/phases/03-action-pipeline-library/03-07-PLAN.md",".planning/phases/03-action-pipeline-library/03-07-SUMMARY.md",".planning/phases/03-action-pipeline-library/03-08-PLAN.md",".planning/phases/03-action-pipeline-library/03-08-SUMMARY.md","build/darwin/Info.dev.plist","build/darwin/Info.plist","frontend/bindings/gifsmith/internal/library/index.ts","frontend/bindings/gifsmith/internal/library/models.ts","frontend/bindings/gifsmith/internal/provider/models.ts","frontend/bindings/gifsmith/internal/services/actionservice.ts","frontend/bindings/gifsmith/internal/services/index.ts","frontend/bindings/gifsmith/internal/services/libraryservice.ts","frontend/bindings/gifsmith/internal/services/models.ts","frontend/src/App.svelte","frontend/src/app.css","frontend/src/components/ActionMenu.svelte","frontend/src/components/DetailsPane.svelte","frontend/src/components/Footer.svelte","frontend/src/components/LibraryGrid.svelte","frontend/src/components/ProviderTabs.svelte","frontend/src/components/RecentSearches.svelte","frontend/src/components/ResultGrid.svelte","frontend/src/components/SetupCard.svelte","frontend/src/components/Tile.svelte","frontend/src/lib/actions.test.ts","frontend/src/lib/actions.ts","frontend/src/lib/api.ts","frontend/src/lib/errors.test.ts","frontend/src/lib/errors.ts","frontend/src/lib/format.test.ts","frontend/src/lib/format.ts","frontend/src/lib/grid.test.ts","frontend/src/lib/grid.ts","frontend/src/lib/library.test.ts","frontend/src/lib/library.ts","frontend/src/lib/popover.test.ts","frontend/src/lib/popover.ts","frontend/src/lib/providers.ts","frontend/src/lib/searches.test.ts","frontend/src/lib/searches.ts","internal/imaging/square.go","internal/imaging/square_test.go","internal/library/store.go","internal/library/store_test.go","internal/platform/fake.go","internal/platform/platform.go","internal/platform/platform_darwin.go","internal/platform/platform_darwin.h","internal/platform/platform_darwin.m","internal/platform/platform_darwin_test.go","internal/platform/platform_stub.go","internal/provider/fakeapi/fakeapi.go","internal/provider/finergifs/finergifs.go","internal/provider/finergifs/finergifs_test.go","internal/provider/giphy/giphy.go","internal/provider/giphy/giphy_test.go","internal/provider/httpx/httpx.go","internal/provider/klipy/klipy.go","internal/provider/klipy/klipy_test.go","internal/provider/provider.go","internal/provider/provider_test.go","internal/services/actions.go","internal/services/actions_test.go","internal/services/errors.go","internal/services/library.go","internal/services/library_test.go","internal/services/settings_test.go","internal/settings/settings.go","internal/settings/settings_test.go","internal/staging/staging.go","internal/staging/staging_test.go","main.go","scripts/smoke-browser-loop.sh","scripts/uat/01-tracer.js","scripts/uat/02-keyboard.js","scripts/uat/05-tabs.js","scripts/uat/06-clips.js","scripts/uat/07-text-actions.js","scripts/uat/08-action-menu.js","scripts/uat/10-download.js","scripts/uat/11-square.js","scripts/uat/12-library-unreadable.js","scripts/uat/12-library.js","scripts/uat/13-chips.js","scripts/uat/13-details.js","scripts/uat/14-backstops.js","wire_desktop.go","wire_server.go"]
-covered_digest: "v3:sha256:1f55bf98995a490a6cc0cdeb92a715d41a82abc68bd5e9941f63f49a657f32f8"
-behavior_unverified: 2
+score: 19/19 must-haves verified
+covered_files: [".planning/phases/03-action-pipeline-library/03-01-PLAN.md",".planning/phases/03-action-pipeline-library/03-01-SUMMARY.md",".planning/phases/03-action-pipeline-library/03-02-PLAN.md",".planning/phases/03-action-pipeline-library/03-02-SUMMARY.md",".planning/phases/03-action-pipeline-library/03-03-PLAN.md",".planning/phases/03-action-pipeline-library/03-03-SUMMARY.md",".planning/phases/03-action-pipeline-library/03-04-PLAN.md",".planning/phases/03-action-pipeline-library/03-04-SUMMARY.md",".planning/phases/03-action-pipeline-library/03-05-PLAN.md",".planning/phases/03-action-pipeline-library/03-05-SUMMARY.md",".planning/phases/03-action-pipeline-library/03-06-PLAN.md",".planning/phases/03-action-pipeline-library/03-06-SUMMARY.md",".planning/phases/03-action-pipeline-library/03-07-PLAN.md",".planning/phases/03-action-pipeline-library/03-07-SUMMARY.md",".planning/phases/03-action-pipeline-library/03-08-PLAN.md",".planning/phases/03-action-pipeline-library/03-08-SUMMARY.md","build/darwin/Info.dev.plist","build/darwin/Info.plist","frontend/bindings/gifsmith/internal/library/index.ts","frontend/bindings/gifsmith/internal/library/models.ts","frontend/bindings/gifsmith/internal/provider/models.ts","frontend/bindings/gifsmith/internal/services/actionservice.ts","frontend/bindings/gifsmith/internal/services/index.ts","frontend/bindings/gifsmith/internal/services/libraryservice.ts","frontend/bindings/gifsmith/internal/services/models.ts","frontend/src/App.svelte","frontend/src/app.css","frontend/src/components/ActionMenu.svelte","frontend/src/components/DetailsPane.svelte","frontend/src/components/Footer.svelte","frontend/src/components/LibraryGrid.svelte","frontend/src/components/ProviderTabs.svelte","frontend/src/components/RecentSearches.svelte","frontend/src/components/ResultGrid.svelte","frontend/src/components/SetupCard.svelte","frontend/src/components/Tile.svelte","frontend/src/lib/actions.test.ts","frontend/src/lib/actions.ts","frontend/src/lib/api.ts","frontend/src/lib/errors.test.ts","frontend/src/lib/errors.ts","frontend/src/lib/format.test.ts","frontend/src/lib/format.ts","frontend/src/lib/grid.test.ts","frontend/src/lib/grid.ts","frontend/src/lib/library.test.ts","frontend/src/lib/library.ts","frontend/src/lib/popover.test.ts","frontend/src/lib/popover.ts","frontend/src/lib/prefs.ts","frontend/src/lib/providers.ts","frontend/src/lib/searches.test.ts","frontend/src/lib/searches.ts","internal/imaging/square.go","internal/imaging/square_test.go","internal/library/store.go","internal/library/store_test.go","internal/platform/fake.go","internal/platform/platform.go","internal/platform/platform_darwin.go","internal/platform/platform_darwin.h","internal/platform/platform_darwin.m","internal/platform/platform_darwin_test.go","internal/platform/platform_stub.go","internal/provider/fakeapi/fakeapi.go","internal/provider/finergifs/finergifs.go","internal/provider/finergifs/finergifs_test.go","internal/provider/giphy/giphy.go","internal/provider/giphy/giphy_test.go","internal/provider/httpx/httpx.go","internal/provider/klipy/klipy.go","internal/provider/klipy/klipy_test.go","internal/provider/provider.go","internal/provider/provider_test.go","internal/services/actions.go","internal/services/actions_test.go","internal/services/errors.go","internal/services/library.go","internal/services/library_test.go","internal/services/settings.go","internal/services/settings_test.go","internal/settings/settings.go","internal/settings/settings_test.go","internal/staging/staging.go","internal/staging/staging_test.go","main.go","scripts/smoke-browser-loop.sh","scripts/uat/01-tracer.js","scripts/uat/02-keyboard.js","scripts/uat/05-tabs.js","scripts/uat/06-clips.js","scripts/uat/07-text-actions.js","scripts/uat/08-action-menu.js","scripts/uat/10-download.js","scripts/uat/11-square.js","scripts/uat/12-library-unreadable.js","scripts/uat/12-library.js","scripts/uat/13-chips.js","scripts/uat/13-details.js","scripts/uat/14-backstops.js","wire_desktop.go","wire_server.go"]
+covered_digest: "v3:sha256:df365c2c38dbed9096f769d442ae82c879e77325ab565b151c1d06eaf68155f0"
+behavior_unverified: 0
 overrides_applied: 0
-deferred:
-  - truth: "User can download a GIF to a CHOSEN folder (SC2 / ACTN-05): Phase 3 ships a fixed, injected destination (~/Downloads) with no picker"
-    addressed_in: "Phase 4"
-    evidence: "Phase 4 SC3: 'The user can set ... download folder, hide filename ...' (SETT-04); 03-CONTEXT Deferred Ideas: 'download folder picker and hide-filename toggle (SETT-04) — Phase 4'"
-  - truth: "Optional hide-original-filename setting (ACTN-11): FileStem(g, hide=true) implements the gifsmith-<id> name, but Download always passes hide=false and no toggle exists"
-    addressed_in: "Phase 4"
-    evidence: "Phase 4 SC3 / SETT-04 'hide filename'"
-behavior_unverified_items:
-  - truth: "A panel:show cancels a pending hide-after-copy timer, so re-showing within 400 ms of a copy does not hide the panel again (03-01, 02 IN-07)"
-    test: "Select a GIF, press Enter, and within about 0.4 s click outside the panel (it hides), then press the hotkey to show it again"
-    expected: "The panel reappears and stays open; it is not hidden again by the copy's 400 ms timer"
-    why_human: "App.svelte:242 clears hideTimer in the panel:show handler, but no unit or UAT test emits panel:show inside the 400 ms window; the server build cannot show/hide a native panel"
-  - truth: "Staging is wiped at quit (ActionService.ServiceShutdown) on the installed app (03-03, ACTN-10, D-17)"
-    test: "After a copy, run: ls ~/Library/Caches/com.kenscott.gifsmith/staging (one hash directory). Quit Gifsmith from the menu bar (and separately with Cmd+Q while the panel has focus), then run the ls again"
-    expected: "The staging directory is empty or absent after each quit"
-    why_human: "TestServiceShutdownClears proves the method clears staging and Wails beta.30 application.go:821 calls ServiceShutdown during cleanup, but no test drives a real Quit/Cmd+Q, and 03-08 recorded that the installed process was never quit"
-human_verification:
-  - test: "Fresh install of the current HEAD: run `wails3 task darwin:install:dev`, then double-click ~/Applications/Gifsmith.app a second time (WR-01 single instance)"
-    expected: "bin/install-dev.log shows 'tray menu ready' and 'hotkey registered'; only one menu bar icon exists; the second launch shows the existing panel and exits; `git diff --quiet -- go.sum` still passes (restore objx lines if added)"
-    why_human: "Native launch, SingleInstance and codesigning cannot run headless; the installed build predates the review fixes (WR-01..03, CR-01)"
-  - test: "Text actions in real targets: open TextEdit, show the panel, search 'cat', press Cmd+Shift+C, then Cmd+V in TextEdit; Cmd+K -> Paste Link (Accessibility granted); Cmd+Shift+M then Cmd+V; Cmd+O on a GIPHY GIF; Cmd+O on a Klipy GIF"
-    expected: "The link is a giphy.com media URL with no '?' query; Paste Link drops the URL into TextEdit without a manual Cmd+V; Markdown is ![title](url); Cmd+O opens the giphy.com page in the default browser; Cmd+O on Klipy does nothing"
-    why_human: "Headless UAT runs platform.Fake: the real NSPasteboard string write, CGEvent Cmd+V and NSWorkspace open are only exercised natively"
-  - test: "Paste Square GIF: select a wide GIPHY GIF, Cmd+K -> type 'square' -> Paste Square GIF into a Messages conversation"
-    expected: "A square, still-animated GIF appears in the message field"
-    why_human: "The crop is golden-tested in Go, but how Messages renders the staged square file needs a real paste"
-  - test: "Klipy 30 s grace delete: on the Klipy tab press Cmd+Enter into Messages; immediately run ls ~/Library/Caches/com.kenscott.gifsmith/staging; run it again after 35 s. Separately, Cmd+Enter into Slack and send about 40 s later"
-    expected: "One staged directory right after the paste, none after 35 s; the Slack message still sends the animated GIF"
-    why_human: "TestKlipyGraceDeletesAfterPaste/GenerationGuard inject the timer; real timing and whether Slack has read the file before deletion are native-only (D-19, A2)"
-  - test: "Clips MP4 paste (only if the GIPHY key is Clips-approved): Cmd+2, Enter on a clip, Cmd+V into Messages"
-    expected: "An MP4 attachment (720p) pastes; footer said 'Copied MP4 — press ⌘V to paste'. If the key is not approved, record 'not verifiable natively (fixture-proven only)'"
-    why_human: "Requires an approved Clips key; 03-08 step 8 was skipped (A1)"
-  - test: "Library persistence and file mode: copy two GIFs from different providers, Cmd+Shift+F one, run a search and wait 2 s. Run ls -l ~/Library/Application\\ Support/com.kenscott.gifsmith/. Quit from the menu bar, relaunch, press Cmd+6 and Cmd+5, then clear the box"
-    expected: "favorites.json, recents.json and searches.json exist with mode -rw-------; after relaunch Recents shows both GIFs grouped by provider (newest first), Favorites shows the starred one, and the recent-search chip appears in the empty box"
-    why_human: "TestRecentsPersistAcrossStores and 12-library.js prove the round-trip in a temp dir; 03-08 found no library files on the installed app, so the real Application Support path and Quit/relaunch were never observed"
-  - test: "WKWebView key handling: on a provider tab type 'hello' then Cmd+Backspace and Cmd+Z; on Recents select a tile and press Cmd+Backspace then Cmd+Z; with no download toast press Cmd+R; press Cmd+I then Esc; press Cmd+S then Cmd+R within 5 s"
-    expected: "Provider tab: text deletes and the undo restores it natively. Recents: the item is removed with the 'Removed from Recents' toast and Cmd+Z restores it in place. Cmd+R does not reload (query and selection kept). Cmd+I opens Details, Esc closes it with the selection kept. Cmd+S saves to Downloads and Cmd+R reveals the file in Finder"
-    why_human: "Headless Chromium proves the JS routing; WKWebView key-equivalent handling against the native menu can differ (A4)"
-  - test: "Process prohibitions (03-01, 03-08, judgment tier): confirm no executor sent synthetic desktop input, killed processes it did not start, or read the Keychain / ~/Downloads during the phase"
-    expected: "No such event observed by the user"
-    why_human: "unverified-prohibition — human review recommended. Non-authoritative LLM-judge verdict: no evidence of violation (all UAT ran headless against -tags server with platform.Fake and bin/uat-* dirs; 03-08 SUMMARY records read-only checks only)"
-human_verification_resolution: "User approved native UAT on a fresh install:dev of HEAD (2026-10-18T18:47:30Z): 'Everything is GTG'. Orchestrator evidence after the session: favorites.json (1 item), recents.json (1), searches.json (2) in ~/Library/Application Support/com.kenscott.gifsmith, all mode 600; ~/Library/Caches/com.kenscott.gifsmith/staging exists and is empty after quit; app process exited (Quit observed). Single-instance, Paste Square, Klipy 30 s delete and ⌘⌫/⌘Z user-attested."
+re_verification:
+  previous_status: passed
+  previous_score: 15/19
+  reason: "Re-verified 2026-10-20 after Phase 4: the 2026-10-18 report was flagged stale because Phase 4 changed covered code (actions.go Klipy gate, download folder/hidden names, default ↵/⌘↵ actions, actions.ts rows, library.ts column count, DetailsPane right-click menu, paste-without-AX message)"
+  gaps_closed:
+    - "Download to a CHOSEN folder (SC2 / ACTN-05): Phase 4 SETT-04 picker; ActionService.DownloadsDir = SettingsService.DownloadDir (main.go:97), read at each Download; 04-UAT test 7 / checklist D15 pass"
+    - "Hide-original-filename toggle (ACTN-11): Download passes a.HideFilenames() (actions.go:435); TestDownloadHideFilenames; checklist D16 pass"
+    - "Truths 7, 10, 17, 19 (behavior-unverified / uncertain): resolved by the 2026-10-18 native UAT on a fresh install:dev (user 'Everything is GTG'; orchestrator observed library JSON files at mode 600 and an empty staging dir after Quit); code paths unchanged since"
+  gaps_remaining: []
+  regressions: []
+superseded:
+  - item: "Klipy file actions (Copy/Paste GIF, Download, Copy/Paste Square) and the Klipy 30 s grace delete in a shipped build"
+    by: "Phase 4 RELS-04 (deliberate compliance gate, not a regression)"
+    evidence: "actions.go:45 KlipyFileActionsCleared = false; gated() at actions.go:103 refuses before busy lock/staging/HTTP/pasteboard; actions.ts:46 omits the rows; prefs.ts:43 maps ↵/⌘↵ on Klipy to Copy/Paste Link. The grace-delete code is intact and still tested with the gate flipped (klipyService sets KlipyFileActions = true; TestKlipyGrace* pass). SC3 'Klipy temp files removed eagerly' holds a fortiori: no Klipy file is written at all"
+  - item: "↵ = Copy GIF, ⌘↵ = Paste GIF fixed bindings in the ⌘K menu"
+    by: "Phase 4 default-actions setting"
+    evidence: "actions.ts buildActions puts ↵/⌘↵ hints on ctx.primary/secondary; App.svelte:644 runs effectiveAction(...) through the single runAction dispatcher"
+human_verification_resolution: "2026-10-18T18:47:30Z native UAT of the then-HEAD install:dev approved by the user ('Everything is GTG'); orchestrator evidence: favorites.json/recents.json/searches.json mode 600, staging empty after Quit, process exited. 2026-10-20 supporting evidence: Phase 4 04-UAT.md 8/8 pass, including a clean macOS 15.7.7 VM install of the notarized DMG where Enter put a public.file-url .gif on the pasteboard and ⌘V into TextEdit pasted it animated, ⌘↵ without Accessibility copied with the 'Copied — press ⌘V to paste' message, and checklist D15-D18 (chosen folder, hidden names, Klipy ⌘S refused)."
 ---
 
 # Phase 3: Action Pipeline & Library Verification Report
 
 **Phase Goal:** Every action the Raycast extension offered works on the selected GIF, and favorites, recents, details, and recent searches put the GIFs a user reuses one keystroke away, even offline or rate-limited.
-**Verified:** 2026-10-18T18:05:00Z
-**Status:** human_needed
-**Re-verification:** No (initial verification)
+**Verified:** 2026-10-20 (original: 2026-10-18T18:05:00Z)
+**Status:** passed
+**Re-verification:** Yes. Re-verified 2026-10-20 after Phase 4, against branch `gsd/phase-04-settings-shell-polish-release` HEAD 7874dc6 (main has the same code).
+
+> **Re-verified 2026-10-20 after Phase 4.** Phase 4 changed code this report covers. I diffed every covered file from 624ef98 (Phase 3 complete) to HEAD, re-read the changed paths, and re-ran `go test -race -count=1 ./internal/...` (15 packages ok) and `node --test src/lib/*.test.ts` (103/103 pass). Following the caller's constraints, I did not re-run the headless browser UAT (port conflicts with concurrent verifiers), did not launch the app, and did not touch ~/Library or ~/Downloads. Results:
+> - Every Phase 3 success criterion still holds.
+> - Both Phase 3 deferrals (folder picker, hide-filename toggle) are now closed by Phase 4.
+> - One Phase 3 behavior is deliberately superseded: Klipy file actions are gated off by RELS-04.
+> - The phase-3 code that Phase 4 did **not** touch is byte-identical since 624ef98: `internal/staging`, `internal/library`, `internal/imaging`, `internal/services/library.go`, and `searches.ts`.
 
 ## Goal Achievement
 
-The code delivers the goal. Every action, the ⌘K menu, download, square crop, Clips MP4, staging cleanup, Favorites/Recents, Details and recent-search chips exist, are wired Go to webview, and pass the unit tests and headless UAT that I re-ran myself on HEAD 9824e93. CR-01 is closed. What remains is native evidence: the installed build predates the review fixes, and its logs show only download and reveal activity. The items below need a fresh `install:dev` of HEAD.
+The goal still holds in today's code. Every action, the ⌘K menu, download, square crop, Clips MP4, staging cleanup, Favorites/Recents, Details and recent-search chips are present and wired. Phase 4 changed the following:
+
+- **Additive:** a chosen download folder, hidden filenames, configurable ↵/⌘↵, column count from grid size, and right-click on the Details preview opening the menu.
+- **One deliberate restriction:** Klipy file actions are refused until Klipy gives written clearance (RELS-04).
+
+The native items that were open on 2026-10-18 were closed by that day's user-approved UAT. Phase 4's clean-VM UAT also re-exercised the file copy/paste path end to end on a notarized build.
 
 ### Observable Truths
 
-| # | Truth | Status | Evidence |
-|---|-------|--------|----------|
-| 1 | SC1: ⌘K lists every action for the selected GIF; copy/paste link, copy/paste Markdown, copy page link, Open in Browser | ✓ VERIFIED | `lib/actions.ts` ROWS (locked order, omit-not-grey); `App.svelte:684` `runAction` is the single dispatcher; Go builds every string (`actions.go` `textFor`/`linkFor`/`markdownFor`/`pageFor`); tests TestCopyTextLink/Markdown/Page/ClipLink, TestPasteText*, TestOpenPage; UAT 07-text-actions, 08-action-menu OK (my run) |
-| 2 | SC2: download without overwrite; non-GIF/MP4 rejected; square crop not offered for Clips; Clips labelled MP4, 720p default | ✓ VERIFIED | `staging.Save` (CreateTemp + `os.Link` loop, never MkdirAll, 0644); `media()` checks GIF87a/89a or `ftyp` before any file exists; `giphy.go:147` 720p→480p→1080p→360p; square rows `applies: !isClip`, Go refuses `IsClip`; UAT 10-download, 11-square, 06-clips OK. Folder **picker** deferred to Phase 4 (see Deferred) |
-| 3 | SC3: copy/paste/download temp files removed promptly; Klipy eagerly | ✓ VERIFIED | `stage.Clear()` before `app.Run()` (main.go); `Sweep(path)` after each staged copy; `putText` clears staging; Klipy `expire` with generation guard; downloads bypass staging; tests TestCopyTwiceKeepsOnlyLatest, TestCopyTextClearsStaging, TestKlipyGrace* (injected After), TestServiceShutdownClears |
-| 4 | SC4: add/remove favorite; every copy/paste in Recents (newest first, capped); grouped by provider, never blended; remove from Recents; render from saved metadata without API calls | ✓ VERIFIED | `library/store.go` (RecentsMax 50, dedupe by provider:id, undo slot, corrupt-file refusal, WriteJSONAtomic 0600); `ActionService.recent` after every Copied result except page; `library` has no net/http in its deps (`go list -deps`); UAT 12-library (incl. rate-limited GIPHY), 12-library-unreadable (file bytes unchanged) OK |
-| 5 | SC5: Details view (title, size, dimensions, tags, source links); empty box shows recent searches that rerun | ✓ VERIFIED | `DetailsPane.svelte` renders only carried fields, links open through `openPage`/`openSource` (Go re-validates); `searches.ts` chipsVisible/shouldSave; `SaveSearch` dedupe/cap 20; UAT 13-details, 13-chips OK |
-| 6 | 03-01: link/Markdown/page rules (GIPHY query stripped, Klipy/Finer byte-for-byte, Clips link = GIF rendition), Go-only URL opening, Fake platform in server build, F1/F3 fixed copy, optional metadata fields | ✓ VERIFIED | `linkFor` strips query only for GIPHY/Clips; `wire_server.go` `Platform: &platform.Fake{}`; MarshalError composed in main.go; giphy/klipy mapper tests |
-| 7 | 03-01: panel:show cancels a pending hide-after-copy timer | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | `App.svelte:242` `clearTimeout(hideTimer)`; no test exercises it (cancellation invariant) |
-| 8 | 03-02: ⌘K popover (filter, ↑↓, ↵, Esc/⌘K close, outside click, shortcuts while open, "No matching actions", ≥8 px placement backstop) | ✓ VERIFIED | `ActionMenu.svelte`, `popover.ts`; UAT 08-action-menu asserts 8 px inside 720x480 for tile 0 and bottom-row columns 1 and 4 (`08-action-menu.js:133-138`); no transition/animation in ActionMenu CSS |
-| 9 | 03-03: Clips MP4 copy/paste, ftyp validation, MP4 badge, E8 gone; staging lifecycle; Klipy 30 s grace with generation guard | ✓ VERIFIED | `Tile.svelte` MP4 badge + aria-label; no "arrives in the next update" in `frontend/src`; tests TestCopyClipMP4, TestPasteClipMP4, TestCopyClipFailingMediaKinds, TestKlipyGraceGenerationGuard, TestKlipyGraceOnlyAfterKlipyPaste |
-| 10 | 03-03: staging wiped at quit on the installed app | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | Method tested (TestServiceShutdownClears); Wails hook confirmed in `wails/v3@v3.0.0-beta.30/pkg/application/application.go:821`; no real Quit observed (03-08) |
-| 11 | 03-04: ⌘S download naming, (2)/(3) no-overwrite, F2/F3/F4, 0644, path containment, Show in Finder via Go, ⌘R captured, not in Recents | ✓ VERIFIED | `Save`, `FileStem`; `Download` has no `recent()` call; `ShowDownload` takes no path; Info.plist + Info.dev.plist NSDownloadsFolderUsageDescription; tests TestDownload*, TestShowDownload*; UAT 10-download |
-| 12 | 03-05: lossless square crop; F6/F7; 300 ms busy threshold; staging keeps only the square; decode budget closes CR-01 | ✓ VERIFIED | `imaging.Square` (SubImage, no re-quantize; golden tests); `framePixels` + `frameOverhead`; TestCopySquareDecodeBudget, …Extensions, …EmptyFrames pass; my adversarial overlay test (below) |
-| 13 | 03-06: library tabs ⌘5/⌘6, sections in slot order with "{label} · {count}", local title filter, ⌘⇧F star, ⌘⌫ remove + 5 s Undo, Clear Recents, F5, unreadable-file refusal, empty/zero-one-many states, ⌘⌫/⌘Z native on provider tabs | ✓ VERIFIED | `LibraryGrid.svelte:59`; StateMessage copy in `App.svelte:944-957`; `onKeydown` returns before preventDefault for ⌘⌫ off-library and ⌘Z without an Undo toast; store tests TestUndoRestoresPosition, TestUnreadableFileNeverOverwritten, TestUnknownVersionNeverOverwritten; UAT 12-library |
-| 14 | 03-07: Details pane behavior, chips (≤8, ↑/↓/←/→, ↵ rerun, ⌘⌫ silent remove), Phase 2 polish, IN-04 Clips error reset, long-text / contrast / keyboard backstops | ✓ VERIFIED | `format.ts`, `RecentSearches.svelte`; UAT 13-details, 13-chips, 14-backstops (P8 widest 492.5 px; contrast ≥ 4.5 in light and dark; aria-activedescendant checks) |
-| 15 | 03-08: whole suite green on one tree | ✓ VERIFIED | Re-run on HEAD 9824e93 (see spot-checks) |
-| 16 | 03-08: signed dev build installs; log shows readiness; go.sum untouched | ✓ VERIFIED | `bin/install-dev.log` has both lines (2 matches), no key leak; go.sum clean before and after my runs. Note: this install predates the review fixes |
-| 17 | 03-08: native, user-verified UAT on the installed app (13 steps) | ? UNCERTAIN | User attested ("approved"; "Already did these before"), but 03-08 found only download and reveal in the log, no library files, and no Quit. Routed to human verification on a fresh install of HEAD |
-| 18 | 03-08: Clips MP4 paste user-verified, or recorded as not verifiable with a reason | ✓ VERIFIED | 03-08 SUMMARY step 8: skipped, key not Clips-approved, fixture-proven only (D-15, A1) |
-| 19 | 03-08: post-session checks (staging clean, library files 0600, no key in log) | ? UNCERTAIN | Log leak grep PASS (I re-ran it); the staging dir was absent; the library files did not exist, so their 0600 mode was never observed natively (the unit test covers WriteJSONAtomic `Chmod(0o600)`) |
+| # | Truth | Status | Evidence (current code) |
+|---|-------|--------|-------------------------|
+| 1 | SC1: ⌘K lists every action for the selected GIF; copy/paste link, copy/paste Markdown, copy page link, Open in Browser | ✓ VERIFIED | `lib/actions.ts` ROWS (locked order; link rows unchanged, still `applies: linkable/hasPage`); ↵/⌘↵ hints now follow the user's default actions (`buildActions`, primary/secondary). `ActionMenu` → `onrun={runAction}` (App.svelte:1156), one dispatcher (App.svelte:755). Go builds every string; TestCopyText{Link,Markdown,Page,ClipLink}, TestOpenPage pass. Text actions work on Klipy even while gated (TestGatedKlipyTextStillWorks) |
+| 2 | SC2: download to a chosen folder (default Downloads) without overwrite; non-GIF/MP4 rejected; square crop not offered for Clips; Clips labelled MP4, 720p | ✓ VERIFIED | `staging.Save` unchanged (CreateTemp + `os.Link`, magic check). **Chosen folder is now delivered:** `actions.DownloadsDir = settingsSvc.DownloadDir` (main.go:97), `cmp.Or(pref, DefaultDownloads)` (settings.go:648); TestDownloadFolderIsInjected, TestDownloadDeletedFolder. Square rows still `!isClip` (actions.ts). `clipRendition` 720p→480p→1080p→360p (giphy.go:149-152). Klipy download refused by RELS-04 (superseded, see frontmatter) |
+| 3 | SC3: copy/paste/download temp files removed promptly; Klipy eagerly | ✓ VERIFIED | `stage.Clear()` before `app.Run()` (main.go:192); `Sweep` after each staged copy (actions.go:80, 523); `ServiceShutdown` (actions.go:408); TestCopyTwiceKeepsOnlyLatest, TestCopyTextClearsStaging, TestServiceShutdownClears pass. Klipy grace delete intact and tested (TestKlipyGrace* with the gate flipped); in the shipped build no Klipy file is written at all (TestGatedKlipyFileActions: 0 staged, 0 saved, 0 requests) |
+| 4 | SC4: add/remove favorite; every copy/paste in Recents (newest first, capped); grouped by provider, never blended; remove from Recents; render from saved metadata without API calls | ✓ VERIFIED | `internal/library/store.go` and `services/library.go` unchanged since 624ef98; LibraryService registered (main.go:128); `actions.Recents = lib` (main.go:67). `library.ts` `rows`/`moveSectioned` now take `cols` (Phase 4 grid size), with sections logic unchanged; library tests pass. TestRecentsRecordedOnEverySuccessfulCopy passes |
+| 5 | SC5: Details view (title, size, dimensions, tags, source links); empty box shows recent searches that rerun | ✓ VERIFIED | `DetailsPane.svelte` (App.svelte:1000) only gained an `onmenu` right-click prop; `RecentSearches` (App.svelte:1010) and `searches.ts` unchanged; format/searches node tests pass |
+| 6 | 03-01: link/Markdown/page rules, Go-only URL opening, Fake platform in server build, F1/F3 fixed copy, optional metadata fields | ✓ VERIFIED | `linkFor` etc. unchanged; `wire_server.go` still Fake platform and `bin/uat-downloads`; giphy/klipy mapper tests pass |
+| 7 | 03-01: panel:show cancels a pending hide-after-copy timer | ✓ VERIFIED (human, 2026-10-18) | `clearTimeout(hideTimer)` still in the panel:show handler (App.svelte:277; timer set at :904-905). No automated test; user-attested in the 2026-10-18 native UAT (item 9) |
+| 8 | 03-02: ⌘K popover (filter, ↑↓, ↵, Esc/⌘K close, outside click, shortcuts while open, "No matching actions", ≥8 px placement) | ✓ VERIFIED | ActionMenu.svelte only gained a contrast rule for destructive rows on highlight (P12); `popover.ts` now takes grid geometry; popover tests pass |
+| 9 | 03-03: Clips MP4 copy/paste, ftyp validation, MP4 badge; staging lifecycle; Klipy 30 s grace with generation guard | ✓ VERIFIED | TestCopyClipMP4, TestKlipyGraceGenerationGuard, TestKlipyGraceDeletesAfterPaste, TestKlipyGraceOnlyAfterKlipyPaste pass |
+| 10 | 03-03: staging wiped at quit on the installed app | ✓ VERIFIED (observed, 2026-10-18) | Orchestrator saw the staging dir empty after Quit on the fresh install; `ServiceShutdown` unchanged; ActionService still registered (main.go:124) |
+| 11 | 03-04: ⌘S naming, (2)/(3) no-overwrite, F2/F3/F4, 0644, containment, Show in Finder via Go, not in Recents | ✓ VERIFIED | `Download` (actions.go:420) still has no `recent()`; now passes `HideFilenames()` (actions.go:435), so `gifsmith-{id}` naming is live (TestDownloadHideFilenames: `gifsmith-office-1.gif`, then `(2)`). Checklist D15/D16 pass on host |
+| 12 | 03-05: lossless square crop; F6/F7; 300 ms busy; staging keeps only the square; CR-01 decode budget | ✓ VERIFIED | `internal/imaging` unchanged; `frameOverhead` still counted (actions.go:470, 624); TestCopySquareDecodeBudget{,Extensions,EmptyFrames} pass. CopySquare/PasteSquare gained only the Klipy gate |
+| 13 | 03-06: library tabs ⌘5/⌘6, sections, local filter, ⌘⇧F, ⌘⌫ + Undo, Clear Recents, unreadable-file refusal, empty states | ✓ VERIFIED | Store and its tests unchanged and passing; LibraryGrid.svelte (App.svelte:1042) changed only for variable columns/tile size |
+| 14 | 03-07: Details behavior, chips, Phase 2 polish, IN-04, backstops | ✓ VERIFIED | Unchanged logic; node tests pass. Browser UAT 13-*/14-backstops not re-run this round (caller constraint); they last passed on 2026-10-18 and the Phase 4 suite runs 18-backstops |
+| 15 | 03-08: whole suite green on one tree | ✓ VERIFIED | Re-run today on HEAD 7874dc6: Go race 15 packages ok; node 103/103 |
+| 16 | 03-08: signed dev build installs; readiness lines; go.sum untouched | ✓ VERIFIED | Superseded by Phase 4's notarized release build (04-UAT tests 2-3); `git status` shows go.sum clean |
+| 17 | 03-08: native, user-verified UAT on the installed app | ✓ VERIFIED (human, 2026-10-18) | Re-run on a fresh install:dev and approved by the user 2026-10-18T18:47:30Z; Phase 4 clean-VM UAT re-exercised copy (public.file-url, animated paste) and paste-without-AX |
+| 18 | 03-08: Clips MP4 paste user-verified, or recorded as not verifiable | ✓ VERIFIED | Recorded as not verifiable (key not Clips-approved); fixture-proven (TestCopyClipMP4/TestPasteClipMP4) |
+| 19 | 03-08: post-session checks (staging clean, library files 0600, no key in log) | ✓ VERIFIED (observed, 2026-10-18) | Orchestrator observed the three JSON files at mode 600 and an empty staging dir; WriteJSONAtomic `Chmod(0o600)` unit-tested |
 
-**Score:** 15/19 truths verified (2 present, behavior-unverified; 2 uncertain, routed to human)
+**Score:** 19/19 truths verified (0 behavior-unverified). Truths 7, 10, 17 and 19 rest on 2026-10-18 human/observed native evidence. Phase 4 did not change those code paths.
 
-### CR-01 closure (square-crop decode budget)
+### What Phase 4 changed in Phase 3 code
 
-- **Fix present:** `actions.go:443` `frameOverhead = 4096 + 256`, added per image descriptor at `actions.go:594`. Budget check before `DecodeAll` at `actions.go:521`.
-- **Tests:** `go test -run TestCopySquareDecodeBudget -v` passes all three:
-  - Full frames: 335,631,360 is over the 268,435,456 budget.
-  - Plain Text, empty Application and unknown-label prefixes are counted or refused.
-  - Empty transparent frames: 268,474,880 is over the budget, refused with `crop_failed` and no platform calls.
-- **Parser parity:** I compared `framePixels` with Go's `image/gif` reader:
-  - Plain Text: 13 raw bytes, then sub-blocks.
-  - Graphic Control: 6 bytes, no sub-blocks.
-  - Application: size byte, that many bytes, then sub-blocks.
-  - Unknown labels: refused.
-  - Frame bounds: limited by the logical screen, which is ≤ 4096².
-  - Go accepts at most one extra sub-block after the image data. Where Go errors, it stops allocating, so walking every sub-block is harmless.
-  - A missing trailer makes `framePixels` fail before `DecodeAll` runs.
-- **Bypass attempt** (go test `-overlay`, no repo files changed). I built the worst-case files that stay just under the budget:
-
-| Variant | File | Frames | Live heap after DecodeAll | Peak heap during CopySquare | Time |
-|---------|------|--------|---------------------------|-----------------------------|------|
-| 0x0 frames, out-of-range transparent index (Go `make(Palette,256)` per frame) | 1.2 MB | 61,630 | +292 MB | 758 MB | 0.86 s |
-| 0x0 transparent frames, 256-entry global table (reviewer's shape) | 1.2 MB | 61,630 | +292 MB | 638 MB | 0.87 s |
-| 0x0 frames with 256-entry local tables, 15 MB file | 15.7 MB | 19,958 | +114 MB | 215 MB | 0.38 s |
-
-The 3.7 GB live / 9 GB process reproduction is now refused. Memory is bounded at roughly the intended 256 MB for decode and under 1 GB peak, with each action finishing in under 1 s. I found no bypass. One residual note: the "about 256 MB" comment understates the peak during `EncodeAll` by about 3x. This is Info, not a blocker.
+| Change | Where | Effect on Phase 3 |
+|--------|-------|-------------------|
+| Klipy file-action gate (RELS-04) | actions.go:45, :103; actions.ts:46; prefs.ts:43; errors.go:31 `klipy_gated` | **Superseded (deliberate):** Klipy Copy/Paste GIF, Download and Square are refused in Go before any I/O and hidden in the menu; ↵/⌘↵ on Klipy run Copy/Paste Link. Grace-delete code dormant but tested |
+| Download folder from Settings | main.go:97; settings.go:648-668 | Closes deferral 1 (ACTN-05 picker) |
+| Hide original file names | actions.go:435; main.go:98 | Closes deferral 2 (ACTN-11 toggle) |
+| Configurable ↵/⌘↵ | actions.ts `buildActions`; App.svelte:644; prefs.ts | Copy/Paste rows lose fixed hints; hints follow the setting. SC1 unaffected |
+| Grid size (3/4/5 columns) | library.ts `rows`/`moveSectioned(cols)`; grid.ts; popover.ts | Sectioned navigation parameterized; tests updated and passing |
+| Paste-without-AX message | actions.go paste() | Now "Copied — press ⌘V to paste" (button carries the call to action); TestPasteWithoutAccessibility updated |
+| Details right-click → menu | DetailsPane.svelte `onmenu` | Additive |
 
 ### Deferred Items
 
-| # | Item | Addressed In | Evidence |
-|---|------|-------------|----------|
-| 1 | Chosen download folder (picker); Phase 3 uses an injected `DownloadsDir` (~/Downloads) | Phase 4 | SC3 "download folder" (SETT-04); 03-CONTEXT Deferred Ideas |
-| 2 | Hide-original-filename toggle (naming implemented in `FileStem(g, true)`, `Download` passes `false`) | Phase 4 | SC3 "hide filename" (SETT-04) |
+None remain. Both 2026-10-18 deferrals (download folder picker, hide-filename toggle) were delivered by Phase 4 (SETT-04) and are recorded under `re_verification.gaps_closed`.
 
 ### Required Artifacts
 
-`gsd-tools verify.artifacts` reports 30/30 across 03-01 to 03-08: all exist and are substantive. I checked them manually:
-
 | Artifact | Status | Details |
 |----------|--------|---------|
-| `internal/services/actions.go` | ✓ VERIFIED | CopyText/PasteText/OpenPage/OpenSource/Download/ShowDownload/CopySquare/PasteSquare/ServiceShutdown, all bound (ActionService registered in main.go) |
-| `internal/staging/staging.go` | ✓ VERIFIED | magic (GIF/ftyp), Save via os.Link, Clear/Sweep/Remove |
-| `internal/imaging/square.go` | ✓ VERIFIED | stdlib only (`go list -deps`: no wails/cgo/png/jpeg) |
-| `internal/library/store.go` + `internal/services/library.go` | ✓ VERIFIED | LibraryService registered in main.go; `actions.Recents = lib` |
-| `frontend/src/components/{ActionMenu,DetailsPane,LibraryGrid,RecentSearches}.svelte` | ✓ VERIFIED | all imported and rendered in App.svelte (lines 920, 929, 961, 1067) |
-| `build/darwin/Info.plist` | ✓ VERIFIED | NSDownloadsFolderUsageDescription in both plists |
-| `scripts/uat/07,08,10,11,12*,13*,14` | ✓ VERIFIED | all UAT OK on my run |
+| `internal/services/actions.go` | ✓ VERIFIED | All Phase 3 methods present; Phase 4 added `gated`, `HideFilenames`, `KlipyFileActions`. ActionService registered (main.go:124) |
+| `internal/staging/staging.go` | ✓ VERIFIED | Unchanged since 624ef98 |
+| `internal/imaging/square.go` | ✓ VERIFIED | Unchanged since 624ef98 |
+| `internal/library/store.go` + `internal/services/library.go` | ✓ VERIFIED | Unchanged; LibraryService registered (main.go:128) |
+| `frontend/src/components/{ActionMenu,DetailsPane,LibraryGrid,RecentSearches}.svelte` | ✓ VERIFIED | Rendered in App.svelte (:1156, :1000, :1042, :1010) |
+| `build/darwin/Info.plist` / `Info.dev.plist` | ✓ VERIFIED | Phase 4 edits did not remove NSDownloadsFolderUsageDescription (checklist D15 saved to a chosen folder) |
+| `scripts/uat/07,08,10,11,12*,13*,14` | ✓ PRESENT | Not re-run this round (caller constraint); last full pass 2026-10-18 |
 
 ### Key Link Verification
 
-`gsd-tools verify.key-links`: 18/20 automated. I checked the 2 misses by hand:
-
 | From | To | Via | Status | Details |
 |------|----|-----|--------|---------|
-| DetailsPane.svelte | actions.go | openPage/openSource | WIRED | The pattern missed because of prop casing (`onopenpage`). `App.svelte:922-923` passes `openItem(detail, openPage/openSource)` → `api.ts:81-82` → `ActionService.OpenPage/OpenSource` |
-| Taskfile install:dev | ~/Applications/Gifsmith.app | build/sign/install | WIRED (historical) | `build/darwin/Taskfile.yml:212` `install:dev`; log evidence in bin/install-dev.log |
-| actions.go | library/store.go | `Recents.Touch` | WIRED | main.go `actions.Recents = lib` |
-| main.go | staging | `stage.Clear()` before `app.Run()` | WIRED | |
-| actions.go | Wails shutdown | `ServiceShutdown` | WIRED | `application.go:821` calls it for registered services |
+| ActionMenu / shortcuts | ActionService | `runAction` → api.ts bindings | WIRED | App.svelte:755 single dispatcher; ↵/⌘↵ via `effectiveAction` (App.svelte:644) |
+| DetailsPane.svelte | actions.go | openPage/openSource | WIRED | unchanged |
+| actions.go | library/store.go | `Recents.Touch` | WIRED | main.go:67 |
+| actions.go | settings | `DownloadsDir`, `HideFilenames` | WIRED | main.go:97-98 (new in Phase 4) |
+| main.go | staging | `stage.Clear()` before `app.Run()` | WIRED | main.go:192 |
+| actions.go | Wails shutdown | `ServiceShutdown` | WIRED | registered service; observed 2026-10-18 |
 
 ### Data-Flow Trace (Level 4)
 
 | Artifact | Data | Source | Real data | Status |
 |----------|------|--------|-----------|--------|
-| LibraryGrid / Favorites / Recents | `library` snapshot | `LibraryService.Load` → `Store.Snapshot` → favorites.json / recents.json | Yes (file-backed, Touch on every copy) | ✓ FLOWING |
-| RecentSearches chips | `library.searches[active]` | `SaveSearch` → searches.json | Yes | ✓ FLOWING |
-| DetailsPane | `detail` (selected Gif) | provider page result or library snapshot | Yes (mapper fields; no request) | ✓ FLOWING |
-| Download toast | `DownloadResult{name, folder}` | `Staging.Save` | Yes | ✓ FLOWING |
+| LibraryGrid | library snapshot | `LibraryService.Load` → Store → JSON files | Yes | ✓ FLOWING |
+| RecentSearches | `searches[active]` | `SaveSearch` → searches.json | Yes | ✓ FLOWING |
+| DetailsPane | selected Gif | provider page / library snapshot | Yes | ✓ FLOWING |
+| Download toast | `DownloadResult{name, folder}` | `Staging.Save` into `SettingsService.DownloadDir()` | Yes | ✓ FLOWING |
 
-### Behavioral Spot-Checks (all run by me on HEAD 9824e93)
+### Behavioral Spot-Checks (run 2026-10-20 on HEAD 7874dc6)
 
 | Behavior | Command | Result | Status |
 |----------|---------|--------|--------|
-| Go vet | `go vet . ./internal/...` | clean | ✓ PASS |
-| Go tests with race | `go test -race -count=1 ./internal/...` | 13 packages ok | ✓ PASS |
-| CR-01 regressions | `go test -run TestCopySquareDecodeBudget -v ./internal/services/` | 3/3 PASS | ✓ PASS |
-| Lint / fmt | `golangci-lint run . ./internal/...`; `gofmt -l` | 0 issues; clean | ✓ PASS |
-| Frontend unit | `pnpm --dir frontend run test` | 63 pass / 0 fail | ✓ PASS |
-| svelte-check | `pnpm --dir frontend run check` | 0 errors / 0 warnings | ✓ PASS |
-| Smoke | `bash scripts/smoke-browser-loop.sh` | SMOKE OK | ✓ PASS |
-| Headless UAT ×18 | `bash scripts/smoke-browser-loop.sh --uat scripts/uat/<x>.js` (env defaulted from each script's Run-via line) | 18/18 UAT OK, including 12-library-unreadable and FAKE_CLIPS=denied scripts | ✓ PASS |
-| go.sum untouched | `git diff --quiet -- go.sum` | clean | ✓ PASS |
-
-Cleanup: ports 8089 and 9245 were free afterwards, no `gifsmith-server` was left running, and no new headless Chrome was started. The pre-existing `gifsmith-uat` browser was reused and left as it was. ~/Applications/Gifsmith.app was not touched.
+| Go tests with race | `go test -race -count=1 ./internal/...` | 15 packages ok (fakeapi has no tests) | ✓ PASS |
+| Phase 3 named tests | `go test -run 'TestCopySquareDecodeBudget\|TestKlipyGrace\|TestServiceShutdownClears\|TestDownload\|TestGatedKlipy\|TestRecentsRecordedOnEverySuccessfulCopy\|TestCopyClipMP4\|TestCopyTwiceKeepsOnlyLatest\|TestOpenPage\|TestCopyText' -v ./internal/services/` | 28/28 PASS | ✓ PASS |
+| Frontend unit | `node --test src/lib/*.test.ts` (frontend/) | 103 pass / 0 fail | ✓ PASS |
+| Headless browser UAT | — | not run (concurrent verifiers; caller constraint) | ? SKIP (2026-10-18 18/18 OK; Phase 4 UAT 8/8 pass) |
 
 ### Probe Execution
 
@@ -179,70 +140,53 @@ No `scripts/*/tests/probe-*.sh` exist and the plans declare no probes. SKIPPED.
 
 | Requirement | Source Plan | Description | Status | Evidence |
 |-------------|------------|-------------|--------|----------|
-| ACTN-03 | 03-01, 03-02, 03-08 | Copy/paste link and Markdown | ✓ SATISFIED (native paste → human) | Truths 1, 6 |
+| ACTN-03 | 03-01, 03-02, 03-08 | Copy/paste link and Markdown | ✓ SATISFIED | Truths 1, 6 |
 | ACTN-04 | 03-01, 03-02, 03-08 | Copy page link, open page in browser | ✓ SATISFIED | Truths 1, 6 |
-| ACTN-05 | 03-04, 03-08 | Download to a chosen folder (default Downloads) | ✓ SATISFIED for default folder; picker deferred to Phase 4 | Truth 11, Deferred 1 |
-| ACTN-06 | 03-05, 03-08 | Square crop, not for Clips | ✓ SATISFIED | Truth 12 |
+| ACTN-05 | 03-04, 03-08 | Download to a chosen folder (default Downloads) | ✓ SATISFIED (picker via Phase 4 SETT-04; Klipy refused under RELS-04) | Truths 2, 11 |
+| ACTN-06 | 03-05, 03-08 | Square crop, not for Clips | ✓ SATISFIED (non-Klipy providers while RELS-04 gate is closed) | Truth 12 |
 | ACTN-07 | 03-02, 03-08 | ⌘K action menu | ✓ SATISFIED | Truth 8 |
-| ACTN-09 | 03-03, 03-08 | Clips as MP4, labelled, 720p | ✓ SATISFIED (native paste needs approved key) | Truth 9 |
-| ACTN-10 | 03-03, 03-08 | Temp files deleted promptly; Klipy eagerly | ✓ SATISFIED (quit path → human) | Truths 3, 9, 10 |
-| ACTN-11 | 03-04, 03-08 | Validated, no overwrite; optional hide filename | ✓ SATISFIED; toggle deferred to Phase 4 | Truth 11, Deferred 2 |
+| ACTN-09 | 03-03, 03-08 | Clips as MP4, labelled, 720p | ✓ SATISFIED | Truth 9 |
+| ACTN-10 | 03-03, 03-08 | Temp files deleted promptly; Klipy eagerly | ✓ SATISFIED | Truths 3, 9, 10 |
+| ACTN-11 | 03-04, 03-08 | Validated, no overwrite; optional hide filename | ✓ SATISFIED (toggle via Phase 4) | Truth 11 |
 | LIBR-01 | 03-06, 03-08 | Add/remove favorites | ✓ SATISFIED | Truth 13 |
-| LIBR-02 | 03-06, 03-08 | Recents on every copy/paste, capped | ✓ SATISFIED | Truths 4, 13; TestRecentsRecordedOnEverySuccessfulCopy |
-| LIBR-03 | 03-06, 03-08 | Browse grouped by provider, remove from Recents | ✓ SATISFIED | Truth 13 |
-| LIBR-04 | 03-06, 03-08 | Render from saved metadata, offline/rate-limited | ✓ SATISFIED (native persistence → human) | Truth 4; 12-library rate-limited case |
+| LIBR-02 | 03-06, 03-08 | Recents on every copy/paste, capped | ✓ SATISFIED | Truths 4, 13 |
+| LIBR-03 | 03-06, 03-08 | Grouped by provider, remove from Recents | ✓ SATISFIED | Truth 13 |
+| LIBR-04 | 03-06, 03-08 | Render from saved metadata, offline/rate-limited | ✓ SATISFIED | Truths 4, 19 |
 | LIBR-05 | 03-07, 03-08 | Details view | ✓ SATISFIED | Truth 14 |
 | SRCH-08 | 03-07, 03-08 | Recent searches when box empty, rerun | ✓ SATISFIED | Truth 14 |
 
-**Orphaned requirements:** none. REQUIREMENTS.md maps exactly these 14 IDs to Phase 3, and every one appears in a plan's `requirements` field.
+**Orphaned requirements:** none. REQUIREMENTS.md still maps exactly these 14 IDs to Phase 3, all marked Complete.
 
 ### Prohibitions
 
 | Plan | Prohibition | Tier | Result |
 |------|-------------|------|--------|
-| 03-01 | Unit tests never write the general pasteboard or open URLs | judgment | Holds: platform_darwin_test uses a private named pasteboard |
-| 03-01/02/07 | Webview never composes clipboard text or URLs; menu rows go through the same dispatcher | judgment | Holds: `api.ts` passes `(Gif, kind)`; Go builds and validates everything |
-| 03-02 | No popover fade/slide | judgment | Holds: no transition/animation in ActionMenu.svelte |
-| 03-03 | ServiceShutdown takes no busy lock / onMain; tests inject After | judgment | Holds: `actions.go:383-385`; tests use `After` |
-| 03-04 | Download never lists, creates or overwrites; no path from JS | judgment | Holds: CreateTemp + Link only; DownloadResult is name + folder |
-| 03-05 | imaging is stdlib image/gif only, no re-quantize | judgment | Holds: `go list -deps` |
-| 03-06 | library has no Wails / provider HTTP; metadata only; tests use TempDir | judgment | Holds: no net/http in deps; Entry = Gif metadata |
-| 03-01/03-08 | Executor conduct (no synthetic input, no foreign kills, no Keychain/~/Downloads access) | judgment | Flagged: unverified-prohibition, human review recommended (non-authoritative: no evidence of violation) |
+| 03-01 | Unit tests never write the general pasteboard or open URLs | judgment | Holds (platform_darwin_test uses a private pasteboard) |
+| 03-01/02/07 | Webview never composes clipboard text or URLs; menu rows share one dispatcher | judgment | Holds: Phase 4 keeps `runAction` as the only dispatcher; `effectiveAction` returns an ActionId, not a string |
+| 03-02 | No popover fade/slide | judgment | Holds (P12 adds a color rule only) |
+| 03-03 | ServiceShutdown takes no busy lock / onMain; tests inject After | judgment | Holds (unchanged) |
+| 03-04 | Download never lists, creates or overwrites; no path from JS | judgment | Holds: the folder comes from Go settings (`ChooseDownloadDir` takes no path from the webview, settings.go:655-657) |
+| 03-05 | imaging is stdlib image/gif only | judgment | Holds (package unchanged) |
+| 03-06 | library has no Wails / provider HTTP | judgment | Holds (package unchanged) |
+| 03-01/03-08 | Executor conduct (no synthetic input, no foreign kills, no Keychain/~/Downloads access) | judgment | Resolved by user review 2026-10-18; this re-verification ran no app, input or ~/Library/~/Downloads access |
 
 ### Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 |------|------|---------|----------|--------|
-| (84 phase-modified files) | - | TBD/FIXME/XXX/TODO/HACK/placeholder | none found | - |
-| `.planning/phases/03-action-pipeline-library/03-REVIEW-DISPOSITION.md` | 8 | CR-01 recorded `open`, but the fix landed in 6928379/39d5c97 | ℹ️ Info | Stale record: update the disposition to `fixed` |
-| `internal/services/actions.go` | 442 | The "about 256 MB" comment; measured peak during CopySquare is up to 758 MB | ℹ️ Info | Bounded; optionally tighten the comment or the budget |
-| App.svelte / errors.ts / staging.go / store.go / provider.go | per 03-REVIEW | IN-01..IN-07 (library refresh ordering, ⌘⌫ in the menu filter, error copy for text/`invalid_item`, `.part` left in ~/Downloads on a crash, IN-05 comment, stale Undo toast, ClampID prefix merge) | ℹ️ Info | None blocks a must-have; all were carried forward by the reviewer as Info |
+| Phase 3 files touched by Phase 4 (actions.go, App.svelte, actions.ts, prefs.ts, components, main.go, staging/library/imaging) | - | TBD/FIXME/XXX | none found | - |
+| `internal/services/actions.go` | 469 | "about 256 MB" comment understates the EncodeAll peak (carried from 2026-10-18) | ℹ️ Info | Bounded; cosmetic |
+| `frontend/src/App.svelte` (search cancel path) | - | 18-backstops intermittent CancelledRejectionError (Phase 4 deferred-items.md, owner Phase 2) | ℹ️ Info | Console-only; not a Phase 3 must-have |
 
 ### Human Verification Required
 
-Run all of these on a fresh `wails3 task darwin:install:dev` of the current HEAD. The installed build predates WR-01..03 and CR-01.
-
-1. **Install + single instance.** Run install:dev, then double-click the app again. Expected: one tray icon, the panel shows, and the log has its readiness lines.
-2. **Text actions in real apps.** In TextEdit try ⌘⇧C, Paste Link, ⌘⇧M, then ⌘O on GIPHY and on Klipy. Expected: the link has no query, Markdown is `![title](url)`, the GIPHY page opens, and Klipy does nothing.
-3. **Paste Square GIF into Messages.** Expected: a square GIF that is still animated.
-4. **Klipy 30 s delete.** Paste with ⌘↵ into Messages and run `ls` on the staging dir immediately and again after 35 s. Then paste into Slack and send about 40 s later. Expected: the file is gone after 35 s and the Slack send still works.
-5. **Clips MP4** (approved key only; otherwise record it as not verifiable).
-6. **Library persistence + mode.** Copy two GIFs, star one, and search. Expected: `ls -l` on Application Support shows the three JSON files at 0600, and after Quit and relaunch ⌘6, ⌘5 and the chip still show them.
-7. **Quit cleanup.** After a copy, quit from the menu bar and also with ⌘Q, running `ls` on the staging dir each time. Expected: empty or absent.
-8. **WKWebView keys.** Check ⌘⌫ and ⌘Z on a provider tab (native editing) and on Recents (remove and Undo), ⌘R with no toast (no reload), ⌘I then Esc, and ⌘S then ⌘R (Finder reveal).
-9. **Hide-timer cancel.** Press ↵, click away within about 0.4 s, then press the hotkey. Expected: the panel stays open.
-10. **Process prohibitions.** Confirm no executor input, kills or Keychain access happened (judgment tier).
+None open. The 2026-10-18 native UAT items were approved by the user (see `human_verification_resolution`). Phase 4 UAT (8/8 pass) adds a clean-VM check of the copy/paste path and host checks of download folder, hidden names and Klipy ⌘S refusal.
 
 ### Gaps Summary
 
-No blocking gaps. All 14 requirement IDs have code, wiring and automated evidence. Code review CR-01 is closed, and my adversarial test found no further decode-budget bypass. Status is `human_needed` for three reasons:
-- Two truths are present and wired, but no test drives them: the panel:show hide-timer cancel and staging cleanup on a real Quit.
-- The 03-08 native UAT was user-attested on a build older than the review fixes, without log or file evidence for library persistence, ⌘Q cleanup, Klipy grace, Clips paste, WKWebView key handling or paste targets.
-- One judgment-tier process prohibition is flagged for confirmation.
-
-The download folder picker and the hide-filename toggle are deferred to Phase 4 (SETT-04).
+No gaps. All 5 roadmap success criteria, 19 plan truths and 14 requirement IDs hold in today's code. Phase 4 closed both Phase 3 deferrals. The only Phase 3 behavior that no longer ships is Klipy file actions (and with them the Klipy grace delete), which RELS-04 gates on purpose until Klipy grants written clearance. The code remains and is tested behind `KlipyFileActionsCleared` (actions.go:45).
 
 ---
 
-_Verified: 2026-10-18T18:05:00Z_
+_Verified: 2026-10-18T18:05:00Z (initial); re-verified 2026-10-20 after Phase 4_
 _Verifier: Claude (gsd-verifier)_
