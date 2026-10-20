@@ -42,11 +42,12 @@
     type SettingsSnapshot,
     type TextKind,
   } from './lib/api';
-  import { actionErrorText, downloadedText, errorState, libraryErrorText, pagingMessage, providerName, revokedMessage } from './lib/errors';
+  import { actionErrorText, downloadedText, errorState, klipyGatedText, libraryErrorText, pagingMessage, providerName, revokedMessage } from './lib/errors';
   import { buildActions, type ActionId, type ActionRow } from './lib/actions';
   import { COLS, move, nearEnd, routeKey } from './lib/grid';
   import { flatItems, moveSectioned, sections } from './lib/library';
   import { placeInDetails, placeMenu } from './lib/popover';
+  import { effectiveAction, shortLabel } from './lib/prefs';
   import { CHIP_MAX, SAVE_IDLE_MS, chipsVisible, shouldSave } from './lib/searches';
   import { applyTheme } from './lib/theme';
   import { CLIPS_ACCESS_MAILTO, LIBRARY_TABS, SLOTS, libraryTab, slotById, type LibraryId, type SlotId } from './lib/providers';
@@ -67,6 +68,7 @@
   const CROP_BUSY_MS = 300; // a square crop shows its busy state only if it is still running then (D-16)
   const LIBRARY_SKELETON_MS = 300; // a library read slower than this shows the S2 skeleton
   const FAVORITE_TOAST_MS = 2000;
+  const KLIPY_GATED_TOAST_MS = 2000; // T11
   // Reduce Motion follows macOS live (WebKit tracks it); no separate toggle (D-12).
   const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
   let reducedMotion = $state(motionQuery.matches);
@@ -110,7 +112,10 @@
   // Provider parameters of the last snapshot; a change marks every provider tab stale.
   const paramsOf = (s: SettingsSnapshot) => [s.giphyRating, s.pageSize, s.giphyLang, s.klipyCountry].join('|');
   let params = untrack(() => paramsOf(initial));
+  // The latest settings: ↵/⌘↵ choices and the Klipy gate (RELS-04).
+  let prefs = $state(untrack(() => initial));
   function onSettings(s: SettingsSnapshot) {
+    prefs = s;
     applyTheme(s.theme);
     downloadFolder = s.downloadDirName;
     if (paramsOf(s) === params) return;
@@ -619,7 +624,7 @@
           else if (a === 'copy' && !libTab && errView?.tryAgain) retry();
           return;
         }
-        runAction(a);
+        runAction(effectiveAction(items[selected], a === 'copy' ? 'primary' : 'secondary', prefs));
         return;
       case 'copyLink':
       case 'copyMarkdown':
@@ -696,7 +701,15 @@
     const tile = document.getElementById(`tile-${selected}`);
     if (!g || !(tile || detail)) return;
     const inDetails = !!detail;
-    menuRows = buildActions({ gif: g, tab: libTab ?? 'provider', inDetails, favorited: favKeys.has(keyOf(g)) });
+    menuRows = buildActions({
+      gif: g,
+      tab: libTab ?? 'provider',
+      inDetails,
+      favorited: favKeys.has(keyOf(g)),
+      gated: !prefs.klipyFileActions,
+      primary: effectiveAction(g, 'primary', prefs),
+      secondary: effectiveAction(g, 'secondary', prefs),
+    });
     menuOpen = true;
     await tick(); // measure the rendered menu, then place it before the browser paints
     if (inDetails || !tile) {
@@ -873,6 +886,7 @@
   function actionFailed(err: unknown, g: Gif, action: 'copy' | 'download' | 'text' = 'copy') {
     const kind = actionError(err)?.kind ?? '';
     if (kind === 'busy') setStatus('');
+    else if (kind === 'klipy_gated') setStatus(klipyGatedText, '', null, KLIPY_GATED_TOAST_MS);
     else setStatus(actionErrorText(kind, g, action, downloadFolder), 'error');
   }
 
@@ -881,6 +895,7 @@
   async function downloadItem() {
     const g = items[selected];
     if (copying || !g) return;
+    if (g.provider === 'klipy' && !prefs.klipyFileActions) return setStatus(klipyGatedText, '', null, KLIPY_GATED_TOAST_MS); // T11
     copying = overlay = true;
     setStatus('Downloading…');
     try {
@@ -1114,6 +1129,8 @@
   <Footer
     {attribution}
     hints={detail ? 'details' : libTab ? (items[selected] ? 'library' : 'none') : 'provider'}
+    primary={shortLabel(effectiveAction(items[selected], 'primary', prefs))}
+    secondary={shortLabel(effectiveAction(items[selected], 'secondary', prefs))}
     text={footerCenter}
     {tone}
     {needsAccessibility}

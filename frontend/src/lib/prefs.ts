@@ -24,14 +24,27 @@ export const countryOptions = (codes: string[], system: string) => options(codes
 export const ratingLabel = (v: string) => v.toUpperCase();
 
 // ↵/⌘↵ choices in Settings order (UI-SPEC "Default actions"); Go stores and validates the id.
-export const DEFAULT_ACTIONS: { id: ActionId; label: string }[] = [];
+export const DEFAULT_ACTIONS: { id: ActionId; label: string; short: string }[] = [
+  { id: 'copy', label: 'Copy GIF', short: 'Copy' },
+  { id: 'paste', label: 'Paste GIF', short: 'Paste' },
+  { id: 'copyLink', label: 'Copy Link', short: 'Copy Link' },
+  { id: 'pasteLink', label: 'Paste Link', short: 'Paste Link' },
+  { id: 'copyMarkdown', label: 'Copy Markdown', short: 'Copy Markdown' },
+  { id: 'pasteMarkdown', label: 'Paste Markdown', short: 'Paste Markdown' },
+  { id: 'download', label: 'Download GIF', short: 'Download' },
+];
 
 type ActionPrefs = { primaryAction: string; secondaryAction: string; klipyFileActions: boolean };
+const FILE_ACTIONS: string[] = ['copy', 'paste', 'download'];
 
-// The action ↵ (primary) or ⌘↵ (secondary) runs on g.
+// The action ↵ (primary) or ⌘↵ (secondary) runs on g. While Klipy file actions are gated (RELS-04),
+// a file action on a Klipy item runs as Copy Link (↵) or Paste Link (⌘↵); a Clip runs the chosen
+// action, which Go performs on its MP4.
 export function effectiveAction(g: Gif | undefined, which: 'primary' | 'secondary', p: ActionPrefs): ActionId {
-  return 'copy';
+  const id = (which === 'primary' ? p.primaryAction : p.secondaryAction) as ActionId;
+  if (g?.provider === 'klipy' && !p.klipyFileActions && FILE_ACTIONS.includes(id)) return which === 'primary' ? 'copyLink' : 'pasteLink';
+  return id;
 }
 
 // Footer short label of an action (UI-SPEC "Footer hints").
-export const shortLabel = (id: ActionId): string => '';
+export const shortLabel = (id: ActionId): string => DEFAULT_ACTIONS.find((a) => a.id === id)?.short ?? id;

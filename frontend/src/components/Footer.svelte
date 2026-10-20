@@ -7,6 +7,8 @@
   let {
     attribution,
     hints = 'provider',
+    primary = 'Copy',
+    secondary = 'Paste',
     text,
     tone,
     needsAccessibility,
@@ -18,6 +20,8 @@
   }: {
     attribution: 'giphy' | 'klipy' | 'finer' | ''; // '' = nothing to attribute (empty library tab)
     hints?: 'provider' | 'library' | 'details' | 'none'; // none: a library tab with nothing selected (P18)
+    primary?: string; // short labels of what ↵ and ⌘↵ run on the selected item (ACTN-08)
+    secondary?: string;
     text: string;
     tone: '' | 'success' | 'error';
     needsAccessibility: boolean;
@@ -62,14 +66,14 @@
   {:else if hints === 'details'}
     <!-- Details: "↵ Copy   ⌘K Actions   Esc Back" -->
     <span class="hints"
-      ><b>↵</b> Copy&nbsp;&nbsp;&nbsp;<b>⌘K</b> Actions&nbsp;&nbsp;&nbsp;<button class="back" aria-label="Close Details (Esc)" onclick={onback}
+      ><b>↵</b> {primary}&nbsp;&nbsp;&nbsp;<b>⌘K</b> Actions&nbsp;&nbsp;&nbsp;<button class="back" aria-label="Close Details (Esc)" onclick={onback}
         ><b>Esc</b> Back</button
       ></span
     >
   {:else if hints === 'library'}
-    <span class="hints"><b>↵</b> Copy&nbsp;&nbsp;&nbsp;<b>⌘K</b> Actions&nbsp;&nbsp;&nbsp;<b>⌘⌫</b> Remove</span>
+    <span class="hints"><b>↵</b> {primary}&nbsp;&nbsp;&nbsp;<b>⌘K</b> Actions&nbsp;&nbsp;&nbsp;<b>⌘⌫</b> Remove</span>
   {:else if hints === 'provider'}
-    <span class="hints"><b>↵</b> Copy&nbsp;&nbsp;&nbsp;<b>⌘↵</b> Paste&nbsp;&nbsp;&nbsp;<b>⌘K</b> Actions</span>
+    <span class="hints"><b>↵</b> {primary}&nbsp;&nbsp;&nbsp;<b>⌘↵</b> {secondary}&nbsp;&nbsp;&nbsp;<b>⌘K</b> Actions</span>
   {/if}
 </footer>
 

@@ -135,7 +135,7 @@ export function folderErrorText(kind: string, folder: string): string {
 }
 
 // T11: ⌘S (or any file action reaching Go) on a Klipy item while file actions are gated.
-export const klipyGatedText = '';
+export const klipyGatedText = "Klipy GIFs can't be downloaded yet.";
 
 // T6: a finished download names the folder by display name only.
 export const downloadedText = (folder: string) => `Downloaded to ${folder}`;
