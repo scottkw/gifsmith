@@ -29,12 +29,21 @@ it by hand. Pushes and pull requests to `main` run the test suite (`.github/work
 7. When the run is green, open the draft on GitHub (Releases), check the DMG, its `.sha256` and
    the notes, then publish. Installed copies see the update once it is published.
 
-The job refuses before touching any credential when the tag is not `vMAJOR.MINOR.PATCH`, does not
-match the version sources, has no release notes, is not on `main`, or already has a release.
-`v1.0.0` is excluded from the tag trigger. It builds the app (`wails3 task darwin:release:app`,
-which installs dependencies) before the signing keychain exists, then signs, notarizes and
-verifies it (`darwin:release:sign`) and deletes the keychain before anything else runs. Locally,
-`wails3 task darwin:release` runs both.
+The `build` job refuses, before any credential is touched, when the tag is not
+`vMAJOR.MINOR.PATCH`, does not match the version sources, has no release notes, is not on `main`,
+or already has a release. `v1.0.0` is excluded from the tag trigger. The run has two jobs on separate runners:
+
+- `build` has no environment, no secrets and a read-only token. It installs dependencies, builds
+  the app (`wails3 task darwin:release:app`) and uploads it as an artifact.
+- `sign` runs in the `release` environment on a fresh runner. It installs only the pinned `wails3`,
+  downloads the app, creates the signing keychain, then signs, notarizes and verifies it
+  (`darwin:release:sign`) and deletes the keychain before `go test` compiles anything. No
+  dependency install or build runs on this runner, and nothing there executes the downloaded app.
+
+`release:app` refuses a tree whose tracked files differ from `HEAD` and stamps the bundle with the
+commit and a digest of its contents (`scripts/release-stamp.sh`). `release:sign` refuses a bundle
+whose stamp does not match `HEAD` and its contents, such as one left by `install:dev`. Locally,
+`wails3 task darwin:release` runs both in your own shell.
 
 ## Dry run
 
