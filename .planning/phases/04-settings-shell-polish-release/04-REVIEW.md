@@ -1,323 +1,204 @@
 ---
 phase: 04-settings-shell-polish-release
-reviewed: 2026-10-20T16:20:48Z
+reviewed: 2026-10-20T16:51:29Z
 depth: standard
-iteration: 2
-files_reviewed: 29
+iteration: 3
+files_reviewed: 24
 files_reviewed_list:
   - .github/workflows/release.yml
   - build/darwin/Taskfile.yml
   - docs/releasing.md
   - frontend/bindings/gifsmith/internal/services/models.ts
-  - frontend/src/App.svelte
+  - frontend/bindings/gifsmith/internal/services/settingsservice.ts
+  - frontend/src/lib/api.ts
   - frontend/src/lib/errors.test.ts
   - frontend/src/lib/errors.ts
-  - frontend/src/lib/hotkeys.test.ts
-  - frontend/src/lib/hotkeys.ts
-  - frontend/src/settings/AboutPane.svelte
   - frontend/src/settings/DownloadsPane.svelte
   - frontend/src/settings/GeneralPane.svelte
   - frontend/src/settings/HotkeyRecorder.svelte
   - frontend/src/settings/HotkeysPane.svelte
-  - frontend/src/settings/KeyRow.svelte
-  - frontend/src/settings/KeysPane.svelte
   - frontend/src/settings/SearchPane.svelte
-  - frontend/src/settings/SettingsApp.svelte
   - internal/services/errors.go
   - internal/services/hotkeys.go
   - internal/services/hotkeys_test.go
   - internal/services/settings.go
   - internal/services/settings_test.go
-  - internal/services/updates.go
-  - internal/services/updates_test.go
   - internal/settings/settings.go
   - internal/settings/settings_test.go
-  - internal/shell/shell.go
-  - scripts/uat/17-hotkeys.js
+  - scripts/release-stamp.sh
+  - scripts/smoke-browser-loop.sh
+  - scripts/uat/15-settings-unreadable.js
+  - scripts/uat/17-hotkeys-open-unbound.js
 findings:
   critical: 0
-  warning: 7
-  info: 28
-  total: 35
+  warning: 2
+  info: 30
+  total: 32
 status: issues_found
 ---
 
-# Phase 4: Code Review Report (iteration 2)
+# Phase 4: Code Review Report (iteration 3, final)
 
-**Reviewed:** 2026-10-20T16:20:48Z
-**Depth:** standard (re-review of the fix pass)
-**Files Reviewed:** 29
+**Reviewed:** 2026-10-20T16:51:29Z
+**Depth:** standard (re-review of fix pass 2)
+**Files Reviewed:** 24
 **Status:** issues_found
 
 ## Summary
 
-This re-review covers the 18 fix commits `6c0df9e..15c703a` (`git diff 00eac67..HEAD`). The iteration-1 report is kept in `04-REVIEW.iter1.md`.
+This re-review covers the 8 fix commits `7abb1b0..c97e49b` (`git diff e992c61..HEAD`). The iteration-2 report is kept in `04-REVIEW.iter2.md`.
 
 Checks run:
 - `go test -race -count=1 ./internal/services/ ./internal/settings/` passes.
-- `node --test src/lib/*.test.ts` passes 102 of 102.
-- One probe test was compiled in with `go test -overlay`; no file in the repo was changed. It confirms WR-05: Settings reports a hotkey as saved, but `settings.json` does not keep it.
+- `node --test src/lib/*.test.ts` passes 103 of 103.
+- `go test -run 'TestRealDMG|TestReleaseJSON' ./internal/update` compiles and runs against the committed `go.sum`, so the sign job's `go test` steps do not need the build job's `go mod tidy`.
+- `shellcheck scripts/release-stamp.sh` is clean. `actionlint` is not installed here, so I checked `needs`, `outputs`, `environment` and job-level `env` by hand. They are correct.
+- `gh api` (read only) confirms the repository settings that WR-02 depends on:
+  - Ruleset 25489108 is `active` on `refs/tags/v*` with `creation`, `update` and `deletion` rules. Only RepositoryRole 5 (admin) can bypass it.
+  - The `release` environment has `scottkw` as a required reviewer, and its deployment policies are `main` (branch) and `v*` (tag).
+- `go mod tidy -diff` reports that `go.sum` is not tidy (WR-02 below).
+- macOS `tar` was tested on xattr-bearing files. `tar -tf` merges the AppleDouble `._*` entries, so the unpack filter does not wrongly refuse a bundle that carries xattrs.
 
-Of the 17 iteration-1 warnings:
-- 12 are resolved.
-- 4 are partially resolved: WR-B03, WR-B04, WR-B05 and WR-F10.
-- WR-B02 is resolved, but its fix introduced two new defects (WR-05, WR-06).
-
-The fix pass introduced no critical issues. It left 7 warnings, listed below. Three of them were introduced by the fixes (WR-04 is an existing defect the fixes made easy to hit). The other four are what remains of the partially resolved items.
+All seven iteration-2 warnings are resolved. Fix pass 2 introduced no critical issues and two new warnings:
+- **WR-01:** the build job's token is now read-only, so the "already has a release" gate can no longer see the draft releases CI creates.
+- **WR-02:** the new clean-tree precondition in `release:app` is broken by the build's own `go mod tidy`.
 
 What I checked in the areas you asked about:
-- **`SettingsService.changed()` and `emitMu`: no deadlock.**
-  - Wails' `EventManager.Emit` runs the hooks, starts the Go listeners on their own goroutine, then adds the event to a FIFO mailbox (`internal/mailbox`) and returns at once. Holding `emitMu` across `Emit` never waits on a webview or the main thread.
-  - Inside `changed()`, locks are taken in one order: `emitMu`, then `Store.mu` and `Hotkeys.mu`, each released quickly. No path takes them in the reverse order.
-  - Only bound methods call `changed()`, and they run on goroutines, never on the main thread. No Go code listens for `settings:changed`.
-  - `SetHotkey` keeps holding `hkMu` while `OnOpenHotkey` waits on the main thread (`InvokeSync` / `Menu.Update`). This is safe because the main thread never takes `hkMu`.
-  - Events therefore leave in write order, and the last one matches the store.
-- **Tray accelerator.** `SetOpenAccelerator("")` sets `accelerator = nil` and then calls `Menu.Update()`. That rebuilds every item on the main thread into the same `nsMenu` the tray has cached. Hidden items (the update item) and labels are kept. This is correct, but not verified natively.
-- **release.yml keychain lifecycle.** Secrets reach only the keychain step's `env`.
-  - On success, the sign step deletes the keychain.
-  - On any failure or cancellation, the `always()` cleanup deletes it. `RELEASE_KEYCHAIN` is only set once the keychain step has started, so a failed build never runs a delete on a path that does not exist.
-  - The weakness is isolation inside the runner, not keychain lifetime (WR-01).
-- **Settings `ErrUnreadable`.** The user's file is now never overwritten, which was the data-loss part of WR-B03. However, the user can stay stuck with an error that cannot be fixed by retrying and says nothing about the cause (WR-03). It also makes WR-04 deterministic.
+- **Two-job `release.yml`.**
+  - *Permissions.* `build` has `contents: read`, no `environment` and no secrets. `sign` has `contents: write` and `environment: release`, so the reviewer gate applies to `sign` only.
+  - *What runs on the sign runner.* Checkout of the same commit, `setup-go` with `cache: false`, the pinned and checksum-verified `wails3`, the artifact download, and then `release:sign`. `release:sign` runs `ditto`, `codesign`, `notarize.sh`, `tiffutil`, `wails3 tool package` (`cp -R` plus `hdiutil`) and `verify-release.sh`. None of these runs pnpm, Vite, `go mod tidy` or `go build`, and none executes the bundle.
+  - *Keychain lifetime.* The keychain is deleted at the end of the sign step, before `go test` compiles anything. On every failure, cancellation or timeout, the `always()` cleanup deletes it.
+  - *Write token.* `GH_TOKEN` is only in the draft step's `env`. TestReleaseJSON runs in a separate step.
+  - *Unpack.* The `grep -vE` filter allows only `gifsmith.app`, `gifsmith.app/...` and `gifsmith.app.release`. bsdtar's defaults refuse `..` and writes through symlinks, and strip a leading `/`; the filter would already reject a leading `/`. If `tar -t` fails, `pipefail` keeps the `if` false and the following `tar -x` fails, so the step fails closed.
+  - *Artifact integrity.* The artifact is still only as trustworthy as the build job, as `docs/releasing.md` and `release-stamp.sh` now say. Within the run, nothing else can replace it.
+- **`scripts/release-stamp.sh`.**
+  - The stamp is deterministic: `LC_ALL=C sort -z` over paths relative to the bundle's parent folder, so the build and sign runners compute the same digest.
+  - It fails closed. A `shasum` error inside `$(digest)` makes the assignment fail under `set -e`/`pipefail`, and a missing or different stamp refuses.
+  - It works on a shallow checkout, because it only needs `git rev-parse HEAD`.
+- **Clean-tree check.**
+  - It does not break the CI build job. A fresh checkout is clean, and `release:app` has no `deps:`, so its precondition runs before `package` installs anything.
+  - It does not affect dev builds (`package`, `install:dev`, `dev`). However, those builds and `release:app` itself dirty `go.sum`, which then blocks the next local release (WR-02).
+- **`prefs_unreadable` reset.**
+  - Data safety: `Store.Reset` holds `Store.mu` for the whole check, link and remove, so it cannot interleave with `Update`.
+  - `os.Link` never replaces an existing `.bak`. If `Remove` fails, both names remain and the store stays unreadable. Read errors other than parse errors fail closed: a directory cannot be hard-linked, and an unreadable folder refuses the link. No path loses the user's bytes.
+  - A double-clicked Reset is idempotent (`!s.unreadable` returns early).
+  - A failed reset surfaces as `prefs_reset_failed` in the banner.
+- **`SetLaunchAtLogin` rollback.** Correct for the case it targets (WR-04 resolved). See IN-09 for two edges.
+- **`SetHotkey` in-transaction check.**
+  - Lock order is unchanged: `hkMu`, then `Hotkeys.mu` (released), then `Store.mu` (released), then `emitMu`, which takes `Store.mu` and `Hotkeys.mu` in turn.
+  - The closure passed to `Store.Update` takes no other lock.
+  - The comparison is sound: `Hotkeys.Canonical` and the store's `Normalize` both use `settings.CanonicalHotkey`.
+  - No deadlock.
+- **New UATs.**
+  - `15-settings-unreadable.js` cannot pass vacuously. The theme is applied only from `settings:changed` (`settings/main.ts:10`), so `dataset.theme === 'dark'` proves that a save went through. The harness also requires exactly one `.bak` holding the seeded bytes.
+  - `17-hotkeys-open-unbound.js` proves the WR-06 fix (the button is enabled). Its "a refused retry shows H4b" half passes even if the click does nothing (IN-11).
 
-## Iteration-1 Warning Status
+## Iteration-2 Warning Status
 
 | ID | Status | Notes |
 |----|--------|-------|
-| WR-B01 | Resolved | `Revert` restores what is registered when the Store write fails (`settings.go:575-579`). A double failure, where re-registering the old combo is also refused, still leaves registered and stored different (IN-03). |
-| WR-B02 | Resolved, with regressions | `Start` binds only combos that registered, and `hotkeysFailed` reaches the pane. Because a refused combo is no longer in `bound`, the duplicate check now lets another slot take it, and the store silently drops that binding (WR-05). An unbound Open also disables Reset to Default (WR-06). |
-| WR-B03 | Partially resolved | The file is never overwritten, and the store recovers once the file is fixed. But writes fail forever with the generic "Couldn't save this setting" and nothing names the cause (WR-03). `SetLaunchAtLogin` now reliably changes the login item and then reports failure (WR-04). |
-| WR-B04 | Partially resolved | The build runs before the keychain exists, but in the same job on the same runner. Code from the build step can still act while the identity is unlocked (WR-01). |
-| WR-B05 | Partially resolved | The gate now runs for both events. It is defined in the workflow file of the ref being run, so a ref that carries its own `release.yml` skips it. The environment policy allows any `v*` tag (WR-02). |
-| WR-B06 | Resolved | `runAutoUpdates` takes an injected `after`. The tests use a channel handshake with exact counts and wait sequences. The remaining sleeps are `slowProvider`'s 50 ms (it only makes overlap observable) and `waitClips`' 3 s polling deadline, and neither can cause a false failure. |
-| WR-B07 | Resolved | There is a distinct `hotkey_register_failed_lost` kind. The old combo is recorded as failed. For Open, the tray is cleared with `OnOpenHotkey("")`, and `settings:changed` is emitted. |
-| WR-F01 | Resolved (needs native check) | `SettingsApp` re-reads `snapshot()` on `settings:show`, and the panes use writable `$derived`. The re-read is a call result, so it can race `settings:changed` (IN-01). |
-| WR-F02 | Resolved (needs native check) | The poll is gated on `document.hidden` at mount and on `settings:show` / `settings:hide`. An `alive` guard and `try/catch` were added. It still runs during ⌘H, and WKWebView's `document.hidden` for a window created hidden is unverified (IN-06). |
-| WR-F03 | Resolved | Every listed call is caught. Failures of `choices()` and `suspendHotkeys()` now show a message. |
-| WR-F04 | Resolved | `statuses` is `null` until the first read. A card shows no state and no key buttons until then. A failed read shows an alert. |
-| WR-F05 | Resolved | `cancel()` clears the message on Esc, Tab and blur. The H2-H4 paths still keep theirs. The UAT covers it. |
-| WR-F06 | Resolved | Tab with no ⌘, ⌃ or ⌥ (so Tab or Shift+Tab) cancels without `preventDefault`. The UAT asserts the cancel and that focus moved. |
-| WR-F07 | Resolved | A hidden span, referenced first in `aria-describedby`, gives the spoken combo or the recording state. `aria-pressed` was added. |
-| WR-F08 | Resolved | When `total` is 0 the bar has no value, so it is indeterminate. |
-| WR-F09 | Resolved | The error is cleared on a `checking` or `downloading` event. A small ordering race remains (IN-07). |
-| WR-F10 | Partially resolved | The Go ordering (`changed()`) is sound. General, Search and Downloads no longer apply their call's result. The Hotkeys pane still does, in two places (WR-07). |
+| WR-01 | Resolved | `build` and `sign` are separate jobs on separate runners. The sign runner never installs dependencies or builds, and its Go cache is off. The keychain exists only between the keychain step and the end of the sign step. The split introduced WR-01 below. |
+| WR-02 | Resolved | `docs/releasing.md` now says the in-workflow gate guards against mistakes, not attacks. The tag ruleset and the required reviewer are applied; I confirmed both with `gh api`. |
+| WR-03 | Resolved | `prefs_unreadable` is a distinct kind at all five `Store.Update` sites. `Snapshot.settingsUnreadable` drives a General banner with a confirmed Reset Settings… that keeps the file as `settings.json.<time>.bak`. The panel's tab switch still fails silently (IN-12). |
+| WR-04 | Resolved | A failed write undoes the `Enable`/`Disable` unless the item was already in the requested state. The test uses a real write failure. Two edges remain (IN-09). |
+| WR-05 | Resolved | `Bind` counts another slot's `failed` combo as taken. The Store transaction refuses a combo that another slot stores, with Open's `""` counted as the default, and reverts the registration. Both tests fail without the fix. |
+| WR-06 | Resolved | `disabled={!!hk.open && canonical(hk.open) === DEFAULT_OPEN}` keeps Reset to Default available while Open is unbound. |
+| WR-07 | Resolved | `hk` is a read-only `$derived(initial.hotkeys)`. `saved`/`onsaved` are gone, and neither `change()` nor the recorder applies a call result. |
+
+Iteration-2 info items closed by this pass: **IN-02** (the write-failure tests now use `readOnlyDir`) and **IN-08** (`release:sign` checks the stamp against `HEAD` and the bundle).
 
 ## Warnings
 
-### WR-01: The signing step still runs on a runner the build step's code could tamper with (WR-B04 residual)
+### WR-01: The "already has a release" gate can no longer see a draft release, so a re-run signs, notarizes and creates a second draft (introduced by the job split)
 
-**File:** `.github/workflows/release.yml:81-134`, `build/darwin/Taskfile.yml:259-276`, `docs/releasing.md:33-37`
-**Issue:** "Build (no credentials)" and "Sign, notarize, verify" are steps in the same job, so they share the runner, the user account, `$HOME` and the workspace. Third-party code from `pnpm install`, Vite plugins and `go mod tidy` runs in the build step and can still reach the identity:
-- **Background processes.** On GitHub-hosted runners, a process started in one step keeps running until the job ends; orphans are only cleaned up then. A process the build step starts can wait until `security find-identity` succeeds, then call `/usr/bin/codesign --sign "Developer ID Application: …"` or `notarytool --keychain-profile gifsmith-notary`.
-- **Files the sign step runs.** The build step can rewrite files that the sign step runs while the keychain is unlocked: `build/darwin/Taskfile.yml`, `build/Taskfile.yml`, `scripts/notarize.sh`, `scripts/verify-release.sh`, `~/go/bin/wails3`, and the node and corepack shims on `PATH`.
+**File:** `.github/workflows/release.yml:27-30, 47-63, 201-209`; `docs/releasing.md` ("The `build` job refuses ... or already has a release")
+**Issue:** The gate now runs in `build`, whose token is `contents: read`. Before the split it ran in the single job with `contents: write`. GitHub returns draft releases only to callers with push access:
+- `GET /releases/tags/{tag}` never returns a draft.
+- When that fails, `gh release view` falls back to listing releases and matching the tag. With a read-only token, that list contains no drafts.
 
-The comments at `release.yml:81-82` and `Taskfile.yml:259-260` say their code "never runs while the Developer ID identity is unlocked". `docs/releasing.md` makes the same claim. None of these hold on a shared runner.
-**Fix:** Split the work into two jobs so the signing runner never runs build-time code:
+The only releases CI ever creates are drafts. So whenever a release already exists for the tag, `gh release view "$TAG"` now fails, and the gate passes. Two common ways to hit this:
+1. **"Re-run failed jobs"** after the draft step succeeded but "Updater accepts the draft release" failed. Only `sign` re-runs (the gate is in `build`, which already succeeded). It approves, signs, notarizes and calls `gh release create "$TAG" --draft` again.
+2. **"Re-run all jobs"**, or `gh run rerun`, of a tag run that already made its draft. The gate runs again but cannot see the draft.
+
+GitHub accepts several drafts for one tag. The run then:
+- leaves two drafts, the older being the one whose verification failed;
+- burns a notarization round;
+- breaks the documented promise that the build job "refuses, before any credential is touched, when [the tag] already has a release".
+
+The maintainer can then publish the wrong draft from the Releases page.
+**Fix:** Run the existing-release check where the token can see drafts, before any credential is touched: the first step of `sign`, before "Signing keychain and notary profile". Keep the published-release check in `build` if you like.
 ```yaml
-jobs:
-  build:            # no environment, no secrets, contents: read
+  sign:
     steps:
-      - checkout, setup-go/node, pnpm, wails3
-      - run: wails3 task darwin:release:app
-      - uses: actions/upload-artifact@<sha>
-        with: { name: app, path: bin/gifsmith.app }
-  release:
-    needs: build
-    environment: release
-    steps:
-      - checkout (fresh), gate, install pinned wails3 only (no pnpm install / go mod)
-      - uses: actions/download-artifact@<sha>
-        with: { name: app, path: bin/gifsmith.app }
-      - keychain step, then wails3 task darwin:release:sign, delete keychain
+      - name: No existing release (drafts included)
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}   # contents: write sees drafts
+        run: |
+          n=$(gh api "repos/$REPO/releases" --paginate --jq "[.[] | select(.tag_name == env.TAG)] | length" | paste -sd+ - | bc)
+          [ "$n" -eq 0 ] || { echo "::error::a release (or draft) for $TAG already exists; delete it before re-running"; exit 1; }
 ```
-`codesign`, `notarytool`, `spctl` and `hdiutil` never run the bundle, so treating the downloaded `.app` as untrusted is enough. Until the split is done, correct the comments and docs.
+Do not use `gh release view` for this check: it stops at the first match, so it cannot report a count.
 
-### WR-02: The main-ancestry gate is defined by the ref it gates, so it does not protect the signing secrets (WR-B05 residual)
+### WR-02: `release:app` refuses its own second run, because its build runs `go mod tidy` and the committed `go.sum` is not tidy (introduced by the clean-tree precondition)
 
-**File:** `.github/workflows/release.yml:46-47`, `docs/releasing.md:31-32, 41-42, 50-51`
-**Issue:** Both `push` and `workflow_dispatch` run the `release.yml` from the triggering ref. A tag or branch whose own `release.yml` drops the `git merge-base` line passes the gate.
-
-The only real control is the `release` environment's deployment policy, which the docs describe as "main and `v*` tags". Anyone who can push a `v*` tag, on any commit, gets the Developer ID and notary secrets. This is the exact scenario in WR-B05 (`gh workflow run release.yml --ref v9.9.9`): a tag pushed with a modified workflow skips the new gate too.
-
-`docs/releasing.md` now promises that a dry run "refuses before touching any credential when the ref is not on `main`". That is true only when the ref's workflow file has not been edited.
-**Fix:** Enforce the policy outside the workflow file:
-- Add a tag ruleset so only the maintainer can create `v*` tags.
-- Make "Required reviewers" mandatory on the `release` environment (step 6 currently says "if").
-- Optionally, limit the environment's deployment refs to `main` plus protected tags.
-
-Then state in `docs/releasing.md` that the in-workflow gate guards against mistakes, not attacks.
-
-### WR-03: An unreadable settings.json blocks every settings change, and the error never says why (WR-B03 residual)
-
-**File:** `internal/settings/settings.go:418-423`, `internal/services/settings.go:445-447, 481-484, 507-509, 571-576, 647-649`, `internal/services/errors.go:71`
-**Issue:** `Store.Update` returns `ErrUnreadable` for as long as the file cannot be parsed. Every caller maps that to `errPrefsWriteFailed`, which the UI shows as "Couldn't save this setting. Try again." The consequences:
-- Trying again can never work.
-- The Snapshot has no flag for this state, so Settings cannot show a banner.
-- Nothing names the file or the cause.
-- The panel's `SetLastProvider` fails silently on every tab switch.
-
-The trigger is the same one WR-B03 described: a single wrong-typed hand edit such as `"pageSize": "36"`. The user's only way out is to find and edit `~/Library/Application Support/…/settings.json`, and nothing in the app tells them to. Data is safe now, but the app is stuck on defaults with no in-app explanation or recovery. That breaks the project rule that a hard failure must stay informative.
-**Fix:**
-- Give it its own error kind, and expose the state:
-  ```go
-  case errors.Is(err, settings.ErrUnreadable):
-      return s.snapshotOf(p), errPrefsUnreadable // kind "prefs_unreadable"
-  ```
-- Add `SettingsUnreadable bool` to `Snapshot`, set from a `Store.Unreadable()` accessor.
-- Show a persistent banner in Settings, for example: "Gifsmith couldn't read its settings file, so changes aren't saved. Reset Settings…". The button calls a bound `ResetSettings()` that renames the file to `settings.json.corrupt-<timestamp>`, clears the flag, and emits `settings:changed`.
-
-### WR-04: Open at login changes the login item, then reports that it failed (now on every attempt while settings.json is unreadable)
-
-**File:** `internal/services/settings.go:500-511`, `frontend/src/settings/GeneralPane.svelte:123-135`
-**Issue:** `SetLaunchAtLogin` calls `Autostart.Enable()` or `Disable()` first and writes the Store afterwards. If the write fails, it returns `errPrefsWriteFailed`, and the pane does two things:
-- reverts the checkbox to `initial.launchAtLogin`;
-- shows "Couldn't change Open at login. Try again."
-
-But the login item has already changed. Before this phase the write rarely failed (disk full). With WR-B03's `ErrUnreadable` it fails on every attempt for as long as the file is unreadable. The user is told it failed and sees the old state, while macOS now has the new state.
-
-The next re-read on show reports the OS state (`snapshotOf` reads `IsEnabled`), so the checkbox then flips on its own. At the next launch, `ApplyStartup` reads the default `LaunchAtLogin=false` and leaves the item enabled.
-**Fix:** Undo the OS change when the store write fails, or write the store first:
-```go
-p, err := s.Store.Update(...)
-if err != nil {
-    undo := s.Autostart.Disable
-    if !on { undo = s.Autostart.Enable }
-    if uerr := undo(); uerr != nil { log.Printf("autostart: rollback failed") }
-    return s.snapshotOf(p), errPrefsWriteFailed
-}
+**File:** `build/darwin/Taskfile.yml:263-266`, `build/darwin/Taskfile.yml:39-40` (`build:native` deps `common:go:mod:tidy`), `go.sum`
+**Issue:** The new precondition `git diff --quiet HEAD --` refuses any tracked change. `go mod tidy -diff` on the committed tree reports two missing `go.sum` lines:
 ```
-
-### WR-05: A combo refused at launch can be bound to another slot, and the store then silently drops that binding (introduced by the WR-B02 fix)
-
-**File:** `internal/services/hotkeys.go:140-144`, `internal/services/settings.go:560-571`, `internal/settings/settings.go:341-366`
-**Issue:** `Bind`'s duplicate check compares only against `h.bound`. Since WR-B02, a stored combo that macOS refused at launch is kept in `h.failed`, not in `h.bound`, so another slot can take it. Then:
-1. `Bind` registers the combo for the new slot.
-2. `Store.Update` runs `Normalize()`, which resets the later slot as a duplicate of the stored one. Open's default counts as taken even when it is stored as `""`.
-3. The write succeeds, so `SetHotkey` returns success and emits a `settings:changed` that shows the new binding.
-
-The live registration and `settings.json` now disagree, which is the WR-B01 invariant again. The binding the user just saved disappears at the next launch, with no message.
-
-Verified with an overlay test: default Open refused at launch, then `SetHotkey("favorites", "Cmd+Ctrl+Option+G")` gives
++github.com/stretchr/objx v0.5.2 h1:...
++github.com/stretchr/objx v0.5.2/go.mod h1:...
 ```
-err=<nil> snap.Hotkeys={Open: Favorites:Cmd+Ctrl+Option+G}
-bound={Open: Favorites:Cmd+Ctrl+Option+G} stored={Open: Favorites: Recents:}
-```
-**Fix:** Treat a stored but unbound combo as taken. Also refuse inside the Store transaction when `Normalize` would reset a slot, and revert:
-```go
-// Bind: duplicate check
-for _, other := range hotkeySlots {
-    if other == slot { continue }
-    if *slotOf(&h.bound, other) == c || *slotOf(&h.failed, other) == c {
-        return &SettingsError{Kind: "hotkey_duplicate", Slot: other}
-    }
-}
-// SetHotkey's Update func, after setting the slot (the store's other fields are already normalized)
-if n := *p; len(n.Normalize()) > 0 {
-    return &SettingsError{Kind: "hotkey_duplicate"} // then SetHotkey reverts with s.Hotkeys.Revert
-}
-```
-For Open stored as `""` that failed at launch, `failed.Open` already holds the canonical default, so the first check covers it.
+Every native build runs `go mod tidy` and adds them: `package`, `install:dev`, and `release:app` itself. The fix report says `go.sum` "was restored after each wails3 run", which hid this. So for the maintainer:
+- After any `install:dev`, `wails3 task darwin:release` and `release:build` refuse with "Tracked files differ from HEAD".
+- After one `wails3 task darwin:release` (for example, one that stops on the notarization 403 that is currently blocking), re-running it refuses for the same reason.
 
-### WR-06: "Reset to Default" is disabled exactly when Open is unbound (introduced by the WR-B02 / WR-B07 fixes)
-
-**File:** `frontend/src/settings/HotkeysPane.svelte:109-114`
-**Issue:** `disabled={canonical(hk.open || DEFAULT_OPEN) === DEFAULT_OPEN}` was written when the Snapshot guaranteed "Open always set". Now `hotkeys.open` is `""` whenever Open is not registered, in two cases:
-- its combo was refused at launch (H4b);
-- a restore failed (`hotkey_register_failed_lost`, whose text says "Choose another one").
-
-In both cases `"" || DEFAULT_OPEN` equals the default, so the button is disabled. The obvious way to recover is blocked, and so is a retry of the default after a transient refusal. The user has no global hotkey and must know to record ⌃⌥⌘G by hand.
-**Fix:**
-```svelte
-disabled={!!hk.open && canonical(hk.open) === DEFAULT_OPEN}
-```
-An unbound Open should always offer Reset. Go's `Bind` re-registers the default even when it is the stored value, through the `errUnchanged && b != was` path.
-
-### WR-07: The Hotkeys pane still applies its call's snapshot, so a late response can overwrite a newer `settings:changed` (WR-F10 residual)
-
-**File:** `frontend/src/settings/HotkeysPane.svelte:34-36, 49`, `frontend/src/settings/HotkeyRecorder.svelte:59, 105`
-**Issue:** `change()` calls `saved(await setHotkey(...))`, and the recorder calls `onsaved(await setHotkey(...))`. Both assign `hk = {...s.hotkeys}` from the RPC result.
-
-WR-F10's fix made `settings:changed` the only source of displayed values in General, Search and Downloads, because call responses are not ordered against events. The Hotkeys pane was missed. Example:
-1. Clear Favorites, then quickly clear Recents.
-2. Go serializes them and emits E1 (Favorites cleared), then E2 (both cleared).
-3. Response 1 can arrive after E2. It sets `hk` back to the E1 state.
-4. The Recents row now shows a shortcut that is no longer registered, and Test is enabled for it, until the next snapshot.
-**Fix:** Drop `saved` and `onsaved`, and rely on `SettingsApp`'s snapshot. On success, every `SetHotkey` that changes registration emits `settings:changed`, including the `errUnchanged && b != was` path. On error, nothing changed, so there is nothing to revert.
-```svelte
-// HotkeysPane: await setHotkey(slot, accel);   (no saved(...))
-// HotkeyRecorder: await setHotkey(slot, accel); onfail('', '', '');
-```
+CI is not affected, because each job starts from a fresh checkout and the precondition runs before tidy. The local release path, which is how v1.0.0 shipped, breaks every time after the first build.
+**Fix:** Commit the tidied `go.sum` (`go mod tidy`, then commit), so tidy is a no-op and the tree stays clean after a build. To stop it drifting again, add `go mod tidy -diff` to `ci.yml`, which fails when `go.mod`/`go.sum` are not tidy.
 
 ## Info
 
-### Carried forward from iteration 1 (unchanged; see `04-REVIEW.iter1.md`)
+### Carried forward (unchanged; see `04-REVIEW.iter1.md` and `04-REVIEW.iter2.md`)
 
-These 20 items are counted in `info`:
-- IN-B01 to IN-B09
-- IN-F01 to IN-F11
+These 26 items are counted in `info`. Fix pass 2 did not change them:
+- IN-B01 to IN-B09 and IN-F01 to IN-F11 (iteration 1)
+- IN-01, IN-03, IN-04, IN-05, IN-06 and IN-07 (iteration 2)
 
-The fix pass did not target any of them. IN-F05 (`hasModifier` used only by tests) still applies, and the new `spoken` export is used in production.
+IN-04 now has a second trigger: `ResetSettings` on a file that was fixed by hand loads that file without re-applying its theme, hotkeys or login item. The fix report acknowledges this.
 
-### New in iteration 2
+### New in iteration 3
 
-### IN-01: The show re-read is a call result, so it can overwrite a newer `settings:changed`
+### IN-09: The login-item rollback undoes when the prior state is unknown, and it toggles the real login item while `settings.json` is unreadable
 
-**File:** `frontend/src/settings/SettingsApp.svelte:34-40`
-**Issue:** `snap = await snapshot()` is applied whenever it resolves. If a write from the panel webview lands between Go serving the snapshot and the webview applying it, the newer event is overwritten with the older snapshot. It stays that way until the next change or show. The window is narrow, because a Settings open is rarely accompanied by a write.
-**Fix:** Count `settings:changed` events. Drop the re-read result if an event arrived after the re-read started.
-
-### IN-02: The "write failure" tests now exercise `ErrUnreadable`, not a failed write
-
-**File:** `internal/services/settings_test.go:513-528`, `internal/services/hotkeys_test.go:366-381`
-**Issue:** `OpenStore(file)`, where `file` is a regular file, now fails the read with ENOTDIR. Since WR-B03 that marks the store unreadable. `TestSetPrefWriteFailure` and `TestSetHotkeyWriteFailureRollsBack` therefore pass through the `ErrUnreadable` early return. The `WriteJSONAtomic` failure branch in the services is no longer covered.
-**Fix:** Open a valid store, then `chmod 0500` its directory (restore it in `t.Cleanup`) so that only the write fails. Keep one test per path.
-
-### IN-03: A failed rollback leaves registered and stored different, with no event or tray update
-
-**File:** `internal/services/settings.go:575-579`, `internal/services/hotkeys.go:157-162`
-**Issue:** If `Revert` cannot re-register the old combo, it keeps or clears the new one, and the result is only logged:
-- If it keeps the new combo, that combo stays live while `settings.json` holds the old one.
-- If it clears it, `failed` is not updated, and the tray and webviews are not told.
-
-This needs a write failure and a Carbon refusal at the same time, so it is rare.
-**Fix:** If `Revert` returns an error, record `failed`, call `OnOpenHotkey(Bindings().Open)` for Open, and return `s.changed()` with the error.
-
-### IN-04: A store that recovers mid-session swaps in the file's prefs without applying them
-
-**File:** `internal/settings/settings.go:421`
-**Issue:** When `load()` succeeds inside `Update`, `s.p` becomes the file's contents. The theme, hotkeys and login item that were applied from defaults at launch are not re-applied. Only the field being written takes effect, until relaunch.
-**Fix:** Log that a relaunch is needed, or have the service re-apply its live state when the store reports that it recovered.
-
-### IN-05: The H4b message is computed once at mount and lost when a recording starts
-
-**File:** `frontend/src/settings/HotkeysPane.svelte:23-29`, `frontend/src/settings/HotkeyRecorder.svelte:32`
+**File:** `internal/services/settings.go:511-540`
 **Issue:**
-- `hotkeysFailed` is read only from the mount-time `initial`. Later snapshots never add or clear the message.
-- `start()` calls `onfail('')`, so clicking the field and pressing Esc removes H4b, although the slot is still unbound.
-**Fix:** Derive the per-slot H4b text from the current snapshot's `hotkeysFailed`. Show it whenever no other message is set.
+- When `IsEnabled()` errors, `wasErr != nil` triggers `undo()`. If the item was already in the requested state, this flips it. For example, with `on=true` on an already-enabled item, the rollback disables a login item the user had on.
+- While the store is unreadable, every toggle runs a real `SMAppService` register followed by an unregister, even though the write can never succeed. On macOS 13+ the register can post a "Login Item Added" notification for a change that is reported as failed.
 
-### IN-06: The Accessibility poll relies on `document.hidden` at mount and misses ⌘H
+**Fix:** Return `writeFailed(...)` before `apply()` when `s.Store.Unreadable()` is true. Skip the undo when `wasErr != nil`, and log instead.
 
-**File:** `frontend/src/settings/GeneralPane.svelte:62, 94-101`, `internal/shell/shell.go:263`
-**Issue:**
-- `visible = !document.hidden` is unverified for a WKWebView window created with `Hidden: true`. If it reads `false`, the launch-to-first-show poll that WR-F02 described still happens.
-- ⌘H (the App menu's Hide) hides Settings without `HideSettings`, so the poll keeps running while the app is hidden.
-**Fix:** Also listen for `visibilitychange`. Alternatively, start with `visible = false` and let `SettingsApp` pass down a `shown` flag that it tracks from `settings:show` and `settings:hide`.
+### IN-10: `Revert` does not restore `failed`, so a reverted Bind drops the slot's H4b state
 
-### IN-07: A fast-failing manual check can lose its error to the `checking` event
+**File:** `internal/services/hotkeys.go:127-163`, `internal/services/settings.go:617-627`
+**Issue:** A successful `Bind` clears `failed[slot]`, and `Revert` only calls `rebind`. Example: Open is refused at launch, so `failed.Open` is ⌃⌥⌘G. The user clicks Reset to Default while `settings.json` is unreadable. `Bind` registers the combo, `Update` returns `ErrUnreadable`, and `Revert("open", "")` unregisters it. `failed.Open` is now `""`, so `Snapshot.hotkeysFailed` no longer reports Open even though it is still unbound.
 
-**File:** `frontend/src/settings/GeneralPane.svelte:86-91, 148-155`
-**Issue:** `check()` sets `updError` when the RPC rejects. The `checking` event that Go emitted before the failure travels a separate channel, the event mailbox, and is not ordered against the RPC response. If it is delivered after the rejection, it clears the fresh error. The fix's own comment names this race for `available`.
-**Fix:** Clear `updError` on `checking` or `downloading` only when no manual call is in flight. Track that with an `inFlight` flag set by `check()` and `download()`.
+The Store check from WR-05 still prevents another slot from storing the combo, so this is a status display issue only.
+**Fix:** Have `Revert` take the `failed` value from before the `Bind`, and restore it together with `bound`.
 
-### IN-08: `release:sign` signs whatever `bin/gifsmith.app` exists
+### IN-11: The second half of `17-hotkeys-open-unbound.js` passes even if the retry never runs
 
-**File:** `build/darwin/Taskfile.yml:265-276`
-**Issue:** Run locally on its own, `release:sign` signs and notarizes any bundle found in `bin/`. That can be one left by `install:dev`, `package:universal`, or a build from an uncommitted tree. `verify-release.sh` checks the version, the architecture and `LSUIElement`, but not that the bundle came from `release:app` at the current commit.
-**Fix:** Have `release:app` write `bin/gifsmith.app.release-sha` containing `git rev-parse HEAD`. Add a `release:sign` precondition that the file matches HEAD and the tree is clean.
+**File:** `scripts/uat/17-hotkeys-open-unbound.js:22-25`
+**Issue:** The H4b text is already on screen from mount (`HotkeysPane.svelte:27-30`). After `reset.click()`, `getByText(...).waitFor()` can resolve before the click's `say(slot, '')` runs, and "Not set" is true either way. The script therefore does not show that clicking Reset sent `SetHotkey` or that the refusal was rendered again. The "enabled" assertion, which is the WR-06 fix, is real.
+**Fix:** After the click, wait for the message to detach and then reappear. Alternatively, wait for the `SetHotkey` request with `B.waitForRequest(r => r.url().includes('/wails/') && r.postData()?.includes('SetHotkey'))` (or by its method ID).
+
+### IN-12: The panel's `setLastProvider` rejection is unhandled on every tab switch while `settings.json` is unreadable
+
+**File:** `frontend/src/App.svelte:480`
+**Issue:** `setLastProvider(p)` is called without `await` or `.catch`. While the store is unreadable, each tab switch produces an unhandled promise rejection (`prefs_unreadable`). The panel has no banner, so the only place the cause appears is Settings › General. This is harmless to the user, but it adds console noise and would trip a `pageerror` listener in a panel UAT that runs on a seeded corrupt file.
+**Fix:** `setLastProvider(p).catch(() => {})`, with a comment explaining that Settings › General reports `prefs_unreadable`.
 
 ---
 
-_Reviewed: 2026-10-20T16:20:48Z_
+_Reviewed: 2026-10-20T16:51:29Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
-_Iteration: 2 (iteration 1 archived as 04-REVIEW.iter1.md)_
+_Iteration: 3 (iteration 2 archived as 04-REVIEW.iter2.md)_
