@@ -18,8 +18,8 @@ const B = await browser.newPage();
 B.on("pageerror", (e) => errors.push("B: " + String(e)));
 await B.setViewportSize({ width: 640, height: 520 });
 await B.goto("http://127.0.0.1:9245/settings.html");
-await B.getByRole("tab", { name: "Keys" }).click();
-await B.getByRole("heading", { name: "Keys" }).waitFor({ timeout: 10000 });
+await B.getByRole("tab", { name: "Keys", exact: true }).click();
+await B.getByRole("heading", { name: "Keys", exact: true }).waitFor({ timeout: 10000 });
 
 // The webview must never hold a key outside the field being typed in.
 const noKeyInPage = async (when) => {
