@@ -85,4 +85,13 @@ export interface Snapshot {
      * canonical; Open always set
      */
     "hotkeys": settings$0.Hotkeys;
+
+    /**
+     * The download folder: full path for display and title only, its name, whether it is the
+     * default Downloads folder, and whether it is missing now.
+     */
+    "downloadDir": string;
+    "downloadDirName": string;
+    "downloadDirDefault": boolean;
+    "downloadDirMissing": boolean;
 }

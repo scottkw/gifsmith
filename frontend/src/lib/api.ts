@@ -31,10 +31,15 @@ export const setPref = (name: string, value: string) => SettingsService.SetPref(
 export const choices = () => SettingsService.Choices();
 // Registers or removes the login item now; rejects with cause.kind autostart_failed | not_in_applications.
 export const setLaunchAtLogin = (on: boolean) => SettingsService.SetLaunchAtLogin(on);
+// Downloads: Go shows the native folder picker and validates the pick; no path crosses from the
+// webview. Rejects with cause.kind folder_missing | folder_fat | folder_network | folder_unwritable
+// (cause.folder names it) or picker_failed; a cancel resolves to the unchanged snapshot.
+export const chooseDownloadDir = () => SettingsService.ChooseDownloadDir();
+export const resetDownloadDir = () => SettingsService.ResetDownloadDir();
 // The Automatic paste grant, read without prompting.
 export const accessibilityStatus = () => SettingsService.AccessibilityStatus();
 // Go's services.SettingsError arrives as err.cause: { kind, slot? }.
-export const settingsError = (e: unknown): { kind: string; slot?: string } | null => providerError(e);
+export const settingsError = (e: unknown): { kind: string; slot?: string; folder?: string } | null => providerError(e);
 // Verifies with a real trending call, then stores in the Keychain; rejects with a provider cause.
 export const saveKey = (p: string, key: string) => SettingsService.SaveKey(p, key);
 // Keys pane: status carries the last 4 characters at most; Test is one uncached trending call;

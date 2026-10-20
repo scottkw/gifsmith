@@ -4,6 +4,7 @@
   import { Events } from '@wailsio/runtime';
   import { onMount, tick, untrack } from 'svelte';
   import type { SettingsSnapshot } from '../lib/api';
+  import DownloadsPane from './DownloadsPane.svelte';
   import GeneralPane from './GeneralPane.svelte';
   import HotkeysPane from './HotkeysPane.svelte';
   import KeysPane from './KeysPane.svelte';
@@ -17,6 +18,7 @@
     { id: 'keys', name: 'Keys', component: KeysPane },
     { id: 'hotkeys', name: 'Hotkeys', component: HotkeysPane },
     { id: 'search', name: 'Search', component: SearchPane },
+    { id: 'downloads', name: 'Downloads', component: DownloadsPane },
   ];
 
   let active = $state(0);

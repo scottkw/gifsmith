@@ -55,6 +55,8 @@ func wire() deps {
 		// Server builds have no global shortcuts; this records bindings and never fires.
 		// FAKE_HOTKEY_FAIL=<accelerator> makes that combo fail to register (UAT H4).
 		Registrar: &memRegistrar{bound: map[string]bool{}, fail: fakeHotkeyFail()},
+		// No native picker in server mode: Choose… "picks" FAKE_PICK_FOLDER (a bin/ path; "" = cancel).
+		PickFolder: func(string) (string, error) { return os.Getenv("FAKE_PICK_FOLDER"), nil },
 	}
 }
 

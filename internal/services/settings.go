@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"log"
+	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -306,8 +308,12 @@ func (s *SettingsService) snapshotOf(p settings.Prefs) Snapshot {
 		log.Printf("autostart: status failed")
 	}
 	prm := s.paramsOf(p)
+	dir, _ := filepath.Abs(cmp.Or(p.DownloadDir, s.DefaultDownloads))
+	fi, statErr := os.Stat(dir)
 	return Snapshot{Theme: p.Theme, LaunchAtLogin: on && err == nil, GiphyRating: prm.Rating, PageSize: prm.PageSize,
-		GiphyLang: p.GiphyLang, KlipyCountry: p.KlipyCountry, Hotkeys: s.Hotkeys.Bindings()}
+		GiphyLang: p.GiphyLang, KlipyCountry: p.KlipyCountry, Hotkeys: s.Hotkeys.Bindings(),
+		DownloadDir: dir, DownloadDirName: filepath.Base(dir), DownloadDirDefault: p.DownloadDir == "",
+		DownloadDirMissing: statErr != nil || !fi.IsDir()}
 }
 
 var errUnchanged = errors.New("unchanged")
@@ -522,14 +528,57 @@ func (s *SettingsService) TestHotkey(ctx context.Context, slot string) error {
 }
 
 // DownloadDir is where the next download goes: the chosen folder, else DefaultDownloads.
-func (s *SettingsService) DownloadDir() string { return "" }
+// Download calls it each time, so a change made during a download applies to the next one.
+func (s *SettingsService) DownloadDir() string {
+	return cmp.Or(s.Store.Get().DownloadDir, s.DefaultDownloads)
+}
 
-// ChooseDownloadDir shows the folder picker and saves the picked folder if Go accepts it.
+// ChooseDownloadDir shows the folder picker and saves the picked folder only if
+// ValidateDownloadDir accepts it; a cancel changes nothing. It takes no path from the webview.
 func (s *SettingsService) ChooseDownloadDir(ctx context.Context) (Snapshot, error) {
-	return s.Snapshot(ctx), nil
+	if s.PickFolder == nil {
+		return s.Snapshot(ctx), errPickerFailed
+	}
+	dir, err := s.PickFolder(s.DownloadDir())
+	if err != nil {
+		log.Printf("folder picker: %v", err)
+		return s.Snapshot(ctx), errPickerFailed
+	}
+	if dir == "" {
+		return s.Snapshot(ctx), nil
+	}
+	if dir, err = filepath.Abs(dir); err != nil {
+		return s.Snapshot(ctx), errPickerFailed
+	}
+	if err := ValidateDownloadDir(dir, Statfs); err != nil {
+		log.Printf("download folder refused: %v", err) // fixed text, no path
+		return s.Snapshot(ctx), err
+	}
+	def, _ := filepath.Abs(s.DefaultDownloads)
+	return s.setDownloadDir(defaultAsEmpty(dir, def))
 }
 
 // ResetDownloadDir goes back to the default Downloads folder.
 func (s *SettingsService) ResetDownloadDir(ctx context.Context) (Snapshot, error) {
-	return s.Snapshot(ctx), nil
+	return s.setDownloadDir("")
+}
+
+func (s *SettingsService) setDownloadDir(dir string) (Snapshot, error) {
+	p, err := s.Store.Update(func(p *settings.Prefs) error {
+		if p.DownloadDir == dir {
+			return errUnchanged
+		}
+		p.DownloadDir = dir
+		return nil
+	})
+	switch {
+	case errors.Is(err, errUnchanged):
+		return s.snapshotOf(p), nil
+	case err != nil:
+		log.Printf("settings write failed: downloadDir")
+		return s.snapshotOf(p), errPrefsWriteFailed
+	}
+	snap := s.snapshotOf(p)
+	s.emit("settings:changed", snap)
+	return snap, nil
 }

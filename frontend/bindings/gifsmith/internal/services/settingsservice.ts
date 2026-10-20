@@ -43,6 +43,22 @@ export function Choices(): $CancellablePromise<$models.Choices> {
 }
 
 /**
+ * ChooseDownloadDir shows the folder picker and saves the picked folder only if
+ * ValidateDownloadDir accepts it; a cancel changes nothing. It takes no path from the webview.
+ */
+export function ChooseDownloadDir(): $CancellablePromise<$models.Snapshot> {
+    return $Call.ByID(2841931217);
+}
+
+/**
+ * DownloadDir is where the next download goes: the chosen folder, else DefaultDownloads.
+ * Download calls it each time, so a change made during a download applies to the next one.
+ */
+export function DownloadDir(): $CancellablePromise<string> {
+    return $Call.ByID(2980781418);
+}
+
+/**
  * KeyStatus reports GIPHY then Klipy.
  */
 export function KeyStatus(): $CancellablePromise<$models.KeyStatus[] | null> {
@@ -70,6 +86,13 @@ export function Params(): $CancellablePromise<provider$0.Params> {
  */
 export function RemoveKey(p: string): $CancellablePromise<void> {
     return $Call.ByID(1430588538, p);
+}
+
+/**
+ * ResetDownloadDir goes back to the default Downloads folder.
+ */
+export function ResetDownloadDir(): $CancellablePromise<$models.Snapshot> {
+    return $Call.ByID(1540146509);
 }
 
 /**

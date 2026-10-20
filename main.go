@@ -41,11 +41,12 @@ type deps struct {
 	Secrets               settings.SecretStore
 	ConfigDir             string // settings.json and the library files live here
 	StagingDir            string
-	DownloadsDir          string                           // Download saves here; never created by the app
-	Allow                 func(provider.ID, *url.URL) bool // download allowlist for staging
-	Platform              platform.Platform                // native in the app; platform.Fake in the UAT build
-	Autostart             services.Autostarter             // nil in the app (app.Autostart); in-memory in the UAT build
-	Registrar             services.Registrar               // nil in the app (app.GlobalShortcut); a fake in the UAT build
+	DownloadsDir          string                             // Download saves here; never created by the app
+	Allow                 func(provider.ID, *url.URL) bool   // download allowlist for staging
+	Platform              platform.Platform                  // native in the app; platform.Fake in the UAT build
+	Autostart             services.Autostarter               // nil in the app (app.Autostart); in-memory in the UAT build
+	Registrar             services.Registrar                 // nil in the app (app.GlobalShortcut); a fake in the UAT build
+	PickFolder            func(start string) (string, error) // nil in the app (the native picker); FAKE_PICK_FOLDER in the UAT build
 }
 
 func main() {
@@ -54,7 +55,7 @@ func main() {
 	// Downloads get their own client: Fetch's 45 s deadline bounds them, and the
 	// API client's 15 s timeout would cut off a multi-MB original on a slow link.
 	stage := &staging.Store{Dir: d.StagingDir, HTTP: &http.Client{}, Allow: d.Allow}
-	actions := &services.ActionService{Platform: plat, Staging: stage, DownloadsDir: func() string { return d.DownloadsDir }}
+	actions := &services.ActionService{Platform: plat, Staging: stage}
 	// Favorites, Recents and recent searches live next to settings.json; metadata only (D-09).
 	lib := &library.Store{Dir: d.ConfigDir, Allow: d.Allow}
 	actions.Recents = lib
@@ -86,7 +87,8 @@ func main() {
 			return &klipy.Client{BaseURL: d.KlipyBase, Key: candidate, HTTP: d.HTTP, Params: params}
 		}
 		return &giphy.Client{BaseURL: d.GiphyBase, Key: candidate, HTTP: d.HTTP, Params: params}
-	}}
+	}, PickFolder: d.PickFolder, DefaultDownloads: d.DownloadsDir}
+	actions.DownloadsDir = settingsSvc.DownloadDir // read at call time: a new folder applies to the next download
 
 	var sh *shell.Shell // set below, before app.Run; a second launch arrives only after Run starts
 	// No ApplicationShouldTerminateAfterLastWindowClosed: the hidden panel counts as closed.
