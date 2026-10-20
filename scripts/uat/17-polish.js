@@ -65,5 +65,32 @@ const gap = await center.locator(".check").evaluate((el) => [getComputedStyle(el
 if (gap[0] !== "4px" || /^\s/.test(gap[1])) fail("toast icon gap " + JSON.stringify(gap));
 await saveScreenshot(await page.screenshot(), "gifsmith-17-polish-t5a.png");
 
+// Reduce Motion (D-12): only the selected tile has an animated <img>, the others a canvas still;
+// moving the selection moves the animation; turning it off animates every tile again, live.
+const kinds = () =>
+  page.evaluate(() => [...document.querySelectorAll("[role=option]")].map((t) => (t.querySelector("img") ? "img" : t.querySelector("canvas") ? "canvas" : "?")));
+const sel = () => page.evaluate(() => [...document.querySelectorAll("[role=option]")].findIndex((t) => t.getAttribute("aria-selected") === "true"));
+const onlySelectedAnimates = async () => {
+  const end = Date.now() + 3000;
+  let k, s;
+  while (Date.now() < end) {
+    [k, s] = [await kinds(), await sel()];
+    if (k.length > 1 && k.every((x, i) => x === (i === s ? "img" : "canvas"))) return;
+    await page.waitForTimeout(50);
+  }
+  fail(`reduced motion tiles ${JSON.stringify(k)}, selected ${s}`);
+};
+await page.emulateMedia({ reducedMotion: "reduce" });
+await onlySelectedAnimates();
+if ((await sel()) !== 0) fail("selection moved");
+await saveScreenshot(await page.screenshot(), "gifsmith-17-polish-reduced.png");
+await input.press("ArrowRight");
+await page.locator("#tile-1 img").waitFor({ timeout: 3000 });
+await onlySelectedAnimates();
+if ((await sel()) !== 1) fail("ArrowRight did not move the selection");
+await page.emulateMedia({ reducedMotion: "no-preference" });
+await page.waitForFunction(() => !document.querySelector("[role=option] canvas"), null, { timeout: 3000 });
+if ((await kinds()).some((x) => x !== "img")) fail("tiles still frozen without Reduce Motion");
+
 if (errors.length) fail("page errors: " + errors.join("; "));
 console.log("UAT OK");

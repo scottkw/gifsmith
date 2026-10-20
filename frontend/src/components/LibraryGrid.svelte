@@ -4,6 +4,7 @@
   import { createVirtualizer } from '@tanstack/svelte-virtual';
   import { untrack } from 'svelte';
   import { rows as toRows, type Section } from '../lib/library';
+  import { animates } from '../lib/motion';
   import Tile from './Tile.svelte';
 
   let {
@@ -12,6 +13,7 @@
     overlay,
     favorites,
     badges,
+    reduced = false,
     onselect,
     oncopy,
   }: {
@@ -20,6 +22,7 @@
     overlay: boolean;
     favorites: Set<string>; // provider:id keys
     badges: boolean; // favorite badges (not on the Favorites tab)
+    reduced?: boolean; // prefers-reduced-motion: only the selected tile animates
     onselect: (i: number) => void;
     oncopy: (i: number) => void;
   } = $props();
@@ -65,6 +68,7 @@
                 gif={g}
                 index={i}
                 selected={i === selected}
+                still={!animates(i, selected, reduced)}
                 {overlay}
                 provider={sections[row.section].label}
                 favorite={badges && favorites.has(`${g.provider}:${g.id}`)}

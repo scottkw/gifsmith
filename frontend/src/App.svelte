@@ -67,6 +67,9 @@
   const CROP_BUSY_MS = 300; // a square crop shows its busy state only if it is still running then (D-16)
   const LIBRARY_SKELETON_MS = 300; // a library read slower than this shows the S2 skeleton
   const FAVORITE_TOAST_MS = 2000;
+  // Reduce Motion follows macOS live (WebKit tracks it); no separate toggle (D-12).
+  const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+  let reducedMotion = $state(motionQuery.matches);
   const FAVORITES_MAX = 1000; // library.FavoritesMax
   const UNDO_TOAST_MS = 5000;
   const AX_FAILED = "Couldn't ask macOS for Accessibility access. Try again.";
@@ -254,6 +257,7 @@
 
   onMount(async () => {
     input.focus();
+    motionQuery.addEventListener('change', (e) => (reducedMotion = e.matches));
     Events.On('panel:show', () => {
       clearTimeout(hideTimer); // a copy just before this show must not hide the panel again (02 IN-07)
       menuOpen = detailsOpen = false; // never reopen on their own
@@ -1002,6 +1006,7 @@
               {overlay}
               favorites={favKeys}
               badges={libTab !== 'favorites'}
+              reduced={reducedMotion}
               onselect={select}
               oncopy={(i) => {
                 select(i);
@@ -1066,6 +1071,7 @@
             {selected}
             {overlay}
             favorites={favKeys}
+            reduced={reducedMotion}
             paging={cur.paging}
             pagingNote={pageView?.note}
             pagingRetry={pageView?.state?.tryAgain ?? true}

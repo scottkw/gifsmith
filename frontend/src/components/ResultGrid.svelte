@@ -2,6 +2,7 @@
   import { createVirtualizer } from '@tanstack/svelte-virtual';
   import { untrack } from 'svelte';
   import type { Gif } from '../lib/api';
+  import { animates } from '../lib/motion';
   import Tile from './Tile.svelte';
 
   type Paging = 'idle' | 'loading' | 'end' | 'error';
@@ -13,6 +14,7 @@
     paging,
     pagingNote = "Couldn't load more.",
     pagingRetry = true,
+    reduced = false,
     onselect,
     oncopy,
     onneedmore,
@@ -25,6 +27,7 @@
     paging: Paging;
     pagingNote?: string; // E6, or E2 while a 429 window is open (S9a)
     pagingRetry?: boolean; // false while the provider is still blocked
+    reduced?: boolean; // prefers-reduced-motion: only the selected tile animates
     onselect: (i: number) => void;
     oncopy: (i: number) => void;
     onneedmore: () => void;
@@ -80,6 +83,7 @@
                 gif={g}
                 index={i}
                 selected={i === selected}
+                still={!animates(i, selected, reduced)}
                 {overlay}
                 favorite={favorites.has(`${g.provider}:${g.id}`)}
                 {onselect}
