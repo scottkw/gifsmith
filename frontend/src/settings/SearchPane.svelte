@@ -1,8 +1,7 @@
 <script lang="ts">
   // Search pane (UI-SPEC "Search"): each change saves at once; Go validates it and flushes the
   // affected providers' cached pages, and the panel refetches a tab the next time it is shown.
-  import { Events } from '@wailsio/runtime';
-  import { onMount, untrack } from 'svelte';
+  import { onMount } from 'svelte';
   import { choices, setPref, type SettingsSnapshot } from '../lib/api';
   import { countryOptions, languageOptions, ratingLabel, type Option } from '../lib/prefs';
   import SettingRow from './SettingRow.svelte';
@@ -18,7 +17,7 @@
     giphyLang: s.giphyLang,
     klipyCountry: s.klipyCountry,
   });
-  let values = $state(untrack(() => valuesOf(initial)));
+  let values = $derived(valuesOf(initial)); // SettingsApp's snapshot: current after settings:changed and on show
   let errors = $state<Partial<Record<Name, string>>>({});
   let sizes = $state<Option[]>([]);
   let ratings = $state<Option[]>([]);
@@ -32,17 +31,16 @@
       langs = languageOptions(c.languages ?? [], c.systemLanguage);
       countries = countryOptions(c.countries ?? [], c.systemCountry);
     });
-    return Events.On('settings:changed', (e) => (values = valuesOf(e.data as SettingsSnapshot)));
   });
 
   async function choose(name: Name, v: string) {
     const prev = values[name];
-    values[name] = v;
+    values = { ...values, [name]: v };
     errors[name] = '';
     try {
       values = valuesOf(await setPref(name, v));
     } catch {
-      values[name] = prev;
+      values = { ...values, [name]: prev };
       errors[name] = "Couldn't save this setting. Try again.";
     }
   }

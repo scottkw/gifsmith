@@ -1,19 +1,15 @@
 <script lang="ts">
   // Downloads pane (UI-SPEC "Downloads"): the folder comes only from the native picker, through Go,
   // which validates it before saving; the webview never sends a path.
-  import { Events } from '@wailsio/runtime';
-  import { onMount, untrack } from 'svelte';
   import { chooseDownloadDir, resetDownloadDir, setPref, settingsError, type SettingsSnapshot } from '../lib/api';
   import { folderErrorText } from '../lib/errors';
   import SettingRow from './SettingRow.svelte';
 
   let { initial }: { initial: SettingsSnapshot } = $props();
 
-  let snap = $state(untrack(() => initial));
+  let snap = $derived(initial); // SettingsApp's: current after settings:changed and on every show
   let folderError = $state(''); // D5–D7 from the last Choose…; the old folder stays saved
   let hideError = $state('');
-
-  onMount(() => Events.On('settings:changed', (e) => (snap = e.data as SettingsSnapshot)));
 
   // shortcut: assumes the home folder is /Users/<name>; a home elsewhere shows the full path.
   const tilde = (p: string) => p.replace(/^\/Users\/[^/]+(?=\/|$)/, '~');

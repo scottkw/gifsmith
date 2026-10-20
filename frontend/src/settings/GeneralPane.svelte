@@ -6,7 +6,7 @@
 <script lang="ts">
   // General pane (UI-SPEC "General"): every change applies at once, no Save button.
   import { Events } from '@wailsio/runtime';
-  import { onMount, untrack } from 'svelte';
+  import { onMount } from 'svelte';
   import {
     accessibilityStatus,
     checkForUpdates,
@@ -26,10 +26,11 @@
 
   let { initial }: { initial: SettingsSnapshot } = $props();
 
-  // settings:changed keeps both current (a change from the other window, or this one).
-  let theme = $state(untrack(() => initial.theme));
-  let launchAtLogin = $state(untrack(() => initial.launchAtLogin));
-  let actions = $state(untrack(() => ({ primaryAction: initial.primaryAction, secondaryAction: initial.secondaryAction })));
+  // These follow the snapshot SettingsApp keeps current (settings:changed, and a re-read on every
+  // show); a change below overrides one until the next snapshot.
+  let theme = $derived(initial.theme);
+  let launchAtLogin = $derived(initial.launchAtLogin);
+  let actions = $derived({ primaryAction: initial.primaryAction, secondaryAction: initial.secondaryAction });
   let actionError = $state('');
   const gated = $derived(!initial.klipyFileActions); // a build constant: it never changes at run time
   let themeError = $state('');
@@ -39,7 +40,7 @@
   let axTimer: ReturnType<typeof setInterval> | undefined;
   let upd = $state<UpdateStatus>({ state: 'idle', current: '', latest: '', done: 0, total: 0 });
   let updError = $state('');
-  let autoCheck = $state(untrack(() => initial.updateCheck));
+  let autoCheck = $derived(initial.updateCheck);
   let autoError = $state('');
 
   function revealUpdates() {
@@ -70,18 +71,10 @@
     const offReveal = Events.On('settings:reveal', revealUpdates);
     if (pendingReveal.updates) revealUpdates();
     const offShow = Events.On('settings:show', readAX);
-    const offChanged = Events.On('settings:changed', (e) => {
-      const s = e.data as SettingsSnapshot;
-      theme = s.theme;
-      launchAtLogin = s.launchAtLogin;
-      actions = { primaryAction: s.primaryAction, secondaryAction: s.secondaryAction };
-      autoCheck = s.updateCheck;
-    });
     return () => {
       offUpdate();
       offReveal();
       offShow();
-      offChanged();
       clearInterval(axTimer);
     };
   });

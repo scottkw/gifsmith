@@ -3,7 +3,7 @@
   // registration; a row shows a new combo only once Go accepted it. Test listens 5 s for the
   // hotkey:test event Go emits when that hotkey's callback fires (the only way to see a clash).
   import { Events } from '@wailsio/runtime';
-  import { onMount, untrack } from 'svelte';
+  import { onMount } from 'svelte';
   import { setHotkey, settingsError, testHotkey, type SettingsSnapshot } from '../lib/api';
   import { hotkeyErrorText } from '../lib/errors';
   import { canonical, DEFAULT_OPEN, glyphs, SLOT_LABELS, type Slot } from '../lib/hotkeys';
@@ -14,7 +14,7 @@
   const ROWS = (['open', 'favorites', 'recents'] as const).map((slot) => ({ slot, label: SLOT_LABELS[slot] }));
   const TEST_MS = 5000;
 
-  let hk = $state(untrack(() => ({ ...initial.hotkeys })));
+  let hk = $derived({ ...initial.hotkeys }); // SettingsApp's snapshot: current after settings:changed and on show
   let msg = $state<Record<string, { text: string; tone: 'secondary' | 'success' | 'error' }>>({});
   let listening = $state<Slot | null>(null);
   let listenTimer: ReturnType<typeof setTimeout> | undefined;
@@ -26,11 +26,7 @@
       const refused = initial.hotkeysFailed[slot];
       if (refused) say(slot, hotkeyErrorText('hotkey_register_failed_new', refused, ''), 'error');
     }
-    const off = Events.On('settings:changed', (e) => (hk = { ...(e.data as SettingsSnapshot).hotkeys }));
-    return () => {
-      off();
-      stopListening();
-    };
+    return stopListening;
   });
 
   const say = (slot: Slot, text: string, tone: 'secondary' | 'success' | 'error' = 'secondary') => (msg[slot] = { text, tone });
