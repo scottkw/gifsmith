@@ -1,0 +1,167 @@
+name: Release
+
+# A vX.Y.Z tag builds, signs, notarizes and verifies the DMG and creates a DRAFT release; the
+# maintainer publishes it. v1.0.0 shipped from a local build and is never touched here (D-36).
+# workflow_dispatch is a dry run: the same build and checks, no release (D-38).
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - '!v1.0.0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-15
+    environment: release
+    permissions:
+      contents: write
+    timeout-minutes: 60
+    env:
+      TAG: ${{ github.ref_name }}
+      EVENT: ${{ github.event_name }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Gate (version, main ancestry, no existing release)
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$EVENT" = push ]; then
+            git merge-base --is-ancestor HEAD origin/main || { echo "::error::$TAG is not on main"; exit 1; }
+            version=$(bash scripts/release-version.sh "$TAG")
+            if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+              echo "::error::release $TAG already exists; CI never replaces a release"
+              exit 1
+            fi
+          else
+            version=$(bash scripts/release-version.sh)
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: pnpm and wails3
+        run: |
+          corepack enable
+          corepack prepare pnpm@12.6.0 --activate
+          go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.30
+
+      # verify-release.sh and TestRealDMG need spctl to report the notarized source (D-43).
+      - name: Gatekeeper assessments
+        run: |
+          if ! spctl --status 2>&1 | grep -q 'assessments enabled'; then
+            sudo spctl --master-enable
+          fi
+          spctl --status 2>&1 | grep -q 'assessments enabled' || { echo "::error::Gatekeeper assessments are disabled on this runner"; exit 1; }
+
+      # The only step that sees credentials. The profile name and identity match the local Mac,
+      # so build/darwin/Taskfile.yml runs unchanged (D-37, D-39). Never echo a variable here.
+      - name: Signing keychain and notary profile
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          NOTARY_KEY_P8_BASE64: ${{ secrets.NOTARY_KEY_P8_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          keychain="$RUNNER_TEMP/gifsmith-release.keychain-db"
+          echo "RELEASE_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+          kc_pass=$(openssl rand -base64 24)
+          security create-keychain -p "$kc_pass" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$kc_pass" "$keychain"
+
+          printf '%s' "$MACOS_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$MACOS_CERT_PASSWORD" -f pkcs12 -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/cert.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$kc_pass" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain"
+          security default-keychain -d user -s "$keychain"
+
+          printf '%s' "$NOTARY_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          xcrun notarytool store-credentials gifsmith-notary --key "$RUNNER_TEMP/AuthKey.p8" \
+            --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" --keychain "$keychain"
+          rm -f "$RUNNER_TEMP/AuthKey.p8"
+
+          if ! security find-identity -v -p codesigning "$keychain" | grep -qF '"Developer ID Application: Ken Scott (S2K7P43927)"'; then
+            security find-identity -p codesigning "$keychain"
+            echo "::error::Developer ID Application: Ken Scott (S2K7P43927) is not a valid identity (CSSMERR_TP_NOT_TRUSTED means the Developer ID G2 intermediate is missing on the runner)"
+            exit 1
+          fi
+          # Exactly as the Taskfile precondition and wails3 call it: no keychain flag.
+          if ! xcrun notarytool history --keychain-profile gifsmith-notary >/dev/null; then
+            echo "::error::notarytool cannot find the gifsmith-notary profile without a keychain flag"
+            exit 1
+          fi
+
+      - name: Build, sign, notarize, verify
+        run: |
+          mkdir -p bin
+          wails3 task darwin:release 2>&1 | tee bin/release.log
+          grep -qF 'RELEASE VERIFY OK (notarized)' bin/release.log || { echo "::error::no 'RELEASE VERIFY OK (notarized)'"; exit 1; }
+          grep -qF 'source=Notarized Developer ID' bin/release.log || { echo "::error::no 'source=Notarized Developer ID'"; exit 1; }
+
+      - name: Updater accepts the DMG
+        env:
+          VERSION: ${{ steps.gate.outputs.version }}
+        run: |
+          UPDATE_REAL_DMG="$PWD/bin/release/Gifsmith-$VERSION-arm64.dmg" \
+            go test ./internal/update -run TestRealDMG -count=1 -v 2>&1 | tee bin/update-verify.log
+          grep -qF -- '--- PASS: TestRealDMG' bin/update-verify.log
+
+      - name: Draft release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.gate.outputs.version }}
+        run: |
+          dmg="bin/release/Gifsmith-$VERSION-arm64.dmg"
+          gh release create "$TAG" --repo "$REPO" --draft --verify-tag \
+            --title "Gifsmith $VERSION" --notes-file "docs/release-notes-$VERSION.md" \
+            "$dmg" "$dmg.sha256"
+
+          got=$(gh release view "$TAG" --repo "$REPO" --json isDraft,name,assets \
+            --jq '[(.isDraft | tostring), .name, ([.assets[].name] | sort | join(","))] | join("|")')
+          want="true|Gifsmith $VERSION|Gifsmith-$VERSION-arm64.dmg,Gifsmith-$VERSION-arm64.dmg.sha256"
+          [ "$got" = "$want" ] || { echo "::error::draft is '$got', expected '$want'"; exit 1; }
+
+          gh api "repos/$REPO/releases" --jq '[.[] | select(.tag_name == env.TAG)][0]' > bin/release-draft.json
+          UPDATE_RELEASE_JSON="$PWD/bin/release-draft.json" UPDATE_DMG_PATH="$PWD/$dmg" \
+            go test ./internal/update -run TestReleaseJSON -count=1 -v 2>&1 | tee bin/release-json-verify.log
+          grep -qF -- '--- PASS: TestReleaseJSON' bin/release-json-verify.log
+
+      - name: Dry run
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "dry run: no release created"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          if [ -n "${RELEASE_KEYCHAIN:-}" ] && [ -f "$RELEASE_KEYCHAIN" ]; then
+            security delete-keychain "$RELEASE_KEYCHAIN"
+          fi
+          rm -f "$RUNNER_TEMP/cert.p12" "$RUNNER_TEMP/AuthKey.p8"

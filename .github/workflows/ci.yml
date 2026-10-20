@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@12.6.0 --activate
+
+      - name: Install frontend
+        run: pnpm --dir frontend install --frozen-lockfile
+
+      - name: Build frontend (go:embed needs frontend/dist)
+        run: pnpm --dir frontend run build
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l main.go wire_desktop.go wire_server.go internal)
+          if [ -n "$unformatted" ]; then
+            echo "gofmt needed:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet . ./internal/...
+
+      - name: go test
+        run: go test -race ./internal/... -count=1
+
+      - name: golangci-lint
+        run: |
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
+          golangci-lint run . ./internal/...
+
+      - name: Server build
+        run: CGO_ENABLED=0 go build -tags server .
+
+      - name: Frontend tests
+        run: pnpm --dir frontend run test
+
+      - name: svelte-check
+        run: pnpm --dir frontend run check
+
+      # The --uat scripts drive the locally installed dev-browser CLI, which has no pinned CI install (D-42).
+      - name: Browser-loop smoke
+        run: bash scripts/smoke-browser-loop.sh
