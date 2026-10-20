@@ -38,7 +38,8 @@ verifies it (`darwin:release:sign`) and deletes the keychain before anything els
 
 ## Dry run
 
-Builds, signs, notarizes and verifies on a runner without creating a release:
+Builds, signs, notarizes and verifies on a runner without creating a release. Like a tag run, it
+refuses before touching any credential when the ref is not on `main`:
 
 ```sh
 gh workflow run release.yml --repo scottkw/gifsmith --ref main

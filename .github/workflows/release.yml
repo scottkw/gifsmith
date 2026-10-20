@@ -43,8 +43,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Both events: a dry run signs and notarizes too, so it may only build what is on main.
+          git merge-base --is-ancestor HEAD origin/main || { echo "::error::$TAG is not on main"; exit 1; }
           if [ "$EVENT" = push ]; then
-            git merge-base --is-ancestor HEAD origin/main || { echo "::error::$TAG is not on main"; exit 1; }
             version=$(bash scripts/release-version.sh "$TAG")
             if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
               echo "::error::release $TAG already exists; CI never replaces a release"
