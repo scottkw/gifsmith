@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { accelFromEvent, canonical, DENYLIST, glyphs, hasModifier } from './hotkeys.ts';
+import { accelFromEvent, canonical, DENYLIST, glyphs, hasModifier, spoken } from './hotkeys.ts';
 
 const ev = (o: Partial<{ key: string; code: string; ctrlKey: boolean; altKey: boolean; metaKey: boolean; shiftKey: boolean }>) =>
   accelFromEvent({ key: '', code: '', ctrlKey: false, altKey: false, metaKey: false, shiftKey: false, ...o });
@@ -36,6 +36,12 @@ test('accelFromEvent reports held modifiers, a missing modifier and unsupported 
   assert.deepEqual(ev({ key: 'h', code: 'KeyH' }), { kind: 'no_modifier' });
   assert.deepEqual(ev({ key: 'H', code: 'KeyH', shiftKey: true }), { kind: 'no_modifier' });
   assert.deepEqual(ev({ key: 'Home', code: 'Home', metaKey: true }), { kind: 'unsupported' });
+});
+
+test('spoken names the modifiers in macOS order, then the key', () => {
+  assert.equal(spoken('Cmd+Ctrl+Option+G'), 'Control Option Command G');
+  assert.equal(spoken('Cmd+Shift+UP'), 'Shift Command Up Arrow');
+  assert.equal(spoken('Ctrl+Option+SPACE'), 'Control Option Space');
 });
 
 test('glyphs renders in macOS order ⌃⌥⇧⌘ then the key', () => {

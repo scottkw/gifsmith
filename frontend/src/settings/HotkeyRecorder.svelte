@@ -2,22 +2,20 @@
   // Click-to-record shortcut field (UI-SPEC "Recorder field"). Gifsmith's hotkeys are suspended for
   // the whole recording so the current combo is captured, not fired; every way out resumes them.
   // The field shows a new combo only after Go registered it.
-  import { resumeHotkeys, setHotkey, settingsError, suspendHotkeys, type SettingsSnapshot } from '../lib/api';
-  import { accelFromEvent, canonical, DENYLIST, glyphs, type Slot } from '../lib/hotkeys';
+  import { resumeHotkeys, setHotkey, settingsError, suspendHotkeys } from '../lib/api';
+  import { accelFromEvent, canonical, DENYLIST, glyphs, spoken, type Slot } from '../lib/hotkeys';
 
   let {
     slot,
     label,
     value,
     describedby,
-    onsaved,
     onfail,
   }: {
     slot: Slot;
     label: string;
     value: string; // canonical accelerator, '' = not set
     describedby: string;
-    onsaved: (s: SettingsSnapshot) => void;
     onfail: (kind: string, accel: string, otherSlot: string) => void; // '' kind clears the row's message
   } = $props();
 
@@ -30,20 +28,33 @@
     recording = true;
     held = '';
     onfail('', '', '');
-    suspendHotkeys();
+    // If Go did not suspend them, the current combo would fire instead of being recorded.
+    suspendHotkeys().catch(() => {
+      if (!recording) return;
+      stop();
+      onfail('record_failed', '', '');
+    });
   }
 
   function stop() {
     if (!recording) return;
     recording = false;
     held = '';
-    resumeHotkeys();
+    resumeHotkeys().catch(() => {}); // Go also resumes them when Settings hides or loses focus
+  }
+
+  // Esc, Tab and blur cancel: the previous value stays, with no message (an H1 from this recording
+  // goes too). stop() alone keeps the message, for the errors that end a recording.
+  function cancel() {
+    if (!recording) return;
+    onfail('', '', '');
+    stop();
   }
 
   async function save(accel: string) {
     saving = true;
     try {
-      onsaved(await setHotkey(slot, accel));
+      await setHotkey(slot, accel); // the new value arrives as settings:changed
       onfail('', '', '');
     } catch (err) {
       const se = settingsError(err);
@@ -63,10 +74,10 @@
       return;
     }
     const mods = e.metaKey || e.ctrlKey || e.altKey || e.shiftKey;
-    if (e.key === 'Tab' && !mods) return stop(); // focus moves on
+    if (e.key === 'Tab' && !e.metaKey && !e.ctrlKey && !e.altKey) return cancel(); // Tab, Shift+Tab: focus moves on
     e.preventDefault();
     if (saving) return;
-    if (e.key === 'Escape' && !mods) return stop();
+    if (e.key === 'Escape' && !mods) return cancel();
     if ((e.key === 'Backspace' || e.key === 'Delete') && !mods) {
       if (slot !== 'open') save(''); // Open Gifsmith can only be reset, never cleared
       return;
@@ -86,6 +97,8 @@
   }
 </script>
 
+<!-- aria-label replaces the content as the name, so the value and the recording state are the description -->
+<span id="{describedby}-value" class="sr-only">{recording ? 'Recording. Type a shortcut.' : value ? spoken(value) : 'Not set'}</span>
 <div
   class="recorder"
   class:recording
@@ -93,16 +106,25 @@
   role="button"
   tabindex="0"
   aria-label="{label} shortcut"
-  aria-describedby={describedby}
+  aria-describedby="{describedby}-value {describedby}"
+  aria-pressed={recording}
   onclick={start}
   {onkeydown}
   {onkeyup}
-  onblur={stop}
+  onblur={cancel}
 >
   {#if recording}{held || 'Type shortcut…'}{:else}{value ? glyphs(value) : 'Not set'}{/if}
 </div>
 
 <style>
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
   .recorder {
     box-sizing: border-box;
     width: 160px;

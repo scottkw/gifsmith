@@ -22,30 +22,38 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  # Runs third-party code (pnpm install, Vite plugins, go mod tidy), so it gets no environment, no
+  # secrets and a read-only token. Its only output is the unsigned bundle.
+  build:
     runs-on: macos-15
-    environment: release
     permissions:
-      contents: write
-    timeout-minutes: 60
+      contents: read
+    timeout-minutes: 30
     env:
       TAG: ${{ github.ref_name }}
       EVENT: ${{ github.event_name }}
       REPO: ${{ github.repository }}
+    outputs:
+      version: ${{ steps.gate.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Gate (version, main ancestry, no existing release)
+      # Guards against mistakes, not attacks: it is defined by the ref it gates, so a ref carrying an
+      # edited release.yml skips it. The v* tag ruleset and the release environment's required
+      # reviewer are the real control (docs/releasing.md, Protecting the signing secrets).
+      - name: Gate (version, main ancestry, no published release)
         id: gate
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Both events: a dry run signs and notarizes too, so it may only build what is on main.
+          git merge-base --is-ancestor HEAD origin/main || { echo "::error::$TAG is not on main"; exit 1; }
           if [ "$EVENT" = push ]; then
-            git merge-base --is-ancestor HEAD origin/main || { echo "::error::$TAG is not on main"; exit 1; }
             version=$(bash scripts/release-version.sh "$TAG")
+            # A read-only token never sees drafts; sign's first step checks those.
             if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
               echo "::error::release $TAG already exists; CI never replaces a release"
               exit 1
@@ -68,6 +76,78 @@ jobs:
           corepack enable
           corepack prepare pnpm@12.6.0 --activate
           go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.30
+
+      - name: Build
+        run: |
+          mkdir -p bin
+          wails3 task darwin:release:app 2>&1 | tee bin/build.log
+          # tar keeps the executable bit and the release stamp; the artifact zip would drop the bit.
+          tar -cf bin/gifsmith-app.tar -C bin gifsmith.app gifsmith.app.release
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: app
+          path: bin/gifsmith-app.tar
+          if-no-files-found: error
+          retention-days: 1
+
+  # A fresh runner that never runs the build's code: no pnpm, Vite, go mod tidy or go build before
+  # the keychain is deleted. codesign, notarytool, spctl, hdiutil and lipo never execute the
+  # downloaded bundle, so it is handled as untrusted data.
+  sign:
+    needs: build
+    runs-on: macos-15
+    environment: release
+    permissions:
+      contents: write
+    timeout-minutes: 45
+    env:
+      TAG: ${{ github.ref_name }}
+      REPO: ${{ github.repository }}
+      VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      # Drafts are visible only to a token with push access, so this runs here, not in build. It
+      # also catches "Re-run failed jobs" after a draft was made, which skips build's gate.
+      - name: No existing release (drafts included)
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ids=$(gh api "repos/$REPO/releases" --paginate --jq '.[] | select(.tag_name == env.TAG) | .id')
+          if [ -n "$ids" ]; then
+            echo "::error::a release or draft for $TAG already exists; delete it before re-running"
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # No cache: a cache saved by the build job could carry objects its code planted.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      # The pinned wails3 runs the signing tasks; go install checks it against the checksum database.
+      - name: wails3
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.30
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: app
+          path: bin
+
+      - name: Unpack the app
+        run: |
+          # Only the bundle and its stamp; macOS tar also refuses absolute paths, .. and writes
+          # through symlinks.
+          if tar -tf bin/gifsmith-app.tar | grep -vE '^gifsmith\.app(/|$|\.release$)'; then
+            echo "::error::unexpected entries in the build artifact"
+            exit 1
+          fi
+          tar -xf bin/gifsmith-app.tar -C bin
+          rm -f bin/gifsmith-app.tar
 
       # verify-release.sh and TestRealDMG need spctl to report the notarized source (D-43).
       - name: Gatekeeper assessments
@@ -117,16 +197,16 @@ jobs:
             exit 1
           fi
 
-      - name: Build, sign, notarize, verify
+      - name: Sign, notarize, verify
         run: |
-          mkdir -p bin
-          wails3 task darwin:release 2>&1 | tee bin/release.log
+          # release:sign refuses a bundle whose stamp does not match HEAD and its contents.
+          wails3 task darwin:release:sign 2>&1 | tee bin/release.log
           grep -qF 'RELEASE VERIFY OK (notarized)' bin/release.log || { echo "::error::no 'RELEASE VERIFY OK (notarized)'"; exit 1; }
           grep -qF 'source=Notarized Developer ID' bin/release.log || { echo "::error::no 'source=Notarized Developer ID'"; exit 1; }
+          # Nothing after this step signs: drop the identity before go test compiles anything.
+          security delete-keychain "$RELEASE_KEYCHAIN"
 
       - name: Updater accepts the DMG
-        env:
-          VERSION: ${{ steps.gate.outputs.version }}
         run: |
           UPDATE_REAL_DMG="$PWD/bin/release/Gifsmith-$VERSION-arm64.dmg" \
             go test ./internal/update -run TestRealDMG -count=1 -v 2>&1 | tee bin/update-verify.log
@@ -136,7 +216,6 @@ jobs:
         if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.gate.outputs.version }}
         run: |
           dmg="bin/release/Gifsmith-$VERSION-arm64.dmg"
           gh release create "$TAG" --repo "$REPO" --draft --verify-tag \
@@ -149,7 +228,12 @@ jobs:
           [ "$got" = "$want" ] || { echo "::error::draft is '$got', expected '$want'"; exit 1; }
 
           gh api "repos/$REPO/releases" --jq '[.[] | select(.tag_name == env.TAG)][0]' > bin/release-draft.json
-          UPDATE_RELEASE_JSON="$PWD/bin/release-draft.json" UPDATE_DMG_PATH="$PWD/$dmg" \
+
+      # Separate from the draft step so go test never runs with the write token in its environment.
+      - name: Updater accepts the draft release
+        if: github.event_name == 'push'
+        run: |
+          UPDATE_RELEASE_JSON="$PWD/bin/release-draft.json" UPDATE_DMG_PATH="$PWD/bin/release/Gifsmith-$VERSION-arm64.dmg" \
             go test ./internal/update -run TestReleaseJSON -count=1 -v 2>&1 | tee bin/release-json-verify.log
           grep -qF -- '--- PASS: TestReleaseJSON' bin/release-json-verify.log
 

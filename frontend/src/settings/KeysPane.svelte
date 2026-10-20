@@ -27,10 +27,17 @@
   // Every pane gets the snapshot; key state is not in it (no key ever crosses in a snapshot).
   let {}: { initial: SettingsSnapshot } = $props();
 
-  let statuses = $state<Record<string, KeyStatus>>({});
+  // null until the first read: a card never shows Not set / Add Key… for a key that is saved.
+  let statuses = $state<Record<string, KeyStatus> | null>(null);
+  let loadError = $state('');
 
   async function load() {
-    statuses = Object.fromEntries((await keyStatus()).map((s) => [s.provider, s]));
+    try {
+      statuses = Object.fromEntries((await keyStatus()).map((s) => [s.provider, s]));
+      loadError = '';
+    } catch {
+      loadError = "Couldn't read your keys from the macOS Keychain. Open Keys again to retry.";
+    }
   }
 
   onMount(() => {
@@ -44,13 +51,21 @@
   });
 </script>
 
+{#if loadError}
+  <p class="load-error" role="alert">{loadError}</p>
+{/if}
 <div class="cards">
   {#each CARDS as c (c.provider)}
-    <KeyRow {...c} status={statuses[c.provider] ?? { provider: c.provider, status: 'not_set' }} />
+    <KeyRow {...c} status={statuses?.[c.provider] ?? null} />
   {/each}
 </div>
 
 <style>
+  .load-error {
+    margin: 0 0 16px;
+    font: var(--label);
+    color: var(--destructive);
+  }
   .cards {
     display: flex;
     flex-direction: column;

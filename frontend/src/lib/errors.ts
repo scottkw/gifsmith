@@ -119,6 +119,19 @@ export function actionErrorText(kind: string, g: Gif, action: 'copy' | 'download
   return "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";
 }
 
+// A setting that did not save, keyed by Go's SettingsError kind. prefs_unreadable cannot be retried:
+// General's banner says why and offers Reset Settings….
+export function saveErrorText(kind = ''): string {
+  if (kind === 'prefs_unreadable') return "Couldn't save. Gifsmith can't read its settings file. See General.";
+  return "Couldn't save this setting. Try again.";
+}
+
+// General's banner while settings.json cannot be read, its reset confirmation, and a failed reset.
+export const settingsUnreadableText =
+  "Gifsmith couldn't read its settings file, so it's using the defaults and can't save changes.";
+export const resetSettingsAskText = 'Reset all settings to their defaults? Gifsmith keeps the old file next to the new one.';
+export const resetSettingsFailedText = "Couldn't reset the settings file. Try again.";
+
 // Downloads pane D5–D8 under Save to, keyed by Go's SettingsError kind; `folder` is the display name.
 export function folderErrorText(kind: string, folder: string): string {
   switch (kind) {
@@ -131,7 +144,7 @@ export function folderErrorText(kind: string, folder: string): string {
     case 'folder_missing':
       return 'This folder no longer exists. Choose another folder or reset to Downloads.';
   }
-  return "Couldn't save this setting. Try again.";
+  return saveErrorText(kind);
 }
 
 // T11: ⌘S (or any file action reaching Go) on a Klipy item while file actions are gated.
@@ -172,8 +185,12 @@ export function hotkeyErrorText(kind: string, accel: string, otherSlotLabel: str
       return `macOS couldn't register ${combo}. Your previous shortcut still works.`;
     case 'hotkey_register_failed_new':
       return `macOS couldn't register ${combo}. Try a different shortcut.`;
+    case 'hotkey_register_failed_lost':
+      return `macOS couldn't register ${combo}, and your previous shortcut stopped working. Choose another one.`;
+    case 'record_failed':
+      return "Couldn't start recording. Try again.";
     case 'test_failed':
       return `Nothing happened. Another app may be using ${combo}. Try a different shortcut.`;
   }
-  return "Couldn't save this setting. Try again.";
+  return saveErrorText(kind);
 }

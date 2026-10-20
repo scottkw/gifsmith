@@ -33,6 +33,26 @@ if (!(await reset.isDisabled())) fail("Reset to Default enabled on the default")
 await B.getByText("macOS doesn't warn when another app uses the same shortcut. Use Test to check yours.").waitFor();
 await saveScreenshot(await B.screenshot(), "gifsmith-17-hotkeys-default.png");
 
+// The accessible name stays "{label} shortcut"; the bound combo is the description, spoken.
+const described = () => open.evaluate((el) => el.getAttribute("aria-describedby").split(" ").map((id) => document.getElementById(id)?.textContent ?? "").join(" "));
+if (!(await described()).includes("Control Option Command G")) fail(`recorder description: ${await described()}`);
+
+// Esc cancels: the old combo stays, and an H1 from that recording goes with it.
+await open.click();
+await waitText(open, "Type shortcut…");
+await B.keyboard.press("KeyH");
+await B.getByText("Include ⌘, ⌥ or ⌃ in the shortcut.").waitFor({ timeout: 3000 });
+await B.keyboard.press("Escape");
+await waitText(open, "⌃⌥⌘G");
+if (await B.getByText("Include ⌘, ⌥ or ⌃ in the shortcut.").count()) fail("H1 still shown after Esc cancelled the recording");
+// Shift+Tab cancels too, and focus moves back out of the field.
+await open.click();
+await waitText(open, "Type shortcut…");
+await B.keyboard.press("Shift+Tab");
+await waitText(open, "⌃⌥⌘G");
+if (await B.getByText("Include ⌘, ⌥ or ⌃ in the shortcut.").count()) fail("Shift+Tab was recorded as H1");
+if (await open.evaluate((el) => el === document.activeElement)) fail("Shift+Tab kept focus in the recorder");
+
 // Record ⌃⌥⌘H: the field shows the new combo only after Go accepted it.
 await open.click();
 await waitText(open, "Type shortcut…");

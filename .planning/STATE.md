@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: Gifsmith MVP
 current_phase: 4
 current_phase_name: Settings, Shell Polish & Release
-status: executing
-stopped_at: Completed 04-06-PLAN.md
-last_updated: "2026-10-20T13:54:19.560Z"
+status: verifying
+stopped_at: Completed 04-08-PLAN.md
+last_updated: "2026-10-20T15:22:21.812Z"
 last_activity: 2026-10-18
 last_activity_desc: Phase 4 execution started
-state_head: 1368868ca5f5b1c61d6bdf542403465ce29af984
+state_head: 438ed772091fd54e45a7a3c50a941e5711ec569c
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 26
-  completed_plans: 25
+  completed_plans: 26
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-18)
 
 Phase: 4 (Settings, Shell Polish & Release) — EXECUTING
 Plan: 7 of 7
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-18 — Phase 4 execution started
 
 Progress: [████████░░] 75% (3/4 phases; 18/18 planned plans complete)
@@ -84,6 +84,7 @@ Progress: [████████░░] 75% (3/4 phases; 18/18 planned plans 
 | Phase 04 P07 | 19 min | 4 tasks | 31 files |
 | Phase 04 P05 | 12 min | 4 tasks | 27 files |
 | Phase 4 P06 | 25min | 3 tasks | 3 files |
+| Phase 04 P08 | 91min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -176,6 +177,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Unreferenced Wails template public assets deleted (wails.png, svelte.svg, Inter-Medium.ttf, style.css, bg-*.jpg)
 - [Phase 4]: RELS-02 clean-machine install was run in a fresh Tart VM (macOS 15.7.7) from the quarantined notarized DMG: PASSED
 - [Phase 4]: Draft release v1.0.0 targets main; Phase 4 must be merged to main before the user publishes (tag is created at publish time)
+- [Phase 04]: 04-08: go.mod pins toolchain go1.27.2 (go 1.25.0 kept) so CI builds with the Go that built 1.0.0; pnpm pinned to the local 12.6.0
+- [Phase 04]: 04-08: notarization runs through scripts/notarize.sh (require Accepted) and every stapler call through scripts/stapler-retry.sh (5x20 s) after GitHub macOS runners dropped 3 of 7 ticket lookups (NSURLError -1005)
 
 ### Pending Todos
 
@@ -209,6 +212,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-20T13:54:19.341Z
-Stopped at: Completed 04-06-PLAN.md
+Last session: 2026-10-20T15:22:21.686Z
+Stopped at: Completed 04-08-PLAN.md
 Resume file: None

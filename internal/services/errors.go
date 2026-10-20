@@ -69,16 +69,19 @@ type SettingsError struct {
 var settingsText = map[string]string{
 	"invalid_value":          "this setting value is not allowed",
 	"prefs_write_failed":     "the settings file could not be written",
+	"prefs_unreadable":       "the settings file could not be read, so changes are not saved",
+	"prefs_reset_failed":     "couldn't move the settings file aside",
 	"autostart_failed":       "could not change Open at login",
 	"not_in_applications":    "Gifsmith is not in the Applications folder",
 	"keychain_delete_failed": "couldn't remove the key from the macOS Keychain",
 	// Slot names the other slot holding the combo.
-	"hotkey_duplicate":           "this shortcut is already used by another Gifsmith hotkey",
-	"hotkey_no_modifier":         "the shortcut needs Command, Option or Control",
-	"hotkey_system":              "this is a macOS shortcut",
-	"hotkey_register_failed":     "macOS couldn't register the shortcut; the previous one still works",
-	"hotkey_register_failed_new": "macOS couldn't register the shortcut",
-	"hotkey_invalid":             "this shortcut is not allowed",
+	"hotkey_duplicate":            "this shortcut is already used by another Gifsmith hotkey",
+	"hotkey_no_modifier":          "the shortcut needs Command, Option or Control",
+	"hotkey_system":               "this is a macOS shortcut",
+	"hotkey_register_failed":      "macOS couldn't register the shortcut; the previous one still works",
+	"hotkey_register_failed_new":  "macOS couldn't register the shortcut",
+	"hotkey_register_failed_lost": "macOS couldn't register the shortcut, and the previous one stopped working",
+	"hotkey_invalid":              "this shortcut is not allowed",
 	// Folder names the refused download folder.
 	"folder_missing":    "the folder does not exist",
 	"folder_fat":        "the folder is on an exFAT or FAT drive",
@@ -102,6 +105,8 @@ func (e *SettingsError) Error() string {
 var (
 	errInvalidValue      = &SettingsError{Kind: "invalid_value"}
 	errPrefsWriteFailed  = &SettingsError{Kind: "prefs_write_failed"}
+	errPrefsUnreadable   = &SettingsError{Kind: "prefs_unreadable"}
+	errPrefsResetFailed  = &SettingsError{Kind: "prefs_reset_failed"}
 	errAutostartFailed   = &SettingsError{Kind: "autostart_failed"}
 	errNotInApplications = &SettingsError{Kind: "not_in_applications"}
 	errKeychainDelete    = &SettingsError{Kind: "keychain_delete_failed"}

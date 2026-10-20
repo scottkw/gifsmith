@@ -1,6 +1,7 @@
 package services
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -190,12 +191,27 @@ func TestBindRestoreFailsLogs(t *testing.T) {
 	f := newHotkeys(t, settings.Hotkeys{})
 	buf := captureLog(t)
 	f.reg.fail = map[string]bool{"Cmd+Ctrl+Option+J": true, DefaultOpenHotkey: true}
-	wantSettingsErr(t, f.h.Bind("open", "Cmd+Ctrl+Option+J"), "hotkey_register_failed")
+	wantSettingsErr(t, f.h.Bind("open", "Cmd+Ctrl+Option+J"), "hotkey_register_failed_lost")
 	if !strings.Contains(buf.String(), "hotkey restore failed") {
 		t.Errorf("log = %q, want a restore failure line", buf.String())
 	}
-	if got := f.h.Bindings().Open; got != "" {
-		t.Errorf("Open = %q, want cleared after a failed restore", got)
+	if bound, failed := f.h.State(); bound.Open != "" || failed.Open != DefaultOpenHotkey {
+		t.Errorf("State = %+v, %+v; want Open cleared and reported failed", bound, failed)
+	}
+}
+
+func TestSetHotkeyRestoreFailsUnbindsTray(t *testing.T) {
+	f, reg := settingsWithHotkeys(t)
+	var tray []string
+	f.svc.OnOpenHotkey = func(a string) { tray = append(tray, a) }
+	reg.fail = map[string]bool{"Cmd+Ctrl+Option+J": true, DefaultOpenHotkey: true}
+	snap, err := f.svc.SetHotkey(context.Background(), "open", "Cmd+Ctrl+Option+J")
+	wantSettingsErr(t, err, "hotkey_register_failed_lost")
+	if snap.Hotkeys.Open != "" || !reflect.DeepEqual(tray, []string{""}) {
+		t.Errorf("snapshot Open %q, tray %v; want both unbound", snap.Hotkeys.Open, tray)
+	}
+	if ev := *f.events; len(ev) != 1 || ev[0] != "settings:changed" {
+		t.Errorf("events = %v, want settings:changed", ev)
 	}
 }
 
@@ -244,6 +260,101 @@ func TestStartRegistersStored(t *testing.T) {
 	want := []string{"register Cmd+Ctrl+Option+H", "register Cmd+Ctrl+Option+F"}
 	if c := reg.take(); !reflect.DeepEqual(c, want) {
 		t.Errorf("calls = %v, want %v", c, want)
+	}
+}
+
+func TestStartFailureIsNotBound(t *testing.T) {
+	reg := &fakeReg{fail: map[string]bool{"Cmd+Ctrl+Option+F": true}}
+	h := &Hotkeys{Reg: reg, Actions: map[string]func(){}, Now: time.Now}
+	h.Start(settings.Hotkeys{Favorites: "Cmd+Ctrl+Option+F"})
+	bound, failed := h.State()
+	if bound != (settings.Hotkeys{Open: DefaultOpenHotkey}) || failed != (settings.Hotkeys{Favorites: "Cmd+Ctrl+Option+F"}) {
+		t.Fatalf("State = %+v, %+v; want favorites failed, not bound", bound, failed)
+	}
+	wantSettingsErr(t, h.ArmTest("favorites"), "hotkey_invalid")
+	reg.fail = nil // the clash went away: recording the same combo binds it
+	if err := h.Bind("favorites", "Cmd+Ctrl+Option+F"); err != nil {
+		t.Fatal(err)
+	}
+	if bound, failed = h.State(); bound.Favorites != "Cmd+Ctrl+Option+F" || failed != (settings.Hotkeys{}) {
+		t.Errorf("State = %+v, %+v; want favorites bound, nothing failed", bound, failed)
+	}
+}
+
+func TestSetHotkeyStoredComboThatFailedAtLaunch(t *testing.T) {
+	f := newSettings(t, "")
+	if _, err := f.svc.Store.Update(func(p *settings.Prefs) error { p.Hotkeys.Open = "Cmd+Ctrl+Option+H"; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	reg := &fakeReg{fail: map[string]bool{"Cmd+Ctrl+Option+H": true}}
+	f.svc.Hotkeys = &Hotkeys{Reg: reg, Actions: map[string]func(){}, Now: time.Now}
+	f.svc.Hotkeys.Start(f.svc.Store.Get().Hotkeys)
+	ctx := context.Background()
+	if s := f.svc.Snapshot(ctx); s.Hotkeys.Open != "" || s.HotkeysFailed.Open != "Cmd+Ctrl+Option+H" {
+		t.Fatalf("snapshot hotkeys %+v, failed %+v", s.Hotkeys, s.HotkeysFailed)
+	}
+	var tray []string
+	f.svc.OnOpenHotkey = func(a string) { tray = append(tray, a) }
+	reg.fail = nil
+	snap, err := f.svc.SetHotkey(ctx, "open", "Cmd+Ctrl+Option+H") // the store already holds it
+	if err != nil || snap.Hotkeys.Open != "Cmd+Ctrl+Option+H" || snap.HotkeysFailed.Open != "" {
+		t.Fatalf("SetHotkey = %+v, %+v, %v", snap.Hotkeys, snap.HotkeysFailed, err)
+	}
+	if !reflect.DeepEqual(tray, []string{"Cmd+Ctrl+Option+H"}) || len(*f.events) != 1 {
+		t.Errorf("tray %v, events %v; want both updated", tray, *f.events)
+	}
+}
+
+// WR-05: a combo refused at launch is still its slot's stored binding, so another slot cannot take
+// it (the store would silently drop one of them).
+func TestSetHotkeyRefusesAComboFailedAtLaunch(t *testing.T) {
+	ctx := context.Background()
+	for _, tc := range []struct{ stored, failedSlot, slot, combo string }{
+		{"", "open", "favorites", DefaultOpenHotkey},                       // default Open refused
+		{"Cmd+Ctrl+Option+F", "favorites", "recents", "Cmd+Ctrl+Option+F"}, // a stored Favorites refused
+		{"Cmd+Ctrl+Option+F", "favorites", "open", "Ctrl+Option+Cmd+F"},    // any spelling of it
+	} {
+		f := newSettings(t, "")
+		if _, err := f.svc.Store.Update(func(p *settings.Prefs) error { p.Hotkeys.Favorites = tc.stored; return nil }); err != nil {
+			t.Fatal(err)
+		}
+		failing := cmp.Or(tc.stored, DefaultOpenHotkey)
+		reg := &fakeReg{fail: map[string]bool{failing: true}}
+		f.svc.Hotkeys = &Hotkeys{Reg: reg, Actions: map[string]func(){}, Now: time.Now}
+		f.svc.Hotkeys.Start(f.svc.Store.Get().Hotkeys)
+		reg.fail = nil // it would register now: only the stored binding stops it
+		before, stored := f.svc.Hotkeys.Bindings(), f.svc.Store.Get().Hotkeys
+		_, err := f.svc.SetHotkey(ctx, tc.slot, tc.combo)
+		var se *SettingsError
+		if !errors.As(err, &se) || se.Kind != "hotkey_duplicate" || se.Slot != tc.failedSlot {
+			t.Errorf("%s -> %s: err = %v, want hotkey_duplicate for %s", tc.slot, tc.combo, err, tc.failedSlot)
+		}
+		if f.svc.Hotkeys.Bindings() != before || f.svc.Store.Get().Hotkeys != stored || len(*f.events) != 0 {
+			t.Errorf("%s: bound %+v, stored %+v, events %v; want unchanged", tc.slot, f.svc.Hotkeys.Bindings(), f.svc.Store.Get().Hotkeys, *f.events)
+		}
+		if _, failed := f.svc.Hotkeys.State(); *slotOf(&failed, tc.failedSlot) != failing {
+			t.Errorf("failed = %+v, want %s still reported", failed, tc.failedSlot)
+		}
+	}
+}
+
+// The store's own check: a combo stored for another slot but unknown to Hotkeys is refused and
+// the registration that Bind made is reverted.
+func TestSetHotkeyStoreDuplicateReverts(t *testing.T) {
+	f, reg := settingsWithHotkeys(t)
+	if _, err := f.svc.Store.Update(func(p *settings.Prefs) error { p.Hotkeys.Favorites = "Cmd+Ctrl+Option+F"; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	_, err := f.svc.SetHotkey(context.Background(), "recents", "Cmd+Ctrl+Option+F")
+	var se *SettingsError
+	if !errors.As(err, &se) || se.Kind != "hotkey_duplicate" || se.Slot != "favorites" {
+		t.Fatalf("err = %v, want hotkey_duplicate for favorites", err)
+	}
+	if got, want := reg.take(), []string{"register Cmd+Ctrl+Option+F", "unregister Cmd+Ctrl+Option+F"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("calls = %v, want %v", got, want)
+	}
+	if b := f.svc.Hotkeys.Bindings(); b.Recents != "" || f.svc.Store.Get().Hotkeys.Recents != "" {
+		t.Errorf("recents bound %q / stored %q, want both empty", b.Recents, f.svc.Store.Get().Hotkeys.Recents)
 	}
 }
 
@@ -303,6 +414,20 @@ func TestSetHotkeyErrorKeepsStore(t *testing.T) {
 	}
 	if len(*f.events) != 0 {
 		t.Errorf("events = %v, want none", *f.events)
+	}
+}
+
+func TestSetHotkeyWriteFailureRollsBack(t *testing.T) {
+	f, reg := settingsWithHotkeys(t)
+	readOnlyDir(t, f.dir) // every write fails
+	snap, err := f.svc.SetHotkey(context.Background(), "open", "Cmd+Ctrl+Option+H")
+	wantSettingsErr(t, err, "prefs_write_failed")
+	want := []string{"unregister Cmd+Ctrl+Option+G", "register Cmd+Ctrl+Option+H", "unregister Cmd+Ctrl+Option+H", "register Cmd+Ctrl+Option+G"}
+	if c := reg.take(); !reflect.DeepEqual(c, want) {
+		t.Errorf("calls = %v, want %v", c, want)
+	}
+	if snap.Hotkeys.Open != DefaultOpenHotkey || f.svc.Hotkeys.Bindings().Open != DefaultOpenHotkey {
+		t.Errorf("Open = %q / %q, want the stored binding registered again", snap.Hotkeys.Open, f.svc.Hotkeys.Bindings().Open)
 	}
 }
 

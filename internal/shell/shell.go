@@ -24,6 +24,7 @@ type Shell struct {
 	panel *application.WebviewWindow
 	// settings is a normal titled window, created hidden once and never closed.
 	settings *application.WebviewWindow
+	trayMenu *application.Menu
 	openItem *application.MenuItem // tray "Open Gifsmith"; shows the Open hotkey
 	// updateItem is the tray "Update to Gifsmith {latest}…" item, hidden until a check finds one.
 	updateItem *application.MenuItem
@@ -105,6 +106,7 @@ func New(app *application.App, plat platform.Platform, trayIcon []byte) *Shell {
 	tray := app.SystemTray.New()
 	tray.SetTemplateIcon(trayIcon)
 	menu := app.NewMenu()
+	s.trayMenu = menu
 	s.openItem = menu.Add("Open Gifsmith").OnClick(func(*application.Context) { s.Show() })
 	// Key equivalents are display only: a tray menu takes keys only while it is open.
 	menu.Add("Settings…").SetAccelerator("CmdOrCtrl+,").OnClick(func(*application.Context) { s.OpenSettings() })
@@ -170,8 +172,13 @@ func (s *Shell) ShowTab(tab string) {
 	s.app.Event.Emit("panel:open-tab", map[string]any{"tab": tab, "wasVisible": visible})
 }
 
-// SetOpenAccelerator shows accel as the tray Open Gifsmith key equivalent.
+// SetOpenAccelerator shows accel as the tray Open Gifsmith key equivalent ("" = none: unregistered).
 func (s *Shell) SetOpenAccelerator(accel string) {
+	if accel == "" { // SetAccelerator("") is an error; a rebuilt menu omits the removed key equivalent
+		s.openItem.RemoveAccelerator()
+		s.trayMenu.Update() // dispatches to the main thread itself
+		return
+	}
 	application.InvokeSync(func() { s.openItem.SetAccelerator(accel) }) // AppKit: main thread only
 }
 
@@ -253,6 +260,7 @@ func (s *Shell) PickFolder(start string) (string, error) {
 // it opened to come back (best effort). Window callbacks call it, so it never takes s.mu.
 func (s *Shell) HideSettings() {
 	s.settings.Hide()
+	s.app.Event.Emit("settings:hide") // General stops its Accessibility poll
 	s.settingsInactive()
 	s.vmu.Lock()
 	pid := s.settingsPrev

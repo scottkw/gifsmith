@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -374,41 +375,74 @@ func TestUpdateReveal(t *testing.T) {
 	(&UpdateService{}).Reveal() // nil RevealFunc: no-op
 }
 
-func TestRunAutoUpdates(t *testing.T) {
+// autoUpdates runs runAutoUpdates on a fake timer. tick fires it and returns once the loop waits
+// again, so that iteration (enabled() and any Check) has finished and nothing runs until the next
+// tick. stop cancels and returns the durations the loop waited for.
+func autoUpdates(t *testing.T, u *UpdateService, enabled func() bool) (tick func(), stop func() []time.Duration) {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	t.Cleanup(cancel)
+	ticks, waiting, done := make(chan time.Time), make(chan time.Duration), make(chan struct{})
+	go func() {
+		runAutoUpdates(ctx, u, enabled, time.Second, time.Hour, func(d time.Duration) <-chan time.Time {
+			waiting <- d
+			return ticks
+		})
+		close(done)
+	}()
+	var waits []time.Duration
+	next := func() {
+		t.Helper()
+		select {
+		case d := <-waiting:
+			waits = append(waits, d)
+		case <-time.After(10 * time.Second):
+			t.Fatal("the update loop is not waiting")
+		}
+	}
+	next()
+	tick = func() {
+		t.Helper()
+		ticks <- time.Time{}
+		next()
+	}
+	stop = func() []time.Duration {
+		t.Helper()
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(10 * time.Second):
+			t.Fatal("RunAutoUpdates did not return after cancel")
+		}
+		return waits
+	}
+	return tick, stop
+}
+
+func TestRunAutoUpdates(t *testing.T) {
 	f := newUpdates(t, serveRelease("v1.0.0", true))
 	var on atomic.Bool
 	on.Store(true)
-	done := make(chan struct{})
-	go func() {
-		RunAutoUpdates(ctx, f.svc, on.Load, 0, 20*time.Millisecond)
-		close(done)
-	}()
-	time.Sleep(150 * time.Millisecond)
-	if n := f.hits.Load(); n < 2 {
-		t.Errorf("%d checks in 150 ms, want at least 2", n)
-	}
+	tick, stop := autoUpdates(t, f.svc, on.Load)
+	tick()
+	tick()
 	on.Store(false)
-	time.Sleep(40 * time.Millisecond) // a check already past enabled() may still land
-	n := f.hits.Load()
-	time.Sleep(100 * time.Millisecond)
-	if f.hits.Load() != n {
-		t.Errorf("checks continued after turning automatic checks off")
+	tick()
+	tick()
+	if n := f.hits.Load(); n != 2 {
+		t.Errorf("%d checks, want 2: one per tick while on, none after", n)
 	}
-	cancel()
-	select {
-	case <-done:
-	case <-time.After(100 * time.Millisecond):
-		t.Error("RunAutoUpdates did not return within 100 ms of cancel")
+	if w := stop(); !reflect.DeepEqual(w, []time.Duration{time.Second, time.Hour, time.Hour, time.Hour, time.Hour}) {
+		t.Errorf("waits = %v, want the delay, then every", w)
 	}
 }
 
 func TestRunAutoUpdatesOff(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
-	defer cancel()
 	f := newUpdates(t, serveRelease("v1.1.0", true))
-	RunAutoUpdates(ctx, f.svc, func() bool { return false }, 0, 20*time.Millisecond)
+	tick, stop := autoUpdates(t, f.svc, func() bool { return false })
+	tick()
+	tick()
+	stop()
 	if n := f.hits.Load(); n != 0 {
 		t.Errorf("%d checks with automatic checks off", n)
 	}
@@ -416,20 +450,10 @@ func TestRunAutoUpdatesOff(t *testing.T) {
 
 func TestRunAutoUpdatesFailureIsQuiet(t *testing.T) {
 	buf := captureLog(t)
-	ctx, cancel := context.WithCancel(context.Background())
 	f := newUpdates(t, func(w http.ResponseWriter, r *http.Request, _ string) { w.WriteHeader(503) })
-	done := make(chan struct{})
-	go func() {
-		RunAutoUpdates(ctx, f.svc, func() bool { return true }, 0, time.Hour)
-		close(done)
-	}()
-	deadline := time.Now().Add(2 * time.Second)
-	for f.hits.Load() == 0 && time.Now().Before(deadline) {
-		time.Sleep(5 * time.Millisecond)
-	}
-	time.Sleep(50 * time.Millisecond)
-	cancel()
-	<-done
+	tick, stop := autoUpdates(t, f.svc, func() bool { return true })
+	tick()
+	stop()
 	if st := f.svc.Status(context.Background()); st.State != "idle" {
 		t.Errorf("state %q, want idle", st.State)
 	}

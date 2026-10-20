@@ -1,19 +1,17 @@
 <script lang="ts">
   // Downloads pane (UI-SPEC "Downloads"): the folder comes only from the native picker, through Go,
   // which validates it before saving; the webview never sends a path.
-  import { Events } from '@wailsio/runtime';
-  import { onMount, untrack } from 'svelte';
   import { chooseDownloadDir, resetDownloadDir, setPref, settingsError, type SettingsSnapshot } from '../lib/api';
-  import { folderErrorText } from '../lib/errors';
+  import { folderErrorText, saveErrorText } from '../lib/errors';
   import SettingRow from './SettingRow.svelte';
 
   let { initial }: { initial: SettingsSnapshot } = $props();
 
-  let snap = $state(untrack(() => initial));
+  // SettingsApp's snapshot: current after settings:changed and on every show. A call's own result
+  // is never shown (responses can arrive out of order; settings:changed cannot).
+  let snap = $derived(initial);
   let folderError = $state(''); // D5–D7 from the last Choose…; the old folder stays saved
   let hideError = $state('');
-
-  onMount(() => Events.On('settings:changed', (e) => (snap = e.data as SettingsSnapshot)));
 
   // shortcut: assumes the home folder is /Users/<name>; a home elsewhere shows the full path.
   const tilde = (p: string) => p.replace(/^\/Users\/[^/]+(?=\/|$)/, '~');
@@ -21,7 +19,7 @@
   async function change(f: () => Promise<SettingsSnapshot>) {
     folderError = '';
     try {
-      snap = await f();
+      await f();
     } catch (e) {
       const c = settingsError(e);
       folderError = folderErrorText(c?.kind ?? '', c?.folder ?? '');
@@ -31,10 +29,10 @@
   async function toggleHide(box: HTMLInputElement) {
     hideError = '';
     try {
-      snap = await setPref('hideFilenames', String(box.checked));
-    } catch {
+      await setPref('hideFilenames', String(box.checked));
+    } catch (e) {
       box.checked = snap.hideFilenames;
-      hideError = "Couldn't save this setting. Try again.";
+      hideError = saveErrorText(settingsError(e)?.kind);
     }
   }
 </script>

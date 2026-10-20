@@ -7,12 +7,12 @@ export const DEFAULT_OPEN = 'Cmd+Ctrl+Option+G';
 export type Slot = 'open' | 'favorites' | 'recents';
 export const SLOT_LABELS: Record<Slot, string> = { open: 'Open Gifsmith', favorites: 'Open Favorites', recents: 'Open Recents' };
 
-// Display order ⌃⌥⇧⌘, each with its Wails modifier name.
+// Display order ⌃⌥⇧⌘, each with its Wails modifier name and its spoken name.
 const MODS = [
-  ['ctrlKey', 'Ctrl', '⌃'],
-  ['altKey', 'Option', '⌥'],
-  ['shiftKey', 'Shift', '⇧'],
-  ['metaKey', 'Cmd', '⌘'],
+  ['ctrlKey', 'Ctrl', '⌃', 'Control'],
+  ['altKey', 'Option', '⌥', 'Option'],
+  ['shiftKey', 'Shift', '⇧', 'Shift'],
+  ['metaKey', 'Cmd', '⌘', 'Command'],
 ] as const;
 
 // KeyboardEvent.code → Wails key name for everything but letters and digits. Never '+' (it splits
@@ -74,6 +74,15 @@ export function glyphs(accel: string): string {
   const { mods, key } = parse(accel);
   const k = key.toUpperCase();
   return MODS.filter(([, n]) => mods.has(n.toLowerCase())).map(([, , g]) => g).join('') + (KEY_GLYPHS[k] ?? k);
+}
+
+const SPOKEN_KEYS: Record<string, string> = { UP: 'Up Arrow', DOWN: 'Down Arrow', LEFT: 'Left Arrow', RIGHT: 'Right Arrow', RETURN: 'Return', TAB: 'Tab', SPACE: 'Space' };
+
+// 'Cmd+Ctrl+Option+G' → 'Control Option Command G', for screen readers (glyphs read poorly).
+export function spoken(accel: string): string {
+  const { mods, key } = parse(accel);
+  const k = key.toUpperCase();
+  return [...MODS.filter(([, n]) => mods.has(n.toLowerCase())).map(([, , , s]) => s), SPOKEN_KEYS[k] ?? k].join(' ');
 }
 
 // Go's canonical form: modifiers sorted (Cmd, Ctrl, Option, Shift), upper-cased key.

@@ -1,9 +1,9 @@
 <script lang="ts">
   // Search pane (UI-SPEC "Search"): each change saves at once; Go validates it and flushes the
   // affected providers' cached pages, and the panel refetches a tab the next time it is shown.
-  import { Events } from '@wailsio/runtime';
-  import { onMount, untrack } from 'svelte';
-  import { choices, setPref, type SettingsSnapshot } from '../lib/api';
+  import { onMount } from 'svelte';
+  import { choices, setPref, settingsError, type SettingsSnapshot } from '../lib/api';
+  import { saveErrorText } from '../lib/errors';
   import { countryOptions, languageOptions, ratingLabel, type Option } from '../lib/prefs';
   import SettingRow from './SettingRow.svelte';
 
@@ -18,32 +18,35 @@
     giphyLang: s.giphyLang,
     klipyCountry: s.klipyCountry,
   });
-  let values = $state(untrack(() => valuesOf(initial)));
+  let values = $derived(valuesOf(initial)); // SettingsApp's snapshot: current after settings:changed and on show
   let errors = $state<Partial<Record<Name, string>>>({});
   let sizes = $state<Option[]>([]);
   let ratings = $state<Option[]>([]);
   let langs = $state<Option[]>([]);
   let countries = $state<Option[]>([]);
+  let loadError = $state('');
 
   onMount(() => {
-    choices().then((c) => {
-      sizes = (c.pageSizes ?? []).map((n) => ({ value: String(n), label: String(n) }));
-      ratings = (c.ratings ?? []).map((r) => ({ value: r, label: ratingLabel(r) }));
-      langs = languageOptions(c.languages ?? [], c.systemLanguage);
-      countries = countryOptions(c.countries ?? [], c.systemCountry);
-    });
-    return Events.On('settings:changed', (e) => (values = valuesOf(e.data as SettingsSnapshot)));
+    choices()
+      .then((c) => {
+        sizes = (c.pageSizes ?? []).map((n) => ({ value: String(n), label: String(n) }));
+        ratings = (c.ratings ?? []).map((r) => ({ value: r, label: ratingLabel(r) }));
+        langs = languageOptions(c.languages ?? [], c.systemLanguage);
+        countries = countryOptions(c.countries ?? [], c.systemCountry);
+      })
+      .catch(() => (loadError = "Couldn't load these options. Open Search again to retry."));
   });
 
+  // Shown values come only from snapshots (settings:changed is ordered; call results are not), so
+  // a late response never reverts this or another control. A failure reverts to the last snapshot.
   async function choose(name: Name, v: string) {
-    const prev = values[name];
-    values[name] = v;
+    values = { ...values, [name]: v };
     errors[name] = '';
     try {
-      values = valuesOf(await setPref(name, v));
-    } catch {
-      values[name] = prev;
-      errors[name] = "Couldn't save this setting. Try again.";
+      await setPref(name, v);
+    } catch (e) {
+      values = { ...values, [name]: valuesOf(initial)[name] };
+      errors[name] = saveErrorText(settingsError(e)?.kind);
     }
   }
 </script>
@@ -81,7 +84,7 @@
   <SettingRow
     label="GIFs per page"
     id="pagesize-label"
-    error={errors.pageSize}
+    error={errors.pageSize || loadError}
     helper="Bigger pages use fewer requests. Free GIPHY and Klipy keys allow 100 per hour."
   >
     {@render picker('pageSize', 'pagesize-label', sizes)}

@@ -3,7 +3,7 @@
   // registration; a row shows a new combo only once Go accepted it. Test listens 5 s for the
   // hotkey:test event Go emits when that hotkey's callback fires (the only way to see a clash).
   import { Events } from '@wailsio/runtime';
-  import { onMount, untrack } from 'svelte';
+  import { onMount } from 'svelte';
   import { setHotkey, settingsError, testHotkey, type SettingsSnapshot } from '../lib/api';
   import { hotkeyErrorText } from '../lib/errors';
   import { canonical, DEFAULT_OPEN, glyphs, SLOT_LABELS, type Slot } from '../lib/hotkeys';
@@ -14,25 +14,24 @@
   const ROWS = (['open', 'favorites', 'recents'] as const).map((slot) => ({ slot, label: SLOT_LABELS[slot] }));
   const TEST_MS = 5000;
 
-  let hk = $state(untrack(() => ({ ...initial.hotkeys })));
+  // Only SettingsApp's snapshot (settings:changed, and a re-read on show), never a call's result:
+  // responses are not ordered against events, so a late one could show an older binding.
+  const hk = $derived(initial.hotkeys);
   let msg = $state<Record<string, { text: string; tone: 'secondary' | 'success' | 'error' }>>({});
   let listening = $state<Slot | null>(null);
   let listenTimer: ReturnType<typeof setTimeout> | undefined;
   let offTest: (() => void) | undefined;
 
   onMount(() => {
-    const off = Events.On('settings:changed', (e) => (hk = { ...(e.data as SettingsSnapshot).hotkeys }));
-    return () => {
-      off();
-      stopListening();
-    };
+    // A stored combo macOS refused at launch is not bound (the row shows Not set): say why (H4b).
+    for (const { slot } of ROWS) {
+      const refused = initial.hotkeysFailed[slot];
+      if (refused) say(slot, hotkeyErrorText('hotkey_register_failed_new', refused, ''), 'error');
+    }
+    return stopListening;
   });
 
   const say = (slot: Slot, text: string, tone: 'secondary' | 'success' | 'error' = 'secondary') => (msg[slot] = { text, tone });
-
-  function saved(s: SettingsSnapshot) {
-    hk = { ...s.hotkeys };
-  }
 
   // '' clears the row's message (a recording started or succeeded); otherwise H1–H4b under the row.
   // The field keeps its combo either way.
@@ -45,7 +44,7 @@
     stopListening();
     say(slot, '');
     try {
-      saved(await setHotkey(slot, accel));
+      await setHotkey(slot, accel); // a change arrives as settings:changed
     } catch (err) {
       const se = settingsError(err);
       fail(slot, se?.kind ?? 'hotkey_register_failed', accel, se?.slot);
@@ -100,7 +99,6 @@
         label={r.label}
         value={hk[r.slot] ?? ''}
         describedby="hk-{r.slot}-msg"
-        onsaved={saved}
         onfail={(kind, accel, other) => fail(r.slot, kind, accel, other)}
       />
       <button class="btn-secondary" aria-label="Test {r.label} shortcut" disabled={!hk[r.slot]} onclick={() => test(r.slot)}>Test</button>
@@ -108,7 +106,7 @@
         <button
           class="btn-secondary"
           aria-label="Reset to Default, {r.label} shortcut"
-          disabled={canonical(hk.open || DEFAULT_OPEN) === DEFAULT_OPEN}
+          disabled={!!hk.open && canonical(hk.open) === DEFAULT_OPEN}
           onclick={() => change('open', DEFAULT_OPEN)}>Reset to Default</button
         >
       {:else}

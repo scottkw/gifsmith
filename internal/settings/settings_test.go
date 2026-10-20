@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -215,6 +216,89 @@ func TestStoreUnreadableIsFirstRun(t *testing.T) {
 	}
 	if buf.Len() == 0 {
 		t.Error("unreadable settings file was not logged")
+	}
+}
+
+func TestStoreNeverOverwritesUnreadable(t *testing.T) {
+	log.SetOutput(io.Discard)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	dir := t.TempDir()
+	file := filepath.Join(dir, "settings.json")
+	bad := []byte(`{"theme":"dark","pageSize":"36"}`) // one wrong-typed field fails the whole decode
+	if err := os.WriteFile(file, bad, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := OpenStore(dir)
+	if _, err := s.Update(func(p *Prefs) error { p.LastProvider = "klipy"; return nil }); !errors.Is(err, ErrUnreadable) {
+		t.Fatalf("Update over an unreadable file: err = %v, want ErrUnreadable", err)
+	}
+	if b, _ := os.ReadFile(file); !bytes.Equal(b, bad) {
+		t.Fatalf("settings.json = %s, want it left as is", b)
+	}
+	// Fixed by hand: the next write re-reads it and keeps its fields.
+	if err := os.WriteFile(file, []byte(`{"theme":"dark","pageSize":36}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	p, err := s.Update(func(p *Prefs) error { p.LastProvider = "klipy"; return nil })
+	if err != nil || p.Theme != "dark" || p.PageSize != 36 || p.LastProvider != "klipy" {
+		t.Errorf("Update after the fix = %+v, %v; want the file's prefs plus lastProvider", p, err)
+	}
+}
+
+// WR-03: Reset keeps the unreadable file as a .bak, runs on defaults, and writes work again.
+func TestStoreResetMovesUnreadableAside(t *testing.T) {
+	log.SetOutput(io.Discard)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	dir := t.TempDir()
+	file := filepath.Join(dir, "settings.json")
+	bad := []byte(`{"theme":"dark","pageSize":"36"}`)
+	if err := os.WriteFile(file, bad, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := OpenStore(dir)
+	if !s.Unreadable() {
+		t.Fatal("Unreadable() = false for a wrong-typed file")
+	}
+	if p, err := s.Reset(); err != nil || p != (Prefs{}) || s.Unreadable() {
+		t.Fatalf("Reset = %+v, %v, unreadable %v; want defaults, nil, false", p, err, s.Unreadable())
+	}
+	baks, _ := filepath.Glob(file + ".*.bak")
+	if len(baks) != 1 {
+		t.Fatalf("backups = %v, want one", baks)
+	}
+	if b, _ := os.ReadFile(baks[0]); !bytes.Equal(b, bad) {
+		t.Errorf("backup = %s, want the original bytes", b)
+	}
+	if p, err := s.Update(func(p *Prefs) error { p.Theme = "light"; return nil }); err != nil || p.Theme != "light" {
+		t.Errorf("Update after Reset = %+v, %v", p, err)
+	}
+	// A readable store: Reset changes nothing.
+	if p, err := s.Reset(); err != nil || p.Theme != "light" {
+		t.Errorf("Reset of a readable store = %+v, %v; want it kept", p, err)
+	}
+	if baks, _ := filepath.Glob(file + ".*.bak"); len(baks) != 1 {
+		t.Errorf("backups = %v after a no-op Reset, want still one", baks)
+	}
+}
+
+// A file fixed by hand before Reset is kept and read, not moved aside.
+func TestStoreResetKeepsAFixedFile(t *testing.T) {
+	log.SetOutput(io.Discard)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	dir := t.TempDir()
+	file := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(file, []byte("{nope"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := OpenStore(dir)
+	if err := os.WriteFile(file, []byte(`{"theme":"dark"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if p, err := s.Reset(); err != nil || p.Theme != "dark" || s.Unreadable() {
+		t.Errorf("Reset = %+v, %v; want the fixed file's prefs", p, err)
+	}
+	if baks, _ := filepath.Glob(file + ".*.bak"); len(baks) != 0 {
+		t.Errorf("backups = %v, want none", baks)
 	}
 }
 

@@ -19,7 +19,7 @@
 
   function open(e: MouseEvent, url: string) {
     e.preventDefault();
-    openExternal(url);
+    openExternal(url).catch(() => {});
   }
 </script>
 

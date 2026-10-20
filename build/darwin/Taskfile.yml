@@ -240,6 +240,7 @@ tasks:
   release:build:
     summary: Developer ID-signed arm64 Gifsmith.app and DMG in bin/release, verified (no notarization)
     cmds:
+      - task: release:app
       - task: release:assemble
         vars:
           NOTARIZE: "false"
@@ -250,17 +251,42 @@ tasks:
       - sh: xcrun notarytool history --keychain-profile "{{.NOTARY_PROFILE}}" >/dev/null 2>&1
         msg: 'No working notary profile "gifsmith-notary": resolve the Apple Developer agreement and run notarytool store-credentials (see .planning/phases/04-settings-shell-polish-release/04-KLIPY-EMAIL.md)'
     cmds:
+      - task: release:app
+      - task: release:sign
+
+  # CI runs release:app in a job with no credentials and release:sign in a separate job on a
+  # fresh runner that only downloads the built bundle, so no dependency install or frontend/Go
+  # build runs on the runner where the Developer ID identity is unlocked. Locally both run in one
+  # shell under your own account; that is your machine's trust boundary, not this file's.
+  release:app:
+    summary: Builds the unsigned arm64 bin/gifsmith.app that release:sign signs (installs dependencies)
+    preconditions:
+      # shortcut: untracked files are not checked; check them too if a release ever ships one.
+      - sh: git diff --quiet HEAD --
+        msg: "Tracked files differ from HEAD: commit or stash them before a release build"
+    cmds:
+      - task: package
+        vars:
+          ARCH: arm64
+      - bash scripts/release-stamp.sh write "{{.BIN_DIR}}/{{.APP_NAME}}.app"
+
+  release:sign:
+    summary: Signs, notarizes, staples and verifies the bin/gifsmith.app that release:app built at HEAD
+    preconditions:
+      - sh: test -x "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS/{{.APP_NAME}}"
+        msg: "No {{.BIN_DIR}}/{{.APP_NAME}}.app: run release:app first"
+      - sh: bash scripts/release-stamp.sh check "{{.BIN_DIR}}/{{.APP_NAME}}.app"
+        msg: "{{.BIN_DIR}}/{{.APP_NAME}}.app is not the release:app build of HEAD (or changed since): run release:app"
+      - sh: xcrun notarytool history --keychain-profile "{{.NOTARY_PROFILE}}" >/dev/null 2>&1
+        msg: 'No working notary profile "gifsmith-notary": resolve the Apple Developer agreement and run notarytool store-credentials (see .planning/phases/04-settings-shell-polish-release/04-KLIPY-EMAIL.md)'
+    cmds:
       - task: release:assemble
         vars:
           NOTARIZE: "true"
 
   release:assemble:
-    summary: Shared release steps; NOTARIZE=true adds notarize + staple for the app and the DMG
+    summary: Shared release steps on bin/gifsmith.app; NOTARIZE=true adds notarize + staple for the app and the DMG
     internal: true
-    deps:
-      - task: package
-        vars:
-          ARCH: arm64
     cmds:
       - case "{{.RELEASE_DIR}}" in */release) ;; *) echo "refusing to use release dir '{{.RELEASE_DIR}}'"; exit 1;; esac
       - rm -rf "{{.RELEASE_DIR}}"

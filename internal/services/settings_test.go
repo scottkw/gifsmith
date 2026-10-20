@@ -488,14 +488,34 @@ func TestSetPrefRejectsInvalid(t *testing.T) {
 	}
 }
 
+func TestSettingsChangedEndsWithTheStore(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	var wg sync.WaitGroup
+	for i := range 40 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if i%2 == 0 {
+				_, _ = f.svc.SetPref(ctx, "theme", []string{"dark", "light"}[i/2%2])
+			} else {
+				_, _ = f.svc.SetPref(ctx, "hideFilenames", []string{"true", "false"}[i/2%2])
+			}
+		}()
+	}
+	wg.Wait()
+	// Webviews show the last settings:changed they get, so it must match what was stored last.
+	last, ok := (*f.data)[len(*f.data)-1].(Snapshot)
+	p := f.svc.Store.Get()
+	if !ok || last.Theme != p.Theme || last.HideFilenames != p.HideFilenames {
+		t.Errorf("last event %+v, store %+v", last, p)
+	}
+}
+
 func TestSetPrefWriteFailure(t *testing.T) {
 	logs := captureLog(t)
 	f := newSettings(t, "")
-	file := filepath.Join(f.dir, "not-a-dir")
-	if err := os.WriteFile(file, []byte("x"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	f.svc.Store = settings.OpenStore(file)
+	readOnlyDir(t, f.dir)
 	_, err := f.svc.SetPref(context.Background(), "theme", "dark")
 	wantSettingsErr(t, err, "prefs_write_failed")
 	if len(*f.events) != 0 {
@@ -503,6 +523,55 @@ func TestSetPrefWriteFailure(t *testing.T) {
 	}
 	if !strings.Contains(logs.String(), "settings write failed: theme") {
 		t.Errorf("log = %q, want the failed field named", logs.String())
+	}
+}
+
+// WR-03: an unreadable settings.json has its own error kind and Snapshot flag, and ResetSettings
+// moves it aside so changes save again.
+func TestUnreadableSettingsReset(t *testing.T) {
+	captureLog(t)
+	f := newSettings(t, "")
+	ctx := context.Background()
+	file := filepath.Join(f.dir, "settings.json")
+	if err := os.WriteFile(file, []byte(`{"pageSize":"36"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f.svc.Store = settings.OpenStore(f.dir)
+	if !f.svc.Snapshot(ctx).SettingsUnreadable {
+		t.Fatal("Snapshot.SettingsUnreadable = false for an unreadable file")
+	}
+	_, err := f.svc.SetPref(ctx, "theme", "dark")
+	wantSettingsErr(t, err, "prefs_unreadable")
+	if err := f.svc.SetLastProvider(ctx, "klipy"); err == nil {
+		t.Error("SetLastProvider over an unreadable file succeeded")
+	}
+	snap, err := f.svc.ResetSettings(ctx)
+	if err != nil || snap.SettingsUnreadable {
+		t.Fatalf("ResetSettings = %+v, %v", snap, err)
+	}
+	if got := *f.events; len(got) != 1 || got[0] != "settings:changed" {
+		t.Errorf("events = %v, want [settings:changed]", got)
+	}
+	if baks, _ := filepath.Glob(file + ".*.bak"); len(baks) != 1 {
+		t.Errorf("backups = %v, want one", baks)
+	}
+	if snap, err := f.svc.SetPref(ctx, "theme", "dark"); err != nil || snap.Theme != "dark" {
+		t.Errorf("SetPref after reset = %+v, %v", snap, err)
+	}
+}
+
+func TestResetSettingsFailure(t *testing.T) {
+	captureLog(t)
+	f := newSettings(t, "")
+	if err := os.WriteFile(filepath.Join(f.dir, "settings.json"), []byte("{nope"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f.svc.Store = settings.OpenStore(f.dir)
+	readOnlyDir(t, f.dir) // the .bak cannot be created
+	snap, err := f.svc.ResetSettings(context.Background())
+	wantSettingsErr(t, err, "prefs_reset_failed")
+	if !snap.SettingsUnreadable || len(*f.events) != 0 {
+		t.Errorf("failed reset: unreadable %v, events %v; want still unreadable, no event", snap.SettingsUnreadable, *f.events)
 	}
 }
 
@@ -668,6 +737,38 @@ func TestSetLaunchAtLoginFailures(t *testing.T) {
 	wantSettingsErr(t, err, "autostart_failed")
 }
 
+// readOnlyDir makes every settings write in dir fail (the file stays readable) until the test ends.
+func readOnlyDir(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+}
+
+// WR-04: a failed write puts the login item back, so the reported failure leaves the OS unchanged.
+func TestSetLaunchAtLoginWriteFailureRollsBack(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	as := f.svc.Autostart.(*fakeAutostart)
+	readOnlyDir(t, f.dir)
+	for _, on := range []bool{true, false} {
+		as.enabled = !on
+		_, err := f.svc.SetLaunchAtLogin(ctx, on)
+		wantSettingsErr(t, err, "prefs_write_failed")
+		if as.enabled != !on || f.svc.Store.Get().LaunchAtLogin || len(*f.events) != 0 {
+			t.Errorf("on=%v: OS enabled %v, pref %v, events %v; want all unchanged", on, as.enabled, f.svc.Store.Get().LaunchAtLogin, *f.events)
+		}
+	}
+	// Already in the requested state: the rollback must not flip it.
+	as.enabled = true
+	_, err := f.svc.SetLaunchAtLogin(ctx, true)
+	wantSettingsErr(t, err, "prefs_write_failed")
+	if !as.enabled {
+		t.Error("rollback disabled a login item that was already on")
+	}
+}
+
 func TestApplyStartup(t *testing.T) {
 	for _, tc := range []struct {
 		name          string
@@ -749,9 +850,9 @@ func TestSaveKeyTriggersClips(t *testing.T) {
 	if err := f.svc.SaveKey(ctx, "giphy", "bad-key-123"); err == nil {
 		t.Fatal("bad key saved")
 	}
-	time.Sleep(50 * time.Millisecond)
-	if n := f.probes.Load(); n != 0 {
-		t.Errorf("failed SaveKey probed Clips %d times, want 0", n)
+	// No sleep needed: a probe starts only with a saved key (State is no_key without one).
+	if s, n := f.clips.State(), f.probes.Load(); s != search.ClipsNoKey || n != 0 {
+		t.Errorf("failed SaveKey: clips %s, probes %d; want no_key, 0", s, n)
 	}
 	if err := f.svc.SaveKey(ctx, "giphy", "uat-key-123"); err != nil {
 		t.Fatal(err)
@@ -770,9 +871,10 @@ func TestSaveKeyTriggersClips(t *testing.T) {
 	if err := f.svc.SaveKey(ctx, "klipy", "uat-key-123"); err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(50 * time.Millisecond)
-	if n := f.probes.Load(); n != 2 {
-		t.Errorf("Klipy save probed Clips (probes %d, want 2)", n)
+	// No sleep needed: a reset + probe would leave Clips checking before SaveKey returned, and a
+	// probe that already finished counted itself first.
+	if s, n := f.clips.State(), f.probes.Load(); s != search.ClipsEnabled || n != 2 {
+		t.Errorf("Klipy save: clips %s, probes %d; want enabled, 2", s, n)
 	}
 }
 
@@ -786,9 +888,9 @@ func TestGiphySuccessTriggersClipsOnce(t *testing.T) {
 	if _, err := f.gifs.Search(ctx, "giphy", "boom", ""); err == nil {
 		t.Fatal("boom succeeded")
 	}
-	time.Sleep(50 * time.Millisecond)
-	if n := f.probes.Load(); n != 0 {
-		t.Errorf("a failed GIPHY call probed Clips (%d)", n)
+	// No sleep needed: Trigger moves Clips to checking before it returns.
+	if s, n := f.clips.State(), f.probes.Load(); s != search.ClipsUnknown || n != 0 {
+		t.Errorf("a failed GIPHY call: clips %s, probes %d; want unknown, 0", s, n)
 	}
 	for range 2 {
 		if _, err := f.gifs.Trending(ctx, "giphy", ""); err != nil {

@@ -4,6 +4,7 @@ import {
   actionErrorText,
   downloadedText,
   folderErrorText,
+  saveErrorText,
   klipyGatedText,
   libraryErrorText,
   errorState,
@@ -267,6 +268,11 @@ test('hotkeyErrorText: H1, H2, H3, H4, H4b and H7 with the combo as glyphs', () 
   assert.equal(hotkeyErrorText('hotkey_system', 'Cmd+Q', ''), '⌘Q is a macOS shortcut. Choose another one.');
   assert.equal(hotkeyErrorText('hotkey_register_failed', 'Cmd+Ctrl+Option+J', ''), "macOS couldn't register ⌃⌥⌘J. Your previous shortcut still works.");
   assert.equal(hotkeyErrorText('hotkey_register_failed_new', 'Cmd+Ctrl+Option+J', ''), "macOS couldn't register ⌃⌥⌘J. Try a different shortcut.");
+  assert.equal(hotkeyErrorText('record_failed', '', ''), "Couldn't start recording. Try again.");
+  assert.equal(
+    hotkeyErrorText('hotkey_register_failed_lost', 'Cmd+Ctrl+Option+J', ''),
+    "macOS couldn't register ⌃⌥⌘J, and your previous shortcut stopped working. Choose another one.",
+  );
   assert.equal(hotkeyErrorText('test_failed', 'Cmd+Ctrl+Option+F', ''), 'Nothing happened. Another app may be using ⌃⌥⌘F. Try a different shortcut.');
   assert.equal(hotkeyErrorText('prefs_write_failed', 'Cmd+Ctrl+Option+F', ''), "Couldn't save this setting. Try again.");
 });
@@ -280,6 +286,15 @@ test('Downloads pane D5–D8 name the folder by display name', () => {
   assert.equal(folderErrorText('folder_unwritable', 'Locked'), "Gifsmith can't write to Locked. Choose another folder.");
   assert.equal(folderErrorText('folder_missing', 'Gone'), 'This folder no longer exists. Choose another folder or reset to Downloads.');
   assert.equal(folderErrorText('picker_failed', ''), "Couldn't save this setting. Try again.");
+});
+
+test('an unreadable settings file is named, not retried (WR-03)', () => {
+  const unreadable = "Couldn't save. Gifsmith can't read its settings file. See General.";
+  assert.equal(saveErrorText('prefs_unreadable'), unreadable);
+  assert.equal(saveErrorText('prefs_write_failed'), "Couldn't save this setting. Try again.");
+  assert.equal(saveErrorText(), "Couldn't save this setting. Try again.");
+  assert.equal(hotkeyErrorText('prefs_unreadable', 'Cmd+Ctrl+Option+F', ''), unreadable);
+  assert.equal(folderErrorText('prefs_unreadable', 'Downloads'), unreadable);
 });
 
 test('T6 and F4 use the folder display name, never a path', () => {

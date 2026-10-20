@@ -12,7 +12,7 @@
     consequence,
     keyUrl,
     status,
-  }: { provider: 'giphy' | 'klipy'; label: string; description: string; consequence: string; keyUrl: string; status: KeyStatus } = $props();
+  }: { provider: 'giphy' | 'klipy'; label: string; description: string; consequence: string; keyUrl: string; status: KeyStatus | null } = $props(); // null: not read yet
 
   let mode = $state<'view' | 'edit' | 'confirm'>('view');
   let value = $state('');
@@ -25,7 +25,7 @@
   let actions = $state<HTMLDivElement>();
   let msgTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const saved = $derived(status.status !== 'not_set');
+  const saved = $derived(status !== null && status.status !== 'not_set');
 
   function say(text: string, t: typeof tone) {
     clearTimeout(msgTimer);
@@ -106,6 +106,8 @@
     <span id="key-{provider}-title" class="name">{label}</span>
     {#if testing}
       <span class="status muted"><span class="spinner" aria-hidden="true"></span> Testing…</span>
+    {:else if status === null}
+      <!-- not read yet: no state, and no Add Key… for a key that may be saved -->
     {:else if status.status === 'saved'}
       <span class="status ok">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" /></svg>
@@ -153,7 +155,9 @@
   {:else}
     <div class="actions" bind:this={actions}>
       <div class="buttons">
-        {#if saved}
+        {#if status === null}
+          <!-- buttons appear once the status is known -->
+        {:else if saved}
           <button class="btn-secondary" onclick={() => open('edit')}>Change Key…</button>
           <button class="btn-secondary" aria-label="Test {label} key" disabled={testing} onclick={test}>Test</button>
           <button class="btn-secondary" aria-label="Remove {label} key" onclick={() => open('confirm')}>Remove</button>
@@ -165,7 +169,7 @@
         href={keyUrl}
         onclick={(e) => {
           e.preventDefault();
-          openExternal(keyUrl);
+          openExternal(keyUrl).catch(() => {});
         }}>Get a free key ↗</a
       >
     </div>

@@ -3,7 +3,7 @@
   // The page is never reloaded, so the active pane survives hide/show within a launch.
   import { Events } from '@wailsio/runtime';
   import { onMount, tick, untrack } from 'svelte';
-  import type { SettingsSnapshot } from '../lib/api';
+  import { snapshot, type SettingsSnapshot } from '../lib/api';
   import AboutPane from './AboutPane.svelte';
   import DownloadsPane from './DownloadsPane.svelte';
   import GeneralPane, { pendingReveal } from './GeneralPane.svelte';
@@ -24,11 +24,20 @@
   ];
 
   let active = $state(0);
-  let snap = $state(untrack(() => initial)); // a pane mounts with the latest snapshot
+  // Every pane follows the latest snapshot. Re-read on each show: the window loads hidden at launch,
+  // and Go fills some fields from the OS (login item, a missing download folder).
+  let snap = $state(untrack(() => initial));
   const tabs: HTMLButtonElement[] = [];
 
   onMount(() => {
     const offChanged = Events.On('settings:changed', (e) => (snap = e.data as SettingsSnapshot));
+    const offShow = Events.On('settings:show', async () => {
+      try {
+        snap = await snapshot();
+      } catch {
+        // keep the last snapshot; settings:changed still updates it
+      }
+    });
     // The update alerts open Settings at General → Updates; a mounted General scrolls itself.
     const offReveal = Events.On('settings:reveal', () => {
       if (active !== 0) pendingReveal.updates = true;
@@ -36,6 +45,7 @@
     });
     return () => {
       offChanged();
+      offShow();
       offReveal();
     };
   });

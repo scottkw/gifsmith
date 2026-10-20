@@ -38,6 +38,7 @@ export const setLaunchAtLogin = (on: boolean) => SettingsService.SetLaunchAtLogi
 // (cause.folder names it) or picker_failed; a cancel resolves to the unchanged snapshot.
 export const chooseDownloadDir = () => SettingsService.ChooseDownloadDir();
 export const resetDownloadDir = () => SettingsService.ResetDownloadDir();
+export const resetSettings = () => SettingsService.ResetSettings();
 // The Automatic paste grant, read without prompting.
 export const accessibilityStatus = () => SettingsService.AccessibilityStatus();
 // Go's services.SettingsError arrives as err.cause: { kind, slot? }.
