@@ -37,6 +37,10 @@ type SettingsService struct {
 	Executable   func() (string, error) // os.Executable; injectable for the not-in-Applications check
 	Hotkeys      *Hotkeys
 	OnOpenHotkey func(accel string) // tray key equivalent for Open Gifsmith; nil in tests
+	// PickFolder shows the native folder picker starting in start; "" and nil is a cancel.
+	// The only source of a download folder: no bound method takes a path from the webview.
+	PickFolder       func(start string) (string, error)
+	DefaultDownloads string // ~/Downloads (bin/uat-downloads in the UAT build)
 
 	mu   sync.Mutex // serializes SaveKey, TestKey and RemoveKey end to end: the Keychain ends in the last call's state
 	hkMu sync.Mutex // serializes SetHotkey: the Store ends with what is registered
@@ -212,6 +216,12 @@ type Snapshot struct {
 	GiphyLang     string           `json:"giphyLang"`    // "" = Match System
 	KlipyCountry  string           `json:"klipyCountry"` // "" = Match System
 	Hotkeys       settings.Hotkeys `json:"hotkeys"`      // canonical; Open always set
+	// The download folder: full path for display and title only, its name, whether it is the
+	// default Downloads folder, and whether it is missing now.
+	DownloadDir        string `json:"downloadDir"`
+	DownloadDirName    string `json:"downloadDirName"`
+	DownloadDirDefault bool   `json:"downloadDirDefault"`
+	DownloadDirMissing bool   `json:"downloadDirMissing"`
 }
 
 // Choices are the allowed Search-pane values, with what Match System resolves to now.
@@ -509,4 +519,17 @@ func (s *SettingsService) ResumeHotkeys(ctx context.Context) { s.Hotkeys.Resume(
 // TestHotkey makes slot's next press within 5 s emit hotkey:test {slot}.
 func (s *SettingsService) TestHotkey(ctx context.Context, slot string) error {
 	return s.Hotkeys.ArmTest(slot)
+}
+
+// DownloadDir is where the next download goes: the chosen folder, else DefaultDownloads.
+func (s *SettingsService) DownloadDir() string { return "" }
+
+// ChooseDownloadDir shows the folder picker and saves the picked folder if Go accepts it.
+func (s *SettingsService) ChooseDownloadDir(ctx context.Context) (Snapshot, error) {
+	return s.Snapshot(ctx), nil
+}
+
+// ResetDownloadDir goes back to the default Downloads folder.
+func (s *SettingsService) ResetDownloadDir(ctx context.Context) (Snapshot, error) {
+	return s.Snapshot(ctx), nil
 }

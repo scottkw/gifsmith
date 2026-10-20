@@ -190,6 +190,7 @@ type Prefs struct {
 	GiphyLang     string  `json:"giphyLang,omitempty"`    // "" = match system
 	KlipyCountry  string  `json:"klipyCountry,omitempty"` // "" = match system
 	Hotkeys       Hotkeys `json:"hotkeys,omitzero"`
+	DownloadDir   string  `json:"downloadDir,omitempty"` // "" = the default Downloads folder
 }
 
 // Hotkeys are the global shortcuts as canonical Wails accelerators ("Cmd+Ctrl+Option+G").

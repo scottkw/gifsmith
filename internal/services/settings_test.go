@@ -1234,3 +1234,131 @@ func TestSearchKeyRejectedMarks(t *testing.T) {
 		t.Errorf("klipy revoked: %v, rejected %v", err, f.svc.Keys.Rejected(provider.Klipy))
 	}
 }
+
+// downloadsFixture gives f a default Downloads folder and a picker that returns *pick.
+func downloadsFixture(t *testing.T) (settingsFixture, *string) {
+	t.Helper()
+	f := newSettings(t, "")
+	f.svc.DefaultDownloads = filepath.Join(t.TempDir(), "Downloads")
+	if err := os.Mkdir(f.svc.DefaultDownloads, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	pick := new(string)
+	f.svc.PickFolder = func(start string) (string, error) { return *pick, nil }
+	return f, pick
+}
+
+func TestChooseDownloadDirCancel(t *testing.T) {
+	f, _ := downloadsFixture(t)
+	ctx := context.Background()
+	before := f.svc.Snapshot(ctx)
+	snap, err := f.svc.ChooseDownloadDir(ctx)
+	if err != nil || snap != before {
+		t.Fatalf("ChooseDownloadDir(cancel) = %+v, %v; want the unchanged %+v", snap, err, before)
+	}
+	if _, err := os.Stat(filepath.Join(f.dir, "settings.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a cancelled pick wrote settings.json (stat err %v)", err)
+	}
+	if len(*f.events) != 0 {
+		t.Errorf("events = %v, want none", *f.events)
+	}
+}
+
+func TestChooseDownloadDirValid(t *testing.T) {
+	f, pick := downloadsFixture(t)
+	ctx := context.Background()
+	var starts []string
+	f.svc.PickFolder = func(start string) (string, error) { starts = append(starts, start); return *pick, nil }
+	*pick = filepath.Join(t.TempDir(), "GIFs")
+	if err := os.Mkdir(*pick, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	snap, err := f.svc.ChooseDownloadDir(ctx)
+	if err != nil || snap.DownloadDirName != "GIFs" || snap.DownloadDir != *pick || snap.DownloadDirDefault || snap.DownloadDirMissing {
+		t.Fatalf("ChooseDownloadDir = %+v, %v; want GIFs at %s", snap, err, *pick)
+	}
+	if got := f.svc.DownloadDir(); got != *pick {
+		t.Errorf("DownloadDir() = %q, want %q", got, *pick)
+	}
+	if len(starts) != 1 || starts[0] != f.svc.DefaultDownloads {
+		t.Errorf("picker started in %v, want [%s]", starts, f.svc.DefaultDownloads)
+	}
+	if got := *f.events; len(got) != 1 || got[0] != "settings:changed" {
+		t.Fatalf("events = %v, want [settings:changed]", got)
+	}
+	// The same folder again: no write, no event.
+	if err := os.Remove(filepath.Join(f.dir, "settings.json")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.ChooseDownloadDir(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(f.dir, "settings.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("re-choosing the saved folder wrote settings.json (stat err %v)", err)
+	}
+	if len(*f.events) != 1 {
+		t.Errorf("events = %v, want no new event", *f.events)
+	}
+	if left, _ := os.ReadDir(*pick); len(left) != 0 {
+		t.Errorf("probe files left in the chosen folder: %v", left)
+	}
+}
+
+func TestChooseDownloadDirInvalid(t *testing.T) {
+	f, pick := downloadsFixture(t)
+	ctx := context.Background()
+	*pick = filepath.Join(t.TempDir(), "Gone")
+	_, err := f.svc.ChooseDownloadDir(ctx)
+	wantFolderErr(t, err, "folder_missing", "Gone")
+	if got := f.svc.DownloadDir(); got != f.svc.DefaultDownloads {
+		t.Errorf("DownloadDir() = %q after a refused folder, want the default", got)
+	}
+	if len(*f.events) != 0 {
+		t.Errorf("events = %v, want none", *f.events)
+	}
+}
+
+func TestChooseDownloadDirNoPicker(t *testing.T) {
+	f, _ := downloadsFixture(t)
+	f.svc.PickFolder = nil
+	_, err := f.svc.ChooseDownloadDir(context.Background())
+	wantSettingsErr(t, err, "picker_failed")
+}
+
+func TestResetDownloadDir(t *testing.T) {
+	f, pick := downloadsFixture(t)
+	ctx := context.Background()
+	*pick = t.TempDir()
+	if _, err := f.svc.ChooseDownloadDir(ctx); err != nil {
+		t.Fatal(err)
+	}
+	snap, err := f.svc.ResetDownloadDir(ctx)
+	if err != nil || !snap.DownloadDirDefault || snap.DownloadDirName != "Downloads" || f.svc.DownloadDir() != f.svc.DefaultDownloads {
+		t.Fatalf("ResetDownloadDir = %+v, %v", snap, err)
+	}
+	if f.svc.Store.Get().DownloadDir != "" {
+		t.Errorf("stored DownloadDir = %q, want \"\"", f.svc.Store.Get().DownloadDir)
+	}
+	n := len(*f.events)
+	if _, err := f.svc.ResetDownloadDir(ctx); err != nil || len(*f.events) != n {
+		t.Errorf("Reset when already default: err %v, events %v; want no new event", err, *f.events)
+	}
+}
+
+func TestSnapshotDownloadDirMissing(t *testing.T) {
+	f, pick := downloadsFixture(t)
+	ctx := context.Background()
+	*pick = filepath.Join(t.TempDir(), "Later")
+	if err := os.Mkdir(*pick, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.ChooseDownloadDir(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(*pick); err != nil {
+		t.Fatal(err)
+	}
+	if snap := f.svc.Snapshot(ctx); !snap.DownloadDirMissing || snap.DownloadDirName != "Later" {
+		t.Errorf("Snapshot after the folder was deleted = %+v, want missing Later", snap)
+	}
+}

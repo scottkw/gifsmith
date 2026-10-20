@@ -60,8 +60,9 @@ func MarshalError(err error) []byte {
 
 // SettingsError is the error SettingsService returns to the webview: fixed text per kind.
 type SettingsError struct {
-	Kind string `json:"kind"`
-	Slot string `json:"slot,omitempty"`
+	Kind   string `json:"kind"`
+	Slot   string `json:"slot,omitempty"`
+	Folder string `json:"folder,omitempty"` // the folder's display name, never a path
 }
 
 var settingsText = map[string]string{
@@ -77,6 +78,12 @@ var settingsText = map[string]string{
 	"hotkey_register_failed":     "macOS couldn't register the shortcut; the previous one still works",
 	"hotkey_register_failed_new": "macOS couldn't register the shortcut",
 	"hotkey_invalid":             "this shortcut is not allowed",
+	// Folder names the refused download folder.
+	"folder_missing":    "the folder does not exist",
+	"folder_fat":        "the folder is on an exFAT or FAT drive",
+	"folder_network":    "the folder is on a network drive",
+	"folder_unwritable": "the folder is not writable",
+	"picker_failed":     "couldn't open the folder picker",
 }
 
 func (e *SettingsError) Error() string {
@@ -92,4 +99,5 @@ var (
 	errAutostartFailed   = &SettingsError{Kind: "autostart_failed"}
 	errNotInApplications = &SettingsError{Kind: "not_in_applications"}
 	errKeychainDelete    = &SettingsError{Kind: "keychain_delete_failed"}
+	errPickerFailed      = &SettingsError{Kind: "picker_failed"}
 )
