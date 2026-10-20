@@ -267,7 +267,11 @@ tasks:
       - mkdir -p "{{.RELEASE_DIR}}"
       # Finder shows the bundle name; APP_NAME is lowercase.
       - ditto "{{.BIN_DIR}}/{{.APP_NAME}}.app" "{{.RELEASE_DIR}}/Gifsmith.app"
-      - wails3 tool sign --input "{{.RELEASE_DIR}}/Gifsmith.app" --identity "{{.SIGN_IDENTITY}}" --hardened-runtime{{if eq .NOTARIZE "true"}} --notarize --keychain-profile "{{.NOTARY_PROFILE}}"{{end}}
+      - wails3 tool sign --input "{{.RELEASE_DIR}}/Gifsmith.app" --identity "{{.SIGN_IDENTITY}}" --hardened-runtime
+      # Not wails3's --notarize: scripts/notarize.sh checks the status and retries the staple.
+      - '{{if eq .NOTARIZE "true"}}ditto -c -k --keepParent "{{.RELEASE_DIR}}/Gifsmith.app" "{{.RELEASE_DIR}}/Gifsmith.app.zip"{{else}}true{{end}}'
+      - '{{if eq .NOTARIZE "true"}}bash scripts/notarize.sh "{{.NOTARY_PROFILE}}" "{{.RELEASE_DIR}}/Gifsmith.app.zip" "{{.RELEASE_DIR}}/Gifsmith.app"{{else}}true{{end}}'
+      - rm -f "{{.RELEASE_DIR}}/Gifsmith.app.zip"
       # Two-representation TIFF so the background is sharp on Retina displays.
       - tiffutil -cathidpicheck build/darwin/dmg-background.png build/darwin/dmg-background@2x.png -out "{{.BIN_DIR}}/dmg-background.tiff"
       - >-
@@ -279,8 +283,7 @@ tasks:
         --files "LICENSE=LICENSE"
       - mv "{{.RELEASE_DIR}}/Gifsmith.dmg" "{{.RELEASE_DIR}}/{{.DMG_NAME}}"
       - codesign --force --sign "{{.SIGN_IDENTITY}}" --timestamp "{{.RELEASE_DIR}}/{{.DMG_NAME}}"
-      - '{{if eq .NOTARIZE "true"}}xcrun notarytool submit "{{.RELEASE_DIR}}/{{.DMG_NAME}}" --keychain-profile "{{.NOTARY_PROFILE}}" --wait{{else}}true{{end}}'
-      - '{{if eq .NOTARIZE "true"}}xcrun stapler staple "{{.RELEASE_DIR}}/{{.DMG_NAME}}"{{else}}true{{end}}'
+      - '{{if eq .NOTARIZE "true"}}bash scripts/notarize.sh "{{.NOTARY_PROFILE}}" "{{.RELEASE_DIR}}/{{.DMG_NAME}}" "{{.RELEASE_DIR}}/{{.DMG_NAME}}"{{else}}true{{end}}'
       - cd "{{.RELEASE_DIR}}" && shasum -a 256 "{{.DMG_NAME}}" > "{{.DMG_NAME}}.sha256"
       - bash scripts/verify-release.sh {{if eq .NOTARIZE "true"}}--notarized {{end}}"{{.RELEASE_DIR}}"
 
