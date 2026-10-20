@@ -255,7 +255,12 @@
       </p>
     {/if}
     {#if upd.state === 'downloading'}
-      <progress class="update-progress" max={upd.total || undefined} value={upd.done}></progress>
+      {#if upd.total > 0}
+        <progress class="update-progress" max={upd.total} value={upd.done}></progress>
+      {:else}
+        <!-- size unknown: indeterminate (a value with no max would read 100% from the first byte) -->
+        <progress class="update-progress"></progress>
+      {/if}
     {/if}
     {#if upd.state === 'available'}
       <button class="btn-primary" disabled={updBusy} onclick={download}>Download and Open…</button>
