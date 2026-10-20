@@ -8,11 +8,11 @@ updated: 2026-10-20T17:00:00Z
 
 ## Current Test
 
-number: 3
-name: Clean-VM install of the rebuilt DMG
+number: 4
+name: Settings window — checklist A1–A6
 expected: |
-  Gatekeeper prompt only, menu bar/no Dock, hotkey, copy/paste animated GIF, ⌘↵ copy-only + Enable Automatic Paste…, About 1.0.0 + up to date.
-awaiting: GIPHY key on VM clipboard (steps 1–3 passed)
+  See 04-HANDSON-CHECKLIST.md group A.
+awaiting: user response
 
 ## Tests
 
@@ -26,7 +26,7 @@ result: pass — local build from ae3d0cd tree: 2× Accepted, RELEASE VERIFY OK 
 
 ### 3. Clean-VM install of the rebuilt DMG (RELS-02, RELS-03)
 expected: same 6 steps as the 2026-10-20 VM test (Gatekeeper prompt only, menu bar/no Dock, hotkey, copy/paste animated GIF, ⌘↵ copy-only + Enable Automatic Paste…, About 1.0.0 + up to date).
-result: [pending]
+result: pass — fresh macOS 15.7.7 Tart VM, Gatekeeper enabled, draft DMG e2a8b510… downloaded via gh with quarantine, Finder drag to /Applications (not translocated): (1) only the "downloaded from the Internet… Apple checked it" prompt, spctl source=Notarized Developer ID; (2) menu bar icon, no Dock icon; (3) ⌃⌥⌘G opens panel, first-run key setup, real key saved, trending loads; (4) Enter puts a public.file-url .gif on the pasteboard, ⌘V into TextEdit pastes it animated; (5) ⌘↵ without Accessibility → "Copied — press ⌘V to paste" + Enable Automatic Paste…; (6) Settings → "Gifsmith 1.0.0 is up to date", About shows Version 1.0.0 with credits. VM deleted after.
 
 ### 4. Settings window — checklist A1–A6
 expected: activation and typing, ⌘W/red button hide and restore the previous app, theme switch without flash, login item on/off, Login Items change reflected on reopen, Accessibility grant shows ✓ On.
@@ -51,9 +51,9 @@ result: [pending]
 ## Summary
 
 total: 8
-passed: 2
+passed: 3
 issues: 0
-pending: 6
+pending: 5
 skipped: 0
 blocked: 0
 
