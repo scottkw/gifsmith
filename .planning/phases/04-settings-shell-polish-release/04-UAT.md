@@ -8,10 +8,10 @@ updated: 2026-10-20T17:00:00Z
 
 ## Current Test
 
-number: 7
-name: Downloads & grid — checklist D15–D18
+number: 8
+name: Motion, About, Updates — checklist E19–E21
 expected: |
-  See 04-HANDSON-CHECKLIST.md group D.
+  See 04-HANDSON-CHECKLIST.md group E.
 awaiting: user response
 
 ## Tests
@@ -42,7 +42,7 @@ result: pass — user on host.
 
 ### 7. Downloads & grid — checklist D15–D18
 expected: folder sheet + privacy prompt, ⌘S saves there; hidden names gifsmith-{id}.gif then (2); Large/Small grids; right-click menu placement; Klipy ⌘S refusal.
-result: [pending]
+result: pass — user on host.
 
 ### 8. Motion, About, Updates — checklist E19–E21
 expected: Reduce motion stills; About links and GIPHY mark in both themes; Updates section in both themes.
@@ -51,9 +51,9 @@ result: [pending]
 ## Summary
 
 total: 8
-passed: 6
+passed: 7
 issues: 0
-pending: 2
+pending: 1
 skipped: 0
 blocked: 0
 
