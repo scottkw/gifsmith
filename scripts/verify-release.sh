@@ -77,6 +77,7 @@ if $notarized; then
   sp=$(spctl -a -vv -t exec "$app" 2>&1) || fail "spctl rejected the app: $sp"
   grep -qF 'source=Notarized Developer ID' <<<"$sp" || fail "app is not 'source=Notarized Developer ID': $sp"
   spd=$(spctl -a -vv -t open --context context:primary-signature "$dmg" 2>&1) || fail "spctl rejected the dmg: $spd"
+  printf "%s\n%s\n" "$sp" "$spd" # the evidence lines release logs are checked for
   xcrun stapler validate "$app" || fail "stapler validate (app)"
   xcrun stapler validate "$dmg" || fail "stapler validate (dmg)"
 fi
