@@ -231,6 +231,7 @@ type Snapshot struct {
 	GridSearch         string `json:"gridSearch"`       // resolved: never ""
 	GridTrending       string `json:"gridTrending"`     // resolved: never ""
 	KlipyFileActions   bool   `json:"klipyFileActions"` // read-only: KlipyFileActionsCleared
+	UpdateCheck        bool   `json:"updateCheck"`      // automatic update checks on (= !UpdateCheckOff)
 }
 
 // Choices are the allowed Search-pane values, with what Match System resolves to now.

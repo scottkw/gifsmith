@@ -346,3 +346,94 @@ func TestUpdateDownloadNotAvailable(t *testing.T) {
 		t.Error("a request was sent")
 	}
 }
+
+func TestUpdateOnAvailable(t *testing.T) {
+	var got []string
+	f := newUpdates(t, serveRelease("v1.1.0", true))
+	f.svc.OnAvailable = func(v string) { got = append(got, v) }
+	if _, err := f.svc.Check(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(got, []string{"1.1.0"}) {
+		t.Errorf("OnAvailable %v", got)
+	}
+	got = nil
+	f = newUpdates(t, serveRelease("v1.0.0", true))
+	f.svc.OnAvailable = func(v string) { got = append(got, v) }
+	if _, err := f.svc.Check(context.Background()); err != nil || got != nil {
+		t.Errorf("up to date: OnAvailable %v, err %v", got, err)
+	}
+}
+
+func TestUpdateReveal(t *testing.T) {
+	n := 0
+	(&UpdateService{RevealFunc: func() { n++ }}).Reveal()
+	if n != 1 {
+		t.Errorf("RevealFunc called %d times", n)
+	}
+	(&UpdateService{}).Reveal() // nil RevealFunc: no-op
+}
+
+func TestRunAutoUpdates(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	f := newUpdates(t, serveRelease("v1.0.0", true))
+	var on atomic.Bool
+	on.Store(true)
+	done := make(chan struct{})
+	go func() {
+		RunAutoUpdates(ctx, f.svc, on.Load, 0, 20*time.Millisecond)
+		close(done)
+	}()
+	time.Sleep(150 * time.Millisecond)
+	if n := f.hits.Load(); n < 2 {
+		t.Errorf("%d checks in 150 ms, want at least 2", n)
+	}
+	on.Store(false)
+	time.Sleep(40 * time.Millisecond) // a check already past enabled() may still land
+	n := f.hits.Load()
+	time.Sleep(100 * time.Millisecond)
+	if f.hits.Load() != n {
+		t.Errorf("checks continued after turning automatic checks off")
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(100 * time.Millisecond):
+		t.Error("RunAutoUpdates did not return within 100 ms of cancel")
+	}
+}
+
+func TestRunAutoUpdatesOff(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+	f := newUpdates(t, serveRelease("v1.1.0", true))
+	RunAutoUpdates(ctx, f.svc, func() bool { return false }, 0, 20*time.Millisecond)
+	if n := f.hits.Load(); n != 0 {
+		t.Errorf("%d checks with automatic checks off", n)
+	}
+}
+
+func TestRunAutoUpdatesFailureIsQuiet(t *testing.T) {
+	buf := captureLog(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	f := newUpdates(t, func(w http.ResponseWriter, r *http.Request, _ string) { w.WriteHeader(503) })
+	done := make(chan struct{})
+	go func() {
+		RunAutoUpdates(ctx, f.svc, func() bool { return true }, 0, time.Hour)
+		close(done)
+	}()
+	deadline := time.Now().Add(2 * time.Second)
+	for f.hits.Load() == 0 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+	<-done
+	if st := f.svc.Status(context.Background()); st.State != "idle" {
+		t.Errorf("state %q, want idle", st.State)
+	}
+	if n := strings.Count(buf.String(), "update: check failed"); n != 1 {
+		t.Errorf("%d check-failed log lines, want 1: %q", n, buf.String())
+	}
+}

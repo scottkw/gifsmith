@@ -197,6 +197,8 @@ type Prefs struct {
 	SecondaryAction string `json:"secondaryAction,omitempty"`
 	GridSearch      string `json:"gridSearch,omitempty"`   // "" = medium | small | large; also Favorites and Recents
 	GridTrending    string `json:"gridTrending,omitempty"` // "" = medium | small | large
+	// The zero value means automatic update checks are on (D-28); SetPref "updateCheck" stores it inverted.
+	UpdateCheckOff bool `json:"updateCheckOff,omitempty"`
 }
 
 // Actions are the ↵/⌘↵ choices in Settings order (no square actions).

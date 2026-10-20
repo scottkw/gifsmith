@@ -485,3 +485,26 @@ func TestNormalizeDefaultActionsAndGrid(t *testing.T) {
 		t.Errorf("valid prefs %+v were reset", ok)
 	}
 }
+
+// updateCheckOff's zero value means automatic update checks are on (D-28).
+func TestStoreUpdateCheckOff(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "com.kenscott.gifsmith")
+	if OpenStore(dir).Get().UpdateCheckOff {
+		t.Fatal("a missing file loads with automatic checks off")
+	}
+	if _, err := OpenStore(dir).Update(func(p *Prefs) error { p.UpdateCheckOff = true; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if m := readPrefsFile(t, dir); m["updateCheckOff"] != true {
+		t.Errorf("settings.json = %v, want updateCheckOff true", m)
+	}
+	if !OpenStore(dir).Get().UpdateCheckOff {
+		t.Error("updateCheckOff not kept")
+	}
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(`{"lastProvider":"giphy"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if OpenStore(dir).Get().UpdateCheckOff {
+		t.Error("a file without the key loads with automatic checks off")
+	}
+}

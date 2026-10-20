@@ -1425,3 +1425,37 @@ func TestSetPrefGridSize(t *testing.T) {
 		t.Errorf("a grid change flushed the cache: %d new requests, %v", f.hits.Load()-before, err)
 	}
 }
+
+func TestSetPrefUpdateCheckPref(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	if !f.svc.Snapshot(ctx).UpdateCheck {
+		t.Fatal("automatic update checks are off on a fresh store")
+	}
+	snap, err := f.svc.SetPref(ctx, "updateCheck", "false")
+	if err != nil || snap.UpdateCheck {
+		t.Fatalf("SetPref(updateCheck, false) = %+v, %v", snap, err)
+	}
+	b, err := os.ReadFile(filepath.Join(f.dir, "settings.json"))
+	if err != nil || !strings.Contains(string(b), `"updateCheckOff":true`) {
+		t.Errorf("settings.json = %s, %v", b, err)
+	}
+	if got := *f.events; len(got) != 1 || got[0] != "settings:changed" {
+		t.Errorf("events = %v", got)
+	}
+	_, err = f.svc.SetPref(ctx, "updateCheck", "maybe")
+	wantSettingsErr(t, err, "invalid_value")
+	if !strings.Contains(string(must(os.ReadFile(filepath.Join(f.dir, "settings.json")))), `"updateCheckOff":true`) {
+		t.Error("an invalid value changed the file")
+	}
+	if snap, err := f.svc.SetPref(ctx, "updateCheck", "true"); err != nil || !snap.UpdateCheck || f.svc.Store.Get().UpdateCheckOff {
+		t.Errorf("SetPref(updateCheck, true) = %+v, %v", snap, err)
+	}
+}
+
+func must[T any](v T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return v
+}

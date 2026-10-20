@@ -40,6 +40,10 @@ type UpdateService struct {
 	Run     update.Runner
 	Open    func(string) error // platform OpenURL
 	Now     func() time.Time   // nil: time.Now
+	// OnAvailable gets the version whenever a check finds a newer release (tray item);
+	// RevealFunc opens Settings at Updates. Both nil in tests.
+	OnAvailable func(version string)
+	RevealFunc  func()
 
 	mu  sync.Mutex
 	st  UpdateStatus
@@ -173,4 +177,9 @@ func (u *UpdateService) Download(context.Context) (UpdateStatus, error) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	return u.set(UpdateStatus{State: "opened", Latest: rel.Version}), nil
+}
+
+func (u *UpdateService) Reveal() {}
+
+func RunAutoUpdates(ctx context.Context, u *UpdateService, enabled func() bool, delay, every time.Duration) {
 }
