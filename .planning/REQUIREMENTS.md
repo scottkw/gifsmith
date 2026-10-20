@@ -43,7 +43,7 @@
 - [x] **ACTN-05**: User can download the GIF to a chosen folder (default Downloads)
 - [x] **ACTN-06**: User can copy or paste a center-cropped square version of a GIF (not offered for Clips)
 - [x] **ACTN-07**: User can open an action menu (⌘K) listing all actions for the selected GIF
-- [ ] **ACTN-08**: User can choose the default Enter action and a second ⌘Enter action in settings
+- [x] **ACTN-08**: User can choose the default Enter action and a second ⌘Enter action in settings
 - [x] **ACTN-09**: Clips are handled as MP4 (labelled accordingly, 720p default)
 - [x] **ACTN-10**: Temp files used for copy/paste/download are deleted promptly; Klipy temp files are deleted eagerly
 - [x] **ACTN-11**: Downloaded files are validated (real GIF/MP4, not an error page) and never overwrite or collide; optional hide-original-filename setting
@@ -61,7 +61,7 @@
 - [x] **SETT-01**: Settings open in their own window, where pasting into fields works
 - [x] **SETT-02**: User can add, test, change (replace), and remove GIPHY and Klipy keys; each key row links to the provider's key sign-up page (GIPHY developer dashboard, Klipy Partner Panel)
 - [x] **SETT-03**: User can rebind the global hotkeys; conflicts are reported and the old binding stays until the new one registers
-- [ ] **SETT-04**: User can set grid item size (search and trending), max results, download folder, hide filename, GIPHY and Klipy locales
+- [x] **SETT-04**: User can set grid item size (search and trending), max results, download folder, hide filename, GIPHY and Klipy locales
 - [x] **SETT-05**: Settings shows Accessibility permission status and a button to grant it
 - [x] **SETT-06**: User can choose the window theme: Light, Dark, or System (default System, follows macOS appearance)
 
@@ -132,7 +132,7 @@
 | ACTN-05 | Phase 3 | Complete |
 | ACTN-06 | Phase 3 | Complete |
 | ACTN-07 | Phase 3 | Complete |
-| ACTN-08 | Phase 4 | Pending |
+| ACTN-08 | Phase 4 | Complete |
 | ACTN-09 | Phase 3 | Complete |
 | ACTN-10 | Phase 3 | Complete |
 | ACTN-11 | Phase 3 | Complete |
@@ -144,7 +144,7 @@
 | SETT-01 | Phase 4 | Complete |
 | SETT-02 | Phase 4 | Complete |
 | SETT-03 | Phase 4 | Complete |
-| SETT-04 | Phase 4 | Pending |
+| SETT-04 | Phase 4 | Complete |
 | SETT-05 | Phase 4 | Complete |
 | SETT-06 | Phase 4 | Complete |
 | RELS-01 | Phase 4 | Pending |

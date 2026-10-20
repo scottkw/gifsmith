@@ -5,16 +5,16 @@ milestone_name: Gifsmith MVP
 current_phase: 4
 current_phase_name: Settings, Shell Polish & Release
 status: executing
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-10-20T01:49:18.783Z"
+stopped_at: Completed 04-04-PLAN.md
+last_updated: "2026-10-20T02:24:37.159Z"
 last_activity: 2026-10-18
 last_activity_desc: Phase 4 execution started
-state_head: 3859e3d09d4b7977468b65c191b018c95aa099c0
+state_head: 1dba92bc205445208f0069bd88b8d20915f9f5d4
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 25
-  completed_plans: 21
+  completed_plans: 22
 ---
 
 # Project State
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-18)
 ## Current Position
 
 Phase: 4 (Settings, Shell Polish & Release) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 7
 Status: Ready to execute
 Last activity: 2026-10-18 — Phase 4 execution started
 
@@ -80,6 +80,7 @@ Progress: [████████░░] 75% (3/4 phases; 18/18 planned plans 
 | Phase 04 P01 | 22 min | 7 tasks | 42 files |
 | Phase 04 P02 | 28 min | 8 tasks | 46 files |
 | Phase 04 P03 | 33 min | 6 tasks | 42 files |
+| Phase 04 P04 | 32min | 9 tasks | 46 files |
 
 ## Accumulated Context
 
@@ -161,6 +162,10 @@ Recent decisions affecting current work:
 - [Phase 04]: Hotkey parser lives in settings (CanonicalHotkey) so Normalize validates stored hotkeys without an import cycle; hotkeys stored in Wails canonical form, Open default stored as empty
 - [Phase 04]: Webview hotkey calls (set/suspend/resume) run strictly in order and Go resumes hotkeys on Settings hide, Cmd+W and lost focus
 - [Phase 04]: Reduce Motion uses a one-time canvas first frame for every provider; only the selected tile keeps an animated img
+- [Phase 04]: Klipy file actions are gated by the compile-time const services.KlipyFileActionsCleared (false), enforced in ActionService before staging/HTTP; never a pref
+- [Phase 04]: Download folder comes only from the picker seam (NSOpenPanel / FAKE_PICK_FOLDER) and is validated by ValidateDownloadDir (Statfs type + MNT_LOCAL + os.Link probe) before the Store saves it
+- [Phase 04]: Grid math takes the column count; a grid-size change remounts the grid via its key, keeping the selection
+- [Phase 04]: Keys-card message backstop follows 04-02's wrap decision; footer-centre >= 200px is measured with the GIPHY mark (Finer leaves ~179px, ellipsized)
 
 ### Pending Todos
 
@@ -194,6 +199,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-20T01:49:18.529Z
-Stopped at: Completed 04-03-PLAN.md
+Last session: 2026-10-20T02:24:36.944Z
+Stopped at: Completed 04-04-PLAN.md
 Resume file: None
