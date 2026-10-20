@@ -129,6 +129,9 @@ func main() {
 		app.Event.Emit("providers:changed")
 	}
 	sh = shell.New(app, plat, trayIcon)
+	if settingsSvc.PickFolder == nil {
+		settingsSvc.PickFolder = sh.PickFolder // the native NSOpenPanel sheet on Settings
+	}
 	reg := d.Registrar
 	if reg == nil {
 		reg = app.GlobalShortcut // Carbon hotkeys: no Accessibility needed

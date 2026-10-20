@@ -26,6 +26,12 @@
 	<true/>
 	<key>NSDownloadsFolderUsageDescription</key>
 	<string>Gifsmith saves the GIFs you download to your Downloads folder.</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Gifsmith saves the GIFs you download to the folder you choose.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Gifsmith saves the GIFs you download to the folder you choose.</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>Gifsmith saves the GIFs you download to the folder you choose.</string>
 	<key>NSHighResolutionCapable</key>
 	<string>true</string>
 	<key>NSHumanReadableCopyright</key>

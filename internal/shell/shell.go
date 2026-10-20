@@ -217,6 +217,18 @@ func (s *Shell) OpenSettings() {
 	s.app.Event.Emit("settings:show")
 }
 
+// PickFolder shows the native folder picker as a sheet on the Settings window (Choose… is
+// clicked there, so it is visible), starting in start; a cancel returns "" and nil.
+func (s *Shell) PickFolder(start string) (string, error) {
+	return s.app.Dialog.OpenFile().
+		CanChooseFiles(false).
+		CanChooseDirectories(true).
+		CanCreateDirectories(true).
+		SetDirectory(start).
+		AttachToWindow(s.settings).
+		PromptForSingleSelection()
+}
+
 // HideSettings hides Settings and, when the panel is not up, asks the app that was frontmost when
 // it opened to come back (best effort). Window callbacks call it, so it never takes s.mu.
 func (s *Shell) HideSettings() {
