@@ -55,13 +55,25 @@
     { value: 'dark', label: 'Dark' },
   ];
 
-  // The grant can change outside the app: re-read on open and every 2 s while it is Off.
+  // The grant can change outside the app: re-read on open, and every 2 s while it is Off and
+  // Settings is visible (the page loads hidden at launch and lives until quit).
+  let visible = !document.hidden;
+  let alive = true;
   async function readAX() {
-    axOn = await accessibilityStatus();
-    if (axOn) {
-      clearInterval(axTimer);
-      axTimer = undefined;
-    } else axTimer ??= setInterval(readAX, 2000);
+    let on: boolean;
+    try {
+      on = await accessibilityStatus();
+    } catch {
+      return; // keep the last status; a running poll tries again
+    }
+    if (!alive) return;
+    axOn = on;
+    if (on || !visible) stopAX();
+    else axTimer ??= setInterval(readAX, 2000);
+  }
+  function stopAX() {
+    clearInterval(axTimer);
+    axTimer = undefined;
   }
 
   onMount(() => {
@@ -70,12 +82,21 @@
     const offUpdate = Events.On('update:status', (e) => (upd = e.data as UpdateStatus));
     const offReveal = Events.On('settings:reveal', revealUpdates);
     if (pendingReveal.updates) revealUpdates();
-    const offShow = Events.On('settings:show', readAX);
+    const offShow = Events.On('settings:show', () => {
+      visible = true;
+      readAX();
+    });
+    const offHide = Events.On('settings:hide', () => {
+      visible = false;
+      stopAX();
+    });
     return () => {
+      alive = false;
       offUpdate();
       offReveal();
       offShow();
-      clearInterval(axTimer);
+      offHide();
+      stopAX();
     };
   });
 

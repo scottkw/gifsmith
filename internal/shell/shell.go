@@ -260,6 +260,7 @@ func (s *Shell) PickFolder(start string) (string, error) {
 // it opened to come back (best effort). Window callbacks call it, so it never takes s.mu.
 func (s *Shell) HideSettings() {
 	s.settings.Hide()
+	s.app.Event.Emit("settings:hide") // General stops its Accessibility poll
 	s.settingsInactive()
 	s.vmu.Lock()
 	pid := s.settingsPrev
