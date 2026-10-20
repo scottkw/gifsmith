@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   actionErrorText,
+  downloadedText,
+  folderErrorText,
   libraryErrorText,
   errorState,
   pagingMessage,
@@ -266,4 +268,23 @@ test('hotkeyErrorText: H1, H2, H3, H4, H4b and H7 with the combo as glyphs', () 
   assert.equal(hotkeyErrorText('hotkey_register_failed_new', 'Cmd+Ctrl+Option+J', ''), "macOS couldn't register ⌃⌥⌘J. Try a different shortcut.");
   assert.equal(hotkeyErrorText('test_failed', 'Cmd+Ctrl+Option+F', ''), 'Nothing happened. Another app may be using ⌃⌥⌘F. Try a different shortcut.');
   assert.equal(hotkeyErrorText('prefs_write_failed', 'Cmd+Ctrl+Option+F', ''), "Couldn't save this setting. Try again.");
+});
+
+test('Downloads pane D5–D8 name the folder by display name', () => {
+  assert.equal(
+    folderErrorText('folder_fat', 'Stick'),
+    "Gifsmith can't save safely to Stick (exFAT or FAT drive). Choose a folder on a Mac-formatted drive.",
+  );
+  assert.equal(folderErrorText('folder_network', 'Share'), 'Share is on a network drive. Choose a folder on this Mac.');
+  assert.equal(folderErrorText('folder_unwritable', 'Locked'), "Gifsmith can't write to Locked. Choose another folder.");
+  assert.equal(folderErrorText('folder_missing', 'Gone'), 'This folder no longer exists. Choose another folder or reset to Downloads.');
+  assert.equal(folderErrorText('picker_failed', ''), "Couldn't save this setting. Try again.");
+});
+
+test('T6 and F4 use the folder display name, never a path', () => {
+  assert.equal(downloadedText('GIFs'), 'Downloaded to GIFs');
+  const g = { provider: 'finergifs' } as Parameters<typeof actionErrorText>[1];
+  const f4 = actionErrorText('folder_unwritable', g, 'download', 'GIFs');
+  assert.equal(f4, "Couldn't save to GIFs. Check that the folder exists and that Gifsmith can write to it.");
+  assert.ok(!f4.includes('/'));
 });

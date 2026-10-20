@@ -119,6 +119,14 @@ export function actionErrorText(kind: string, g: Gif, action: 'copy' | 'download
   return "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";
 }
 
+// Downloads pane D5–D8 under Save to, keyed by Go's SettingsError kind; `folder` is the display name.
+export function folderErrorText(kind: string, folder: string): string {
+  return '';
+}
+
+// T6: a finished download names the folder by display name only.
+export const downloadedText = (folder: string) => '';
+
 // F5: a library write failed (favorite, remove, Clear Recents, Undo); the list keeps its pre-change state.
 export function libraryErrorText(list: 'favorites' | 'recents'): string {
   return `Couldn't save your ${list === 'favorites' ? 'Favorites' : 'Recents'}. Try again.`;
