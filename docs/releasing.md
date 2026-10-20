@@ -27,7 +27,16 @@ it by hand. Pushes and pull requests to `main` run the test suite (`.github/work
 6. The run pauses before the `sign` job until you approve it: Actions, the Release run, Review
    deployments, `release`, Approve and deploy (see Protecting the signing secrets).
 7. When the run is green, open the draft on GitHub (Releases), check the DMG, its `.sha256` and
-   the notes, then publish. Installed copies see the update once it is published.
+   the notes, then publish it and mark it latest in one step:
+
+   ```sh
+   gh release edit vX.Y.Z --draft=false --latest
+   ```
+
+   Publishing from the web page alone left v1.0.1 unmarked, and `releases/latest` (which the
+   in-app updater reads) kept returning the previous version. Check with
+   `curl -s https://api.github.com/repos/scottkw/gifsmith/releases/latest | grep tag_name`.
+   Installed copies see the update once `releases/latest` returns the new tag.
 
 The `build` job refuses, before any credential is touched, when the tag is not
 `vMAJOR.MINOR.PATCH`, does not match the version sources, has no release notes, is not on `main`,
