@@ -192,7 +192,23 @@ type Prefs struct {
 	Hotkeys       Hotkeys `json:"hotkeys,omitzero"`
 	DownloadDir   string  `json:"downloadDir,omitempty"` // "" = the default Downloads folder; else absolute
 	HideFilenames bool    `json:"hideFilenames,omitempty"`
+	// ↵ and ⌘↵ actions, one of Actions; "" = DefaultPrimary / DefaultSecondary. Never equal.
+	PrimaryAction   string `json:"primaryAction,omitempty"`
+	SecondaryAction string `json:"secondaryAction,omitempty"`
+	GridSearch      string `json:"gridSearch,omitempty"`   // "" = medium | small | large; also Favorites and Recents
+	GridTrending    string `json:"gridTrending,omitempty"` // "" = medium | small | large
 }
+
+// Actions are the ↵/⌘↵ choices in Settings order (no square actions).
+var Actions = []string{"copy", "paste", "copyLink", "pasteLink", "copyMarkdown", "pasteMarkdown", "download"}
+
+// GridSizes are the panel grid sizes; "" stores the default, medium.
+var GridSizes = []string{"small", "medium", "large"}
+
+const (
+	DefaultPrimary   = "copy"
+	DefaultSecondary = "paste"
+)
 
 // Hotkeys are the global shortcuts as canonical Wails accelerators ("Cmd+Ctrl+Option+G").
 type Hotkeys struct {

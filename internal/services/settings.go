@@ -43,6 +43,7 @@ type SettingsService struct {
 	// The only source of a download folder: no bound method takes a path from the webview.
 	PickFolder       func(start string) (string, error)
 	DefaultDownloads string // ~/Downloads (bin/uat-downloads in the UAT build)
+	KlipyFileActions bool   // main sets it from KlipyFileActionsCleared; never a pref
 
 	mu   sync.Mutex // serializes SaveKey, TestKey and RemoveKey end to end: the Keychain ends in the last call's state
 	hkMu sync.Mutex // serializes SetHotkey: the Store ends with what is registered
@@ -225,6 +226,11 @@ type Snapshot struct {
 	DownloadDirDefault bool   `json:"downloadDirDefault"`
 	DownloadDirMissing bool   `json:"downloadDirMissing"`
 	HideFilenames      bool   `json:"hideFilenames"`
+	PrimaryAction      string `json:"primaryAction"`    // resolved: never ""
+	SecondaryAction    string `json:"secondaryAction"`  // resolved: never ""
+	GridSearch         string `json:"gridSearch"`       // resolved: never ""
+	GridTrending       string `json:"gridTrending"`     // resolved: never ""
+	KlipyFileActions   bool   `json:"klipyFileActions"` // read-only: KlipyFileActionsCleared
 }
 
 // Choices are the allowed Search-pane values, with what Match System resolves to now.

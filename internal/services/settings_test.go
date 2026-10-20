@@ -1376,3 +1376,52 @@ func TestSetPrefHideFilenames(t *testing.T) {
 		t.Errorf("SetPref(hideFilenames, false) = %+v, %v", snap, err)
 	}
 }
+
+func TestSetPrefDefaultActions(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	snap := f.svc.Snapshot(ctx)
+	if snap.PrimaryAction != "copy" || snap.SecondaryAction != "paste" {
+		t.Fatalf("default actions = %s / %s, want copy / paste", snap.PrimaryAction, snap.SecondaryAction)
+	}
+	snap, err := f.svc.SetPref(ctx, "primaryAction", "copyLink")
+	if err != nil || snap.PrimaryAction != "copyLink" || snap.SecondaryAction != "paste" {
+		t.Fatalf("SetPref(primaryAction, copyLink) = %s / %s, %v", snap.PrimaryAction, snap.SecondaryAction, err)
+	}
+	// The other key's action: the two swap, so ↵ and ⌘↵ always differ.
+	snap, err = f.svc.SetPref(ctx, "secondaryAction", "copyLink")
+	if err != nil || snap.SecondaryAction != "copyLink" || snap.PrimaryAction != "paste" {
+		t.Fatalf("SetPref(secondaryAction, copyLink) = %s / %s, %v; want paste / copyLink", snap.PrimaryAction, snap.SecondaryAction, err)
+	}
+	for _, v := range []string{"copySquare", "open", "", "Copy"} {
+		_, err := f.svc.SetPref(ctx, "primaryAction", v)
+		wantSettingsErr(t, err, "invalid_value")
+	}
+	if snap := f.svc.Snapshot(ctx); snap.KlipyFileActions {
+		t.Error("Snapshot.klipyFileActions is true; the gate ships closed")
+	}
+}
+
+func TestSetPrefGridSize(t *testing.T) {
+	f := newSettings(t, "")
+	ctx := context.Background()
+	if snap := f.svc.Snapshot(ctx); snap.GridSearch != "medium" || snap.GridTrending != "medium" {
+		t.Fatalf("default grid = %s / %s, want medium / medium", snap.GridSearch, snap.GridTrending)
+	}
+	if _, err := f.gifs.Search(ctx, "finergifs", "dwight", ""); err != nil {
+		t.Fatal(err)
+	}
+	snap, err := f.svc.SetPref(ctx, "gridSearch", "small")
+	if err != nil || snap.GridSearch != "small" || snap.GridTrending != "medium" {
+		t.Fatalf("SetPref(gridSearch, small) = %+v, %v", snap, err)
+	}
+	if snap, err := f.svc.SetPref(ctx, "gridTrending", "large"); err != nil || snap.GridTrending != "large" {
+		t.Fatalf("SetPref(gridTrending, large) = %+v, %v", snap, err)
+	}
+	_, err = f.svc.SetPref(ctx, "gridTrending", "huge")
+	wantSettingsErr(t, err, "invalid_value")
+	before := f.hits.Load()
+	if _, err := f.gifs.Search(ctx, "finergifs", "dwight", ""); err != nil || f.hits.Load() != before {
+		t.Errorf("a grid change flushed the cache: %d new requests, %v", f.hits.Load()-before, err)
+	}
+}

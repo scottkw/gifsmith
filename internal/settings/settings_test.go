@@ -467,3 +467,21 @@ func TestStoreNormalizeDownloadDir(t *testing.T) {
 		t.Errorf("absolute DownloadDir %+v was reset", ok)
 	}
 }
+
+func TestNormalizeDefaultActionsAndGrid(t *testing.T) {
+	for _, c := range []struct{ in, want Prefs }{
+		{Prefs{PrimaryAction: "copySquare", SecondaryAction: "nope"}, Prefs{}},
+		{Prefs{PrimaryAction: "copyLink", SecondaryAction: "copyLink"}, Prefs{PrimaryAction: "copyLink"}},
+		{Prefs{PrimaryAction: "paste"}, Prefs{}}, // paste collides with the default ⌘↵: primary goes back to copy
+		{Prefs{GridSearch: "huge", GridTrending: "small"}, Prefs{GridTrending: "small"}},
+	} {
+		p := c.in
+		if p.Normalize(); p != c.want {
+			t.Errorf("Normalize(%+v) = %+v, want %+v", c.in, p, c.want)
+		}
+	}
+	ok := Prefs{PrimaryAction: "download", SecondaryAction: "pasteMarkdown", GridSearch: "large", GridTrending: "small"}
+	if p := ok; len(p.Normalize()) != 0 || p != ok {
+		t.Errorf("valid prefs %+v were reset", ok)
+	}
+}

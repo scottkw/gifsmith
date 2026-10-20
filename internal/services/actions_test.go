@@ -642,6 +642,7 @@ func klipyService(t *testing.T, f *platform.Fake) (*ActionService, fixture, *tim
 	s.After = tm.after
 	base, _, _ := strings.Cut(fx.gif.DownloadURL, "/media/")
 	k := provider.Gif{Provider: provider.Klipy, ID: "8041071659142945", Title: "Klipy moment 1", DownloadURL: base + "/media/klipy-1-hd.gif"}
+	s.KlipyFileActions = true // the cleared build: these tests cover the D-19 grace delete
 	return s, fx, tm, k
 }
 
@@ -1327,5 +1328,43 @@ func TestDownloadDeletedFolder(t *testing.T) {
 	r, err := s.Download(context.Background(), fx.gif)
 	if actionKind(err) != "folder_unwritable" || r != (DownloadResult{}) {
 		t.Errorf("Download into a deleted folder = %+v, %v; want folder_unwritable and an empty result", r, err)
+	}
+}
+
+// RELS-04: until KlipyFileActionsCleared, every Klipy file action is refused before any staging,
+// HTTP or pasteboard call; text actions still work.
+func TestGatedKlipyFileActions(t *testing.T) {
+	ctx := context.Background()
+	for name, run := range map[string]func(*ActionService, provider.Gif) error{
+		"copy":        func(s *ActionService, g provider.Gif) error { _, err := s.Copy(ctx, g); return err },
+		"paste":       func(s *ActionService, g provider.Gif) error { _, err := s.Paste(ctx, g); return err },
+		"download":    func(s *ActionService, g provider.Gif) error { _, err := s.Download(ctx, g); return err },
+		"copySquare":  func(s *ActionService, g provider.Gif) error { _, err := s.CopySquare(ctx, g); return err },
+		"pasteSquare": func(s *ActionService, g provider.Gif) error { _, err := s.PasteSquare(ctx, g); return err },
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := &platform.Fake{Trusted: true, Frontmost: prevApp}
+			s, fx, _, k := klipyService(t, f)
+			s.KlipyFileActions = false
+			dl := t.TempDir()
+			s.DownloadsDir = func() string { return dl }
+			if err := run(s, k); actionKind(err) != "klipy_gated" {
+				t.Fatalf("err = %v, want kind klipy_gated", err)
+			}
+			staged, _ := os.ReadDir(fx.dir)
+			saved, _ := os.ReadDir(dl)
+			if len(staged)+len(saved) != 0 || fx.hits.Load() != 0 || len(f.Calls) != 0 {
+				t.Errorf("gated %s: %d staged, %d saved, %d requests, calls %q; want none", name, len(staged), len(saved), fx.hits.Load(), f.Calls)
+			}
+		})
+	}
+}
+
+func TestGatedKlipyTextStillWorks(t *testing.T) {
+	f := &platform.Fake{}
+	s, _, _, k := klipyService(t, f)
+	s.KlipyFileActions = false
+	if r, err := s.CopyText(context.Background(), k, "link"); err != nil || r.Message != "Copied link" {
+		t.Errorf("CopyText(klipy, link) while gated = %+v, %v", r, err)
 	}
 }

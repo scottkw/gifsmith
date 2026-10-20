@@ -39,6 +39,11 @@ type Result struct {
 	Message            string `json:"message"`
 }
 
+// KlipyFileActionsCleared records Klipy's written clearance for file actions (Copy, Paste, Download,
+// Copy/Paste Square), which keep a copy of KLIPY media; see 04-KLIPY-EMAIL.md. It is never a pref
+// and has no UI: flip it only after that written answer, in a rebuild and release.
+const KlipyFileActionsCleared = false
+
 type ActionService struct {
 	Platform platform.Platform
 	Staging  *staging.Store
@@ -50,6 +55,8 @@ type ActionService struct {
 	DownloadsDir func() string
 	// HideFilenames names downloads gifsmith-{id} instead of the title slug; nil means off.
 	HideFilenames func() bool
+	// KlipyFileActions lets file actions run on Klipy items; main sets it from KlipyFileActionsCleared.
+	KlipyFileActions bool
 	// Recents records every successful copy or paste (D-07); nil records nothing.
 	Recents      interface{ Touch(provider.Gif) error }
 	busy         sync.Mutex    // one action at a time: no racing pasteboard writes, no double ⌘V
