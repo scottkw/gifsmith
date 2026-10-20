@@ -31,8 +31,10 @@ it by hand. Pushes and pull requests to `main` run the test suite (`.github/work
 
 The `build` job refuses, before any credential is touched, when the tag is not
 `vMAJOR.MINOR.PATCH`, does not match the version sources, has no release notes, is not on `main`,
-or already has a release. `v1.0.0` is excluded from the tag trigger. The run has two jobs on
-separate runners:
+or already has a published release. Its read-only token cannot see drafts, so the `sign` job's
+first step, before the keychain, refuses a tag that already has any release, draft included. That
+also covers "Re-run failed jobs", which skips `build`: delete the old draft before re-running.
+`v1.0.0` is excluded from the tag trigger. The run has two jobs on separate runners:
 
 - `build` has no environment, no secrets and a read-only token. It installs dependencies, builds
   the app (`wails3 task darwin:release:app`) and uploads it as an artifact.
