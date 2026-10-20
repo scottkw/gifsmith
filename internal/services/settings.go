@@ -215,6 +215,27 @@ func (s *SettingsService) emit(name string, data ...any) {
 	}
 }
 
+// writeFailed logs a failed Store.Update and maps it for the webview. An unreadable settings.json
+// has its own kind: trying again cannot help until the file is fixed or reset (ResetSettings).
+func writeFailed(what string, err error) error {
+	log.Printf("settings write failed: %s", what)
+	if errors.Is(err, settings.ErrUnreadable) {
+		return errPrefsUnreadable
+	}
+	return errPrefsWriteFailed
+}
+
+// ResetSettings moves an unreadable settings.json aside (kept next to it as a .bak) so changes
+// save again, starting from the defaults the app has been running on since launch.
+func (s *SettingsService) ResetSettings(ctx context.Context) (Snapshot, error) {
+	if _, err := s.Store.Reset(); err != nil {
+		log.Printf("settings reset failed: %v", err)
+		return s.Snapshot(ctx), errPrefsResetFailed
+	}
+	log.Printf("settings reset to defaults")
+	return s.changed(), nil
+}
+
 // Autostarter is the login item (*application.AutostartManager in the app, a fake in the UAT build).
 type Autostarter interface {
 	Enable() error
@@ -246,6 +267,9 @@ type Snapshot struct {
 	KlipyFileActions   bool   `json:"klipyFileActions"` // read-only: KlipyFileActionsCleared
 	UpdateCheck        bool   `json:"updateCheck"`      // automatic update checks on (= !UpdateCheckOff)
 	Version            string `json:"version"`          // services.Version, shown in About
+	// settings.json exists but could not be read: running on defaults, no change is saved (General
+	// offers ResetSettings).
+	SettingsUnreadable bool `json:"settingsUnreadable"`
 }
 
 // Choices are the allowed Search-pane values, with what Match System resolves to now.
@@ -339,7 +363,7 @@ func (s *SettingsService) snapshotOf(p settings.Prefs) Snapshot {
 		DownloadDirMissing: statErr != nil || !fi.IsDir(), HideFilenames: p.HideFilenames,
 		PrimaryAction: cmp.Or(p.PrimaryAction, settings.DefaultPrimary), SecondaryAction: cmp.Or(p.SecondaryAction, settings.DefaultSecondary),
 		GridSearch: cmp.Or(p.GridSearch, "medium"), GridTrending: cmp.Or(p.GridTrending, "medium"), KlipyFileActions: s.KlipyFileActions,
-		UpdateCheck: !p.UpdateCheckOff, Version: Version}
+		UpdateCheck: !p.UpdateCheckOff, Version: Version, SettingsUnreadable: s.Store.Unreadable()}
 }
 
 var errUnchanged = errors.New("unchanged")
@@ -443,8 +467,7 @@ func (s *SettingsService) SetPref(ctx context.Context, name, value string) (Snap
 	case errors.Is(err, errInvalidValue):
 		return s.snapshotOf(p), err
 	case err != nil:
-		log.Printf("settings write failed: %s", name)
-		return s.snapshotOf(p), errPrefsWriteFailed
+		return s.snapshotOf(p), writeFailed(name, err)
 	}
 	if name == "theme" && s.ApplyTheme != nil {
 		s.ApplyTheme(p.Theme)
@@ -479,8 +502,7 @@ func (s *SettingsService) SetLastProvider(ctx context.Context, p string) error {
 		return err
 	}
 	if _, err := s.Store.Update(func(p *settings.Prefs) error { p.LastProvider = string(id); return nil }); err != nil {
-		log.Printf("settings write failed: lastProvider")
-		return errPrefsWriteFailed
+		return writeFailed("lastProvider", err)
 	}
 	return nil
 }
@@ -506,14 +528,14 @@ func (s *SettingsService) SetLaunchAtLogin(ctx context.Context, on bool) (Snapsh
 	}
 	p, err := s.Store.Update(func(p *settings.Prefs) error { p.LaunchAtLogin = on; return nil })
 	if err != nil {
-		log.Printf("settings write failed: launchAtLogin")
+		werr := writeFailed("launchAtLogin", err)
 		// Put the login item back, so a reported failure means nothing changed (as SetHotkey).
 		if wasErr != nil || was != on {
 			if err := undo(); err != nil {
 				log.Printf("autostart: rollback after the failed write failed")
 			}
 		}
-		return s.snapshotOf(p), errPrefsWriteFailed
+		return s.snapshotOf(p), werr
 	}
 	return s.changed(), nil
 }
@@ -581,11 +603,11 @@ func (s *SettingsService) SetHotkey(ctx context.Context, slot, accel string) (Sn
 			return s.snapshotOf(p), nil
 		} // the stored combo registered now (it had failed at launch): update the tray and webviews
 	case err != nil:
-		log.Printf("settings write failed: hotkeys.%s", slot)
+		werr := writeFailed("hotkeys."+slot, err)
 		if err := s.Hotkeys.Revert(slot, *slotOf(&was, slot)); err != nil { // registered = stored again
 			log.Printf("hotkey rollback failed: %s", slot)
 		}
-		return s.snapshotOf(p), errPrefsWriteFailed
+		return s.snapshotOf(p), werr
 	}
 	if slot == "open" && s.OnOpenHotkey != nil {
 		s.OnOpenHotkey(c)
@@ -655,8 +677,7 @@ func (s *SettingsService) setDownloadDir(dir string) (Snapshot, error) {
 	case errors.Is(err, errUnchanged):
 		return s.snapshotOf(p), nil
 	case err != nil:
-		log.Printf("settings write failed: downloadDir")
-		return s.snapshotOf(p), errPrefsWriteFailed
+		return s.snapshotOf(p), writeFailed("downloadDir", err)
 	}
 	return s.changed(), nil
 }

@@ -15,6 +15,8 @@
 # releases answer; unset, it offers Gifsmith 9.9.0.
 # UAT_SEED_FAVORITES='<bytes>' seeds bin/uat-config/favorites.json (e.g. a corrupt file); a --uat
 # run then also fails if the app changed that file (an unreadable library file is never overwritten).
+# UAT_SEED_SETTINGS='<bytes>' seeds bin/uat-config/settings.json; a --uat run then also fails unless
+# those bytes were kept as exactly one settings.json.<time>.bak (Reset Settings… never deletes them).
 set -euo pipefail
 
 MODE=smoke
@@ -44,6 +46,7 @@ if [ -n "$UAT_SCRIPT" ]; then
   case "$RUN_VIA" in *FAKE_UPDATE=tamper*) : "${FAKE_UPDATE:=tamper}" ;; *FAKE_UPDATE=current*) : "${FAKE_UPDATE:=current}" ;; esac
   case "$RUN_VIA" in *FAKE_PICK_FOLDER=*) : "${FAKE_PICK_FOLDER:=$(sed -E 's/.*FAKE_PICK_FOLDER=([^ ]+).*/\1/' <<<"$RUN_VIA")}" ;; esac
   case "$RUN_VIA" in *"UAT_SEED_FAVORITES='{not json'"*) : "${UAT_SEED_FAVORITES:={not json}" ;; esac
+  case "$RUN_VIA" in *"UAT_SEED_SETTINGS='{not json'"*) : "${UAT_SEED_SETTINGS:={not json}" ;; esac
 fi
 
 fail() { echo "SMOKE FAIL: $*" >&2; exit 1; }
@@ -66,6 +69,10 @@ mkdir -p bin/uat-downloads bin/uat-picked
 if [ -n "${UAT_SEED_FAVORITES:-}" ]; then
   mkdir -p bin/uat-config
   printf '%s' "$UAT_SEED_FAVORITES" >bin/uat-config/favorites.json
+fi
+if [ -n "${UAT_SEED_SETTINGS:-}" ]; then
+  mkdir -p bin/uat-config
+  printf '%s' "$UAT_SEED_SETTINGS" >bin/uat-config/settings.json
 fi
 
 PIDS=()
@@ -113,6 +120,13 @@ if [ "$MODE" = uat ]; then
   if [ -n "${UAT_SEED_FAVORITES:-}" ] && [ "$(cat bin/uat-config/favorites.json)" != "$UAT_SEED_FAVORITES" ]; then
     echo "UAT FAIL: the seeded favorites.json was changed" >&2
     exit 1
+  fi
+  if [ -n "${UAT_SEED_SETTINGS:-}" ]; then
+    baks=(bin/uat-config/settings.json.*.bak)
+    if [ ${#baks[@]} -ne 1 ] || [ ! -f "${baks[0]}" ] || [ "$(cat "${baks[0]}")" != "$UAT_SEED_SETTINGS" ]; then
+      echo "UAT FAIL: the seeded settings.json was not kept as one .bak: ${baks[*]}" >&2
+      exit 1
+    fi
   fi
   exit 0
 fi

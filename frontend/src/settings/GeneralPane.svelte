@@ -6,12 +6,13 @@
 <script lang="ts">
   // General pane (UI-SPEC "General"): every change applies at once, no Save button.
   import { Events } from '@wailsio/runtime';
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import {
     accessibilityStatus,
     checkForUpdates,
     downloadUpdate,
     requestAccessibility,
+    resetSettings,
     setLaunchAtLogin,
     setPref,
     settingsError,
@@ -20,6 +21,7 @@
     type SettingsSnapshot,
     type UpdateStatus,
   } from '../lib/api';
+  import { resetSettingsAskText, resetSettingsFailedText, saveErrorText, settingsUnreadableText } from '../lib/errors';
   import { DEFAULT_ACTIONS } from '../lib/prefs';
   import { updateErrorText, updateText } from '../lib/update';
   import SettingRow from './SettingRow.svelte';
@@ -114,9 +116,9 @@
     themeError = '';
     try {
       await setPref('theme', v);
-    } catch {
+    } catch (e) {
       theme = initial.theme;
-      themeError = "Couldn't save this setting. Try again.";
+      themeError = saveErrorText(settingsError(e)?.kind);
     }
   }
 
@@ -127,10 +129,13 @@
       await setLaunchAtLogin(on);
     } catch (e) {
       launchAtLogin = initial.launchAtLogin;
+      const kind = settingsError(e)?.kind;
       loginError =
-        settingsError(e)?.kind === 'not_in_applications'
+        kind === 'not_in_applications'
           ? 'Move Gifsmith to the Applications folder, then try again.'
-          : "Couldn't change Open at login. Try again.";
+          : kind === 'prefs_unreadable'
+            ? saveErrorText(kind)
+            : "Couldn't change Open at login. Try again.";
     }
   }
 
@@ -139,9 +144,9 @@
     actionError = '';
     try {
       await setPref(name, box.value);
-    } catch {
+    } catch (e) {
       box.value = actions[name];
-      actionError = "Couldn't save this setting. Try again.";
+      actionError = saveErrorText(settingsError(e)?.kind);
     }
   }
 
@@ -168,9 +173,29 @@
     autoError = '';
     try {
       await setPref('updateCheck', String(on));
-    } catch {
+    } catch (e) {
       autoCheck = initial.updateCheck;
-      autoError = "Couldn't save this setting. Try again.";
+      autoError = saveErrorText(settingsError(e)?.kind);
+    }
+  }
+
+  // settings.json could not be read: Reset moves it aside (Go keeps it as a .bak) after a confirm.
+  let confirmReset = $state(false);
+  let resetError = $state('');
+  let resetCancel = $state<HTMLButtonElement>();
+  async function askReset(on: boolean) {
+    confirmReset = on;
+    resetError = '';
+    await tick();
+    if (on) resetCancel?.focus();
+  }
+  async function reset() {
+    resetError = '';
+    try {
+      await resetSettings(); // settings:changed clears initial.settingsUnreadable
+      confirmReset = false;
+    } catch {
+      resetError = resetSettingsFailedText;
     }
   }
 
@@ -183,6 +208,24 @@
     }
   }
 </script>
+
+{#if initial.settingsUnreadable}
+  <div class="unreadable" role="alert">
+    {#if confirmReset}
+      <p>{resetSettingsAskText}</p>
+      <div class="buttons">
+        <button class="btn-secondary" bind:this={resetCancel} onclick={() => askReset(false)}>Cancel</button>
+        <button class="btn-destructive" onclick={reset}>Reset Settings</button>
+      </div>
+    {:else}
+      <p>{settingsUnreadableText}</p>
+      <div class="buttons">
+        <button class="btn-secondary" onclick={() => askReset(true)}>Reset Settings…</button>
+      </div>
+    {/if}
+    {#if resetError}<p class="error">{resetError}</p>{/if}
+  </div>
+{/if}
 
 <div class="settings-section">
   <SettingRow label="Theme" id="theme-label" error={themeError}>
@@ -286,6 +329,28 @@
 </div>
 
 <style>
+  .unreadable {
+    margin: 0 0 16px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    background: var(--surface);
+    font: var(--body);
+    color: var(--text);
+  }
+  .unreadable p {
+    margin: 0;
+  }
+  .unreadable .buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .unreadable .error {
+    margin-top: 8px;
+    font: var(--label);
+    color: var(--destructive);
+  }
   .update-status {
     flex-basis: 100%;
     display: flex;

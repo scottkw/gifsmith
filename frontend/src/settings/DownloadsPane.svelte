@@ -2,7 +2,7 @@
   // Downloads pane (UI-SPEC "Downloads"): the folder comes only from the native picker, through Go,
   // which validates it before saving; the webview never sends a path.
   import { chooseDownloadDir, resetDownloadDir, setPref, settingsError, type SettingsSnapshot } from '../lib/api';
-  import { folderErrorText } from '../lib/errors';
+  import { folderErrorText, saveErrorText } from '../lib/errors';
   import SettingRow from './SettingRow.svelte';
 
   let { initial }: { initial: SettingsSnapshot } = $props();
@@ -30,9 +30,9 @@
     hideError = '';
     try {
       await setPref('hideFilenames', String(box.checked));
-    } catch {
+    } catch (e) {
       box.checked = snap.hideFilenames;
-      hideError = "Couldn't save this setting. Try again.";
+      hideError = saveErrorText(settingsError(e)?.kind);
     }
   }
 </script>

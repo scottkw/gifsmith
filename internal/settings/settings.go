@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"gifsmith/internal/provider"
 	"gifsmith/internal/provider/giphy"
@@ -411,6 +412,34 @@ func (s *Store) Get() Prefs {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.p
+}
+
+// Unreadable reports that settings.json exists but could not be read, so no write is saved.
+func (s *Store) Unreadable() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.unreadable
+}
+
+// Reset moves an unreadable settings.json aside to settings.json.<time>.bak in the same folder
+// (never deleted, never over an existing file) and runs on defaults, so writes work again. A file
+// that reads now is kept, and nothing moves.
+func (s *Store) Reset() (Prefs, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.unreadable || s.load() == nil {
+		return s.p, nil
+	}
+	src := filepath.Join(s.dir, prefsFile)
+	bak := src + "." + time.Now().Format("20060102-150405") + ".bak"
+	if err := os.Link(src, bak); err != nil { // Link, not Rename: it fails instead of replacing a .bak
+		return s.p, err
+	}
+	if err := os.Remove(src); err != nil {
+		return s.p, err
+	}
+	s.p, s.unreadable = Prefs{}, false
+	return s.p, nil
 }
 
 // Update runs f on a copy, normalizes and writes it atomically, and keeps it only when the write

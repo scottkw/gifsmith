@@ -103,6 +103,14 @@ export function ResetDownloadDir(): $CancellablePromise<$models.Snapshot> {
 }
 
 /**
+ * ResetSettings moves an unreadable settings.json aside (kept next to it as a .bak) so changes
+ * save again, starting from the defaults the app has been running on since launch.
+ */
+export function ResetSettings(): $CancellablePromise<$models.Snapshot> {
+    return $Call.ByID(720673531);
+}
+
+/**
  * ResumeHotkeys registers them again; also called when the Settings window hides or loses focus.
  */
 export function ResumeHotkeys(): $CancellablePromise<void> {

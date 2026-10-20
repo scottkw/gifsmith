@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -367,11 +365,7 @@ func TestSetHotkeyErrorKeepsStore(t *testing.T) {
 
 func TestSetHotkeyWriteFailureRollsBack(t *testing.T) {
 	f, reg := settingsWithHotkeys(t)
-	file := filepath.Join(f.dir, "not-a-dir")
-	if err := os.WriteFile(file, []byte("x"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	f.svc.Store = settings.OpenStore(file) // every write fails
+	readOnlyDir(t, f.dir) // every write fails
 	snap, err := f.svc.SetHotkey(context.Background(), "open", "Cmd+Ctrl+Option+H")
 	wantSettingsErr(t, err, "prefs_write_failed")
 	want := []string{"unregister Cmd+Ctrl+Option+G", "register Cmd+Ctrl+Option+H", "unregister Cmd+Ctrl+Option+H", "register Cmd+Ctrl+Option+G"}

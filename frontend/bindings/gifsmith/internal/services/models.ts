@@ -135,6 +135,12 @@ export interface Snapshot {
      * services.Version, shown in About
      */
     "version": string;
+
+    /**
+     * settings.json exists but could not be read: running on defaults, no change is saved (General
+     * offers ResetSettings).
+     */
+    "settingsUnreadable": boolean;
 }
 
 /**

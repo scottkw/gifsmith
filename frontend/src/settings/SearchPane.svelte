@@ -2,7 +2,8 @@
   // Search pane (UI-SPEC "Search"): each change saves at once; Go validates it and flushes the
   // affected providers' cached pages, and the panel refetches a tab the next time it is shown.
   import { onMount } from 'svelte';
-  import { choices, setPref, type SettingsSnapshot } from '../lib/api';
+  import { choices, setPref, settingsError, type SettingsSnapshot } from '../lib/api';
+  import { saveErrorText } from '../lib/errors';
   import { countryOptions, languageOptions, ratingLabel, type Option } from '../lib/prefs';
   import SettingRow from './SettingRow.svelte';
 
@@ -43,9 +44,9 @@
     errors[name] = '';
     try {
       await setPref(name, v);
-    } catch {
+    } catch (e) {
       values = { ...values, [name]: valuesOf(initial)[name] };
-      errors[name] = "Couldn't save this setting. Try again.";
+      errors[name] = saveErrorText(settingsError(e)?.kind);
     }
   }
 </script>

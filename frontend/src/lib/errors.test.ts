@@ -4,6 +4,7 @@ import {
   actionErrorText,
   downloadedText,
   folderErrorText,
+  saveErrorText,
   klipyGatedText,
   libraryErrorText,
   errorState,
@@ -285,6 +286,15 @@ test('Downloads pane D5–D8 name the folder by display name', () => {
   assert.equal(folderErrorText('folder_unwritable', 'Locked'), "Gifsmith can't write to Locked. Choose another folder.");
   assert.equal(folderErrorText('folder_missing', 'Gone'), 'This folder no longer exists. Choose another folder or reset to Downloads.');
   assert.equal(folderErrorText('picker_failed', ''), "Couldn't save this setting. Try again.");
+});
+
+test('an unreadable settings file is named, not retried (WR-03)', () => {
+  const unreadable = "Couldn't save. Gifsmith can't read its settings file. See General.";
+  assert.equal(saveErrorText('prefs_unreadable'), unreadable);
+  assert.equal(saveErrorText('prefs_write_failed'), "Couldn't save this setting. Try again.");
+  assert.equal(saveErrorText(), "Couldn't save this setting. Try again.");
+  assert.equal(hotkeyErrorText('prefs_unreadable', 'Cmd+Ctrl+Option+F', ''), unreadable);
+  assert.equal(folderErrorText('prefs_unreadable', 'Downloads'), unreadable);
 });
 
 test('T6 and F4 use the folder display name, never a path', () => {
