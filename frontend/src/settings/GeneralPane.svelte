@@ -5,10 +5,12 @@
   import {
     accessibilityStatus,
     checkForUpdates,
+    downloadUpdate,
     requestAccessibility,
     setLaunchAtLogin,
     setPref,
     settingsError,
+    updateError,
     updateStatus,
     type SettingsSnapshot,
     type UpdateStatus,
@@ -41,9 +43,21 @@
         return `Gifsmith ${st.current} is up to date.`;
       case 'available':
         return `Gifsmith ${st.latest} is available. You have ${st.current}.`;
+      case 'downloading':
+        return `Downloading Gifsmith ${st.latest}…` + (st.total > 0 ? ` ${Math.floor((st.done * 100) / st.total)}%` : '');
+      case 'verifying':
+        return "Checking the download's signature…";
+      case 'opened':
+        return `The Gifsmith ${st.latest} disk image is open. Quit Gifsmith, then drag the new Gifsmith to Applications and choose Replace.`;
     }
     return '';
   }
+
+  const UPDATE_ERRORS: Record<string, (st: UpdateStatus) => string> = {
+    update_download_failed: (st) => `Couldn't download Gifsmith ${st.latest}. Check your connection, then try again.`,
+    update_verify_failed: () => "The download didn't pass the signature check, so Gifsmith deleted it. Nothing was opened.",
+    update_open_failed: () => "Gifsmith couldn't open the downloaded disk image. Try again.",
+  };
 
   const THEMES = [
     { value: '', label: 'System' },
@@ -123,6 +137,16 @@
       upd = await checkForUpdates();
     } catch {
       updError = "Couldn't check for updates. Check your connection, then try again.";
+    }
+  }
+
+  async function download() {
+    updError = '';
+    try {
+      upd = await downloadUpdate();
+    } catch (e) {
+      const text = UPDATE_ERRORS[updateError(e)?.kind ?? ''] ?? UPDATE_ERRORS.update_download_failed;
+      updError = text(upd);
     }
   }
 
@@ -211,6 +235,12 @@
         {updText(upd)}
       </p>
     {/if}
+    {#if upd.state === 'downloading'}
+      <progress class="update-progress" max={upd.total || undefined} value={upd.done}></progress>
+    {/if}
+    {#if upd.state === 'available'}
+      <button class="btn-primary" disabled={updBusy} onclick={download}>Download and Open…</button>
+    {/if}
     <button class="btn-secondary" disabled={updBusy} onclick={check}>Check for Updates…</button>
   </SettingRow>
 </div>
@@ -225,7 +255,14 @@
     font: var(--body);
     color: var(--text);
   }
-  .update-status.checking {
+  .update-progress {
+    flex-basis: 100%;
+    width: 272px;
+    margin: -4px 0 0;
+  }
+  .update-status.checking,
+  .update-status.downloading,
+  .update-status.verifying {
     color: var(--text-secondary);
   }
   .update-status.current {

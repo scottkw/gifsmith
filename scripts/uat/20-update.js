@@ -27,5 +27,28 @@ await row.getByText(available, { exact: true }).waitFor({ timeout: 5000 });
 if (await row.locator("[role=alert]").count()) fail("error after the second check: " + (await row.locator("[role=alert]").innerText()));
 await saveScreenshot(await B.screenshot(), "gifsmith-20-update-available.png");
 
+// Download and Open…: record every status text and whether a progress bar appeared.
+await B.evaluate(() => {
+  const row = document.querySelector("#updates").closest(".row");
+  window.__upd = { texts: [], progress: false };
+  const note = () => {
+    const s = row.querySelector("[role=status]");
+    if (s && window.__upd.texts.at(-1) !== s.textContent.trim()) window.__upd.texts.push(s.textContent.trim());
+    if (row.querySelector("progress")) window.__upd.progress = true;
+  };
+  new MutationObserver(note).observe(row, { subtree: true, childList: true, characterData: true, attributes: true });
+});
+await B.getByRole("button", { name: "Download and Open…", exact: true }).click();
+const opened = "The Gifsmith 9.9.0 disk image is open. Quit Gifsmith, then drag the new Gifsmith to Applications and choose Replace.";
+await row.getByText(opened, { exact: true }).waitFor({ timeout: 10000 });
+const seen = await B.evaluate(() => window.__upd);
+if (!seen.texts.some((t) => t.startsWith("Downloading Gifsmith 9.9.0…"))) fail("no Downloading status: " + JSON.stringify(seen.texts));
+if (!seen.texts.some((t) => /Downloading Gifsmith 9\.9\.0… \d+%/.test(t))) fail("no percent: " + JSON.stringify(seen.texts));
+if (!seen.texts.includes("Checking the download's signature…")) fail("no verifying status: " + JSON.stringify(seen.texts));
+if (!seen.progress) fail("no progress bar seen");
+if (await B.getByRole("button", { name: "Download and Open…", exact: true }).count()) fail("Download and Open… still shown");
+if (await row.locator("[role=alert]").count()) fail("error after download: " + (await row.locator("[role=alert]").innerText()));
+await saveScreenshot(await B.screenshot(), "gifsmith-20-update-opened.png");
+
 if (errors.length) fail("page error: " + errors[0]);
 console.log("UAT OK");

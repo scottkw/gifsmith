@@ -50,6 +50,8 @@ type deps struct {
 	PickFolder            func(start string) (string, error) // nil in the app (the native picker); FAKE_PICK_FOLDER in the UAT build
 	UpdateAPI             string                             // GitHub REST base (the fixture's /github in the UAT build)
 	UpdateAllow           func(*url.URL) bool                // allowed update download URLs and redirects
+	UpdateDir             string                             // update DMGs: the app cache's updates folder
+	UpdateRun             update.Runner                      // codesign/spctl/xattr; canned in the UAT build
 }
 
 func main() {
@@ -100,6 +102,10 @@ func main() {
 	updates := &services.UpdateService{
 		Checker: &update.Checker{API: d.UpdateAPI, Repo: update.Repo, HTTP: d.HTTP, Allow: d.UpdateAllow},
 		Current: services.Version,
+		Dir:     d.UpdateDir,
+		Client:  update.NewDownloadClient(d.UpdateAllow),
+		Run:     d.UpdateRun,
+		Open:    plat.OpenURL,
 	}
 
 	var sh *shell.Shell // set below, before app.Run; a second launch arrives only after Run starts
@@ -179,6 +185,9 @@ func main() {
 	// ActionService.ServiceShutdown clears it again at quit.
 	if err := stage.Clear(); err != nil {
 		log.Printf("staging clear: %v", err)
+	}
+	if err := update.Clean(d.UpdateDir); err != nil { // stale update downloads from an earlier run
+		log.Printf("update clean: %v", err)
 	}
 	if err := app.Run(); err != nil {
 		log.Fatal(err)

@@ -6,6 +6,9 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -109,6 +112,65 @@ func (u *UpdateService) Check(ctx context.Context) (UpdateStatus, error) {
 	return u.set(UpdateStatus{State: "current"}), nil
 }
 
-func (u *UpdateService) Download(ctx context.Context) (UpdateStatus, error) {
-	return UpdateStatus{}, nil
+// Download fetches the available release's DMG into Dir, verifies it (digest, signature, Team ID,
+// notarization, quarantine) and only then opens it; a failed check deletes the file. It runs on
+// its own 10-minute deadline, so a Settings reload does not abort it. Any error restores available.
+func (u *UpdateService) Download(context.Context) (UpdateStatus, error) {
+	u.mu.Lock()
+	if busy(u.st.State) {
+		defer u.mu.Unlock()
+		return u.status(), nil
+	}
+	if u.st.State != "available" && u.st.State != "opened" {
+		defer u.mu.Unlock()
+		return u.status(), errInvalidValue
+	}
+	rel := u.rel
+	u.set(UpdateStatus{State: "downloading", Latest: rel.Version, Total: rel.DMG.Size})
+	u.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	fail := func(kind string) (UpdateStatus, error) {
+		u.mu.Lock()
+		defer u.mu.Unlock()
+		return u.set(UpdateStatus{State: "available", Latest: rel.Version}), &SettingsError{Kind: kind}
+	}
+	if err := update.Clean(u.Dir); err != nil {
+		log.Printf("update: clean: %v", err)
+	}
+	path, err := update.Download(ctx, u.Client, rel.DMG, u.Dir, func(done, total int64) {
+		u.mu.Lock()
+		defer u.mu.Unlock()
+		u.set(UpdateStatus{State: "downloading", Latest: rel.Version, Done: done, Total: total})
+	})
+	if errors.Is(err, update.ErrDigest) {
+		log.Printf("update: verification failed: digest")
+		return fail("update_verify_failed")
+	}
+	if err != nil {
+		log.Printf("update: download failed")
+		return fail("update_download_failed")
+	}
+
+	u.mu.Lock()
+	u.set(UpdateStatus{State: "verifying", Latest: rel.Version})
+	u.mu.Unlock()
+	now := time.Now
+	if u.Now != nil {
+		now = u.Now
+	}
+	if err := update.Verify(ctx, u.Run, path, update.TeamID, now()); err != nil {
+		log.Printf("update: verification failed: %v", err)
+		_ = os.Remove(path)
+		return fail("update_verify_failed")
+	}
+	if err := u.Open((&url.URL{Scheme: "file", Path: path}).String()); err != nil {
+		log.Printf("update: open failed") // the verified file stays for a retry
+		return fail("update_open_failed")
+	}
+	log.Printf("update: opened %s", filepath.Base(path))
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.set(UpdateStatus{State: "opened", Latest: rel.Version}), nil
 }

@@ -67,6 +67,8 @@ export const testHotkey = (slot: string) => SettingsService.TestHotkey(slot);
 // Failures reject with cause.kind update_check_failed | update_download_failed | update_verify_failed | update_open_failed.
 export const updateStatus = () => UpdateService.Status();
 export const checkForUpdates = () => UpdateService.Check();
+// Downloads, verifies and opens the available release's DMG; nothing is installed in place.
+export const downloadUpdate = () => UpdateService.Download();
 export const updateError = (e: unknown): { kind: string } | null => providerError(e);
 // Re-probes Clips once when its result is unknown; resolves to the state, rejects with the probe's cause.
 export const checkClips = () => GifService.CheckClips();

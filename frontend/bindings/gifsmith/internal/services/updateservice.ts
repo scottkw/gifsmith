@@ -23,6 +23,15 @@ export function Check(): $CancellablePromise<$models.UpdateStatus> {
     return $Call.ByID(1115872461);
 }
 
+/**
+ * Download fetches the available release's DMG into Dir, verifies it (digest, signature, Team ID,
+ * notarization, quarantine) and only then opens it; a failed check deletes the file. It runs on
+ * its own 10-minute deadline, so a Settings reload does not abort it. Any error restores available.
+ */
+export function Download(): $CancellablePromise<$models.UpdateStatus> {
+    return $Call.ByID(3960671023);
+}
+
 export function Status(): $CancellablePromise<$models.UpdateStatus> {
     return $Call.ByID(294379533);
 }

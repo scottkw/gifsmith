@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -10,6 +11,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -18,6 +21,7 @@ import (
 	"gifsmith/internal/provider/fakeapi"
 	"gifsmith/internal/settings"
 	"gifsmith/internal/staging"
+	"gifsmith/internal/update"
 )
 
 // wire points every provider at an in-process fixture server on 127.0.0.1 (browser UAT only, never shipped).
@@ -35,6 +39,10 @@ func wire() deps {
 	go func() { log.Fatal(http.Serve(ln, h)) }()
 	host := ln.Addr().String()
 	log.Printf("fixture server: http://%s", host)
+	updateDir, err := filepath.Abs("bin/uat-cache/updates") // absolute: Download opens a file:// URL
+	if err != nil {
+		log.Fatal(err)
+	}
 	return deps{
 		HTTP:         &http.Client{Timeout: 3 * time.Second},
 		FinerBase:    "http://" + host + "/finer",
@@ -61,7 +69,21 @@ func wire() deps {
 		// The update check asks the fixture, never api.github.com; downloads only plain http to it.
 		UpdateAPI:   "http://" + host + "/github",
 		UpdateAllow: func(u *url.URL) bool { return u.Scheme == "http" && u.Host == host },
+		UpdateDir:   updateDir,
+		UpdateRun:   cannedVerify,
 	}
+}
+
+// cannedVerify stands in for codesign/spctl/xattr: it answers like a good notarized DMG and never
+// executes anything (the fixture "DMG" is not a disk image; tamper is caught by the digest).
+func cannedVerify(_ context.Context, name string, args ...string) ([]byte, error) {
+	switch {
+	case name == "/usr/bin/codesign" && slices.Contains(args, "-dvv"):
+		return []byte("TeamIdentifier=" + update.TeamID + "\n"), nil
+	case name == "/usr/sbin/spctl":
+		return []byte("fixture.dmg: accepted\nsource=Notarized Developer ID\n"), nil
+	}
+	return nil, nil
 }
 
 // memRegistrar is the UAT build's Registrar: registered accelerators in memory.

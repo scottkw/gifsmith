@@ -23,7 +23,8 @@ type Platform interface {
 	CopyFile(path string) error
 	// CopyText puts a plain string on the general pasteboard (public.utf8-plain-text).
 	CopyText(text string) error
-	// OpenURL opens an https URL in the default browser (callers validate the URL).
+	// OpenURL opens a URL with its default handler: https links in the browser, the verified
+	// update DMG's file URL in DiskImageMounter (callers validate).
 	OpenURL(u string) error
 	// FocusWebView makes the window's WKWebView first responder so typing reaches the page.
 	FocusWebView(nsWindow unsafe.Pointer)
