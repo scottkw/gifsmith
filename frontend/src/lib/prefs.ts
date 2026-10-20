@@ -56,7 +56,9 @@ const GRID: Record<string, { cols: number; tile: number }> = {
   large: { cols: 3, tile: 192 },
 };
 const grid = (size: string) => GRID[size] ?? GRID.medium;
-export const colsFor = (size: string): number => grid(size).cols;
+export function colsFor(size: string): number {
+  return grid(size).cols;
+}
 export const tileHeight = (size: string): number => grid(size).tile;
 // S2: two rows of skeleton tiles.
 export const skeletonCount = (size: string): number => 2 * grid(size).cols;
