@@ -374,3 +374,60 @@ func TestInvalidateDropsInFlightResult(t *testing.T) {
 		})
 	}
 }
+
+// Flush (a provider parameter changed) drops cached pages of the budget but keeps a 429 block.
+func TestFlushKeepsRateLimitBlock(t *testing.T) {
+	g, cl := &fakeProv{page: page("a")}, &fakeProv{page: page("c")}
+	c := &clock{t: time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)}
+	s := New(map[provider.ID]provider.Provider{provider.GIPHY: g, provider.Clips: cl}, c.now)
+	_, _ = s.Trending(ctx, provider.Clips, "")
+	g.err = &provider.Error{Kind: provider.RateLimited, Provider: provider.GIPHY, RetryAfterSec: 120}
+	_, _ = s.Trending(ctx, provider.GIPHY, "")
+	g.err = nil
+	s.Flush(provider.GIPHY)
+	_, err := s.Search(ctx, provider.GIPHY, "cat", "")
+	if pe := rateLimited(t, err); pe.RetryAfterSec != 120 || g.n() != 1 {
+		t.Fatalf("after Flush: %+v, calls %d; want still rate_limited, no new call", pe, g.n())
+	}
+	c.advance(121 * time.Second)
+	_, _ = s.Trending(ctx, provider.Clips, "")
+	if cl.n() != 2 {
+		t.Errorf("clips calls = %d, want 2 (Flush(giphy) drops the cached Clips page)", cl.n())
+	}
+	s.Invalidate(provider.GIPHY) // a key change still lifts a block
+	g.err = &provider.Error{Kind: provider.RateLimited, Provider: provider.GIPHY}
+	_, _ = s.Trending(ctx, provider.GIPHY, "")
+	g.err = nil
+	s.Invalidate(provider.GIPHY)
+	if _, err := s.Trending(ctx, provider.GIPHY, ""); err != nil {
+		t.Errorf("Invalidate did not lift the block: %v", err)
+	}
+}
+
+func TestFlushKeepsOtherProviders(t *testing.T) {
+	g, k := &fakeProv{page: page("a")}, &fakeProv{page: page("k")}
+	s := New(map[provider.ID]provider.Provider{provider.GIPHY: g, provider.Klipy: k}, nil)
+	_, _ = s.Trending(ctx, provider.GIPHY, "")
+	_, _ = s.Trending(ctx, provider.Klipy, "")
+	s.Flush(provider.GIPHY)
+	_, _ = s.Trending(ctx, provider.GIPHY, "")
+	_, _ = s.Trending(ctx, provider.Klipy, "")
+	if g.n() != 2 || k.n() != 1 {
+		t.Errorf("calls giphy %d klipy %d; want 2 and 1", g.n(), k.n())
+	}
+}
+
+// A 429 that lands after a Flush still blocks the budget: only a key change voids it.
+func TestFlushInFlight429StillBlocks(t *testing.T) {
+	g := &gatedProv{started: make(chan struct{}), release: make(chan struct{}), err: &provider.Error{Kind: provider.RateLimited, Provider: provider.GIPHY}}
+	s := New(map[provider.ID]provider.Provider{provider.GIPHY: g}, nil)
+	done := make(chan struct{})
+	go func() { _, _ = s.Trending(ctx, provider.GIPHY, ""); close(done) }()
+	<-g.started
+	s.Flush(provider.GIPHY)
+	close(g.release)
+	<-done
+	if !s.Blocked(provider.GIPHY) {
+		t.Error("a 429 answered after Flush did not block the budget")
+	}
+}

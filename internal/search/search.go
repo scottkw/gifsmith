@@ -39,14 +39,15 @@ type Service struct {
 	mu      sync.Mutex // never held across a provider call
 	cache   map[string]entry
 	blocked map[provider.ID]block
-	gen     map[provider.ID]int // per budget, bumped by Invalidate: an old key's late answer is never recorded
+	gen     map[provider.ID]int // per budget, bumped by Invalidate and Flush: a late answer is never cached
+	keyGen  map[provider.ID]int // per budget, bumped by Invalidate only: a 429 counts unless the key changed
 }
 
 func New(providers map[provider.ID]provider.Provider, now func() time.Time) *Service {
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{providers: providers, now: now, cache: map[string]entry{}, blocked: map[provider.ID]block{}, gen: map[provider.ID]int{}}
+	return &Service{providers: providers, now: now, cache: map[string]entry{}, blocked: map[provider.ID]block{}, gen: map[provider.ID]int{}, keyGen: map[provider.ID]int{}}
 }
 
 func (s *Service) Search(ctx context.Context, p provider.ID, q, cursor string) (provider.Page, error) {
@@ -81,20 +82,35 @@ func budget(p provider.ID) provider.ID {
 func (s *Service) Invalidate(p provider.ID) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.flush(p)
+	delete(s.blocked, budget(p))
+	s.keyGen[budget(p)]++
+}
+
+// flush drops p's budget's cached pages and bumps its generation, so a late answer fetched with
+// the old key or parameters is never cached. Caller holds mu.
+func (s *Service) flush(p provider.ID) {
 	for k := range s.cache {
 		if id, _, _ := strings.Cut(k, "|"); budget(provider.ID(id)) == budget(p) {
 			delete(s.cache, k)
 		}
 	}
-	delete(s.blocked, budget(p))
 	s.gen[budget(p)]++
+}
+
+// Flush drops the cached pages of every provider on p's budget because a provider parameter
+// changed (rating, page size, language, country). The 429 block stays: the key did not change.
+func (s *Service) Flush(p provider.ID) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.flush(p)
 }
 
 // Guard runs an uncached call (the Clips probe) inside p's 429 budget: refused
 // while blocked, and a 429 it returns blocks the budget like any other request.
 func (s *Service) Guard(p provider.ID, call func() error) error {
 	s.mu.Lock()
-	err, gen := s.blockedErr(p), s.gen[budget(p)]
+	err, gen := s.blockedErr(p), s.keyGen[budget(p)]
 	s.mu.Unlock()
 	if err != nil {
 		return err
@@ -118,8 +134,8 @@ func (s *Service) blockedErr(p provider.ID) error {
 	return &provider.Error{Kind: provider.RateLimited, Provider: p, RetryAfterSec: retry}
 }
 
-// noteRateLimit blocks p's budget when err is a 429 for the key generation gen.
-func (s *Service) noteRateLimit(p provider.ID, gen int, err error) {
+// noteRateLimit blocks p's budget when err is a 429 for the key generation kgen.
+func (s *Service) noteRateLimit(p provider.ID, kgen int, err error) {
 	var pe *provider.Error
 	if !errors.As(err, &pe) || pe.Kind != provider.RateLimited {
 		return
@@ -127,7 +143,7 @@ func (s *Service) noteRateLimit(p provider.ID, gen int, err error) {
 	wait := max(time.Duration(pe.RetryAfterSec)*time.Second, MinBlock)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.gen[budget(p)] == gen {
+	if s.keyGen[budget(p)] == kgen {
 		s.blocked[budget(p)] = block{until: s.now().Add(wait), known: pe.RetryAfterSec > 0}
 	}
 }
@@ -148,17 +164,17 @@ func (s *Service) get(p provider.ID, rest string, ttl time.Duration, call func(p
 		s.mu.Unlock()
 		return e.page, nil
 	}
-	gen := s.gen[budget(p)]
+	gen, kgen := s.gen[budget(p)], s.keyGen[budget(p)]
 	s.mu.Unlock()
 
 	pg, err := call(pr)
 	if err != nil {
-		s.noteRateLimit(p, gen, err)
+		s.noteRateLimit(p, kgen, err)
 		return pg, err // errors and cancellations are never cached
 	}
 	pg = dedupe(p, pg)
 	s.mu.Lock()
-	if s.gen[budget(p)] == gen { // the key changed mid-flight: answer the caller, never cache the old key's page
+	if s.gen[budget(p)] == gen { // the key or parameters changed mid-flight: answer the caller, never cache the old page
 		s.cache[key] = entry{pg, s.now().Add(ttl)}
 	}
 	s.mu.Unlock()

@@ -7,3 +7,6 @@ import "gifsmith/internal/platform"
 func panelOrigin(wa platform.Rect, w, h int) (x, y int) {
 	return wa.X + (wa.Width-w)/2, wa.Y + wa.Height/6
 }
+
+// settingsOrigin places the Settings window the way the panel is placed.
+func settingsOrigin(wa platform.Rect, w, h int) (x, y int) { return panelOrigin(wa, w, h) }

@@ -4,18 +4,17 @@ milestone: v1.0
 milestone_name: Gifsmith MVP
 current_phase: 4
 current_phase_name: Settings, Shell Polish & Release
-status: planning
-stopped_at: Phase 3 complete, ready to plan Phase 4
-last_updated: "2026-10-18T18:47:41.661Z"
+status: executing
+stopped_at: Completed 04-06-PLAN.md
+last_updated: "2026-10-20T13:54:19.560Z"
 last_activity: 2026-10-18
-last_activity_desc: Phase 3 complete, transitioned to Phase 4
-state_head: a370f208307208c368b1de40f03189beeb2538a2
+last_activity_desc: Phase 4 execution started
+state_head: 1368868ca5f5b1c61d6bdf542403465ce29af984
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 18
-  completed_plans: 18
-  percent: 75
+  total_plans: 26
+  completed_plans: 25
 ---
 
 # Project State
@@ -29,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-10-18)
 
 ## Current Position
 
-Phase: 4 — Settings, Shell Polish & Release
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-10-18 — Phase 3 complete, transitioned to Phase 4
+Phase: 4 (Settings, Shell Polish & Release) — EXECUTING
+Plan: 7 of 7
+Status: Ready to execute
+Last activity: 2026-10-18 — Phase 4 execution started
 
 Progress: [████████░░] 75% (3/4 phases; 18/18 planned plans complete)
 
@@ -78,6 +77,13 @@ Progress: [████████░░] 75% (3/4 phases; 18/18 planned plans 
 | Phase 03 P06 | 20 min | 3 tasks | 35 files |
 | Phase 03 P07 | 33min | 3 tasks | 25 files |
 | Phase 03 P08 | 10min | 2 tasks | 1 files |
+| Phase 04 P01 | 22 min | 7 tasks | 42 files |
+| Phase 04 P02 | 28 min | 8 tasks | 46 files |
+| Phase 04 P03 | 33 min | 6 tasks | 42 files |
+| Phase 04 P04 | 32min | 9 tasks | 46 files |
+| Phase 04 P07 | 19 min | 4 tasks | 31 files |
+| Phase 04 P05 | 12 min | 4 tasks | 27 files |
+| Phase 4 P06 | 25min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -150,6 +156,26 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-08: Clips MP4 paste skipped natively (GIPHY key not Clips-approved); fixture-proven only
 - [Phase 3 close]: Native UAT passed on a fresh signed install (favorites/recents/searches persisted mode 600; staging empty after quit); CR-01 square-crop budget fixed; 7 Info items (IN-01..IN-07) left open in 03-REVIEW-DISPOSITION.md
 - [Phase 3 close]: Clips link/Markdown use the GIF rendition (D-18), copy/paste as 720p MP4; Klipy staged files deleted 30 s after paste/next copy/quit; single-instance added
+- [Phase 04]: settings.Store is the single owner of settings.json; SetPref validates via Prefs.Normalize inside Update and emits settings:changed with the full Snapshot
+- [Phase 04]: Snapshot.launchAtLogin reports the OS state (Autostart.IsEnabled), not the pref
+- [Phase 04]: Vite 8 build.rolldownOptions.input serves the second settings.html entry
+- [Phase 04]: 04-02: search.Service keeps a key generation (429 recording) separate from the cache generation (Flush and Invalidate), so a parameter change never voids a real 429
+- [Phase 04]: 04-02: provider parameters are read per request through Params func on each client; Match System is stored as empty and resolved from platform.SystemLocale with en/us fallbacks
+- [Phase 04]: 04-02: the Keys card message line wraps instead of UI-SPEC's one-line ellipsis (K2/K3/K-T2 exceed 400px at 12px)
+- [Phase 04]: Hotkey parser lives in settings (CanonicalHotkey) so Normalize validates stored hotkeys without an import cycle; hotkeys stored in Wails canonical form, Open default stored as empty
+- [Phase 04]: Webview hotkey calls (set/suspend/resume) run strictly in order and Go resumes hotkeys on Settings hide, Cmd+W and lost focus
+- [Phase 04]: Reduce Motion uses a one-time canvas first frame for every provider; only the selected tile keeps an animated img
+- [Phase 04]: Klipy file actions are gated by the compile-time const services.KlipyFileActionsCleared (false), enforced in ActionService before staging/HTTP; never a pref
+- [Phase 04]: Download folder comes only from the picker seam (NSOpenPanel / FAKE_PICK_FOLDER) and is validated by ValidateDownloadDir (Statfs type + MNT_LOCAL + os.Link probe) before the Store saves it
+- [Phase 04]: Grid math takes the column count; a grid-size change remounts the grid via its key, keeping the selection
+- [Phase 04]: Keys-card message backstop follows 04-02's wrap decision; footer-centre >= 200px is measured with the GIPHY mark (Finer leaves ~179px, ellipsized)
+- [Phase 04]: 04-07: update check is one GET to GitHub releases/latest (Accept, User-Agent Gifsmith, If-None-Match only); 404 = up to date; a release without a valid DMG asset counts as up to date
+- [Phase 04]: 04-07: UpdateService opens the DMG only after update.Verify (SHA-256 = API digest, codesign --strict, TeamIdentifier=S2K7P43927, spctl Notarized Developer ID, quarantine); RunAutoUpdates is a package func so Wails never binds it
+- [Phase 04]: Release DMG background: committed @1x/@2x PNGs combined into a two-representation TIFF at build time
+- [Phase 04]: darwin:release signs once with --hardened-runtime --notarize instead of sign then re-sign
+- [Phase 04]: Unreferenced Wails template public assets deleted (wails.png, svelte.svg, Inter-Medium.ttf, style.css, bg-*.jpg)
+- [Phase 4]: RELS-02 clean-machine install was run in a fresh Tart VM (macOS 15.7.7) from the quarantined notarized DMG: PASSED
+- [Phase 4]: Draft release v1.0.0 targets main; Phase 4 must be merged to main before the user publishes (tag is created at publish time)
 
 ### Pending Todos
 
@@ -183,6 +209,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-18
-Stopped at: Phase 3 complete, ready to plan Phase 4
+Last session: 2026-10-20T13:54:19.341Z
+Stopped at: Completed 04-06-PLAN.md
 Resume file: None

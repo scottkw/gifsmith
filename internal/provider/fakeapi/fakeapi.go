@@ -5,6 +5,8 @@ package fakeapi
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
@@ -22,6 +24,9 @@ type Options struct {
 	FinerDown   bool          // /finer/search answers like the real host does when it is down (530, Cloudflare 1033)
 	SlowDelay   time.Duration // used by the "slow" scenario word (plan 02-03)
 	ClipsDenied bool          // /giphy/v1/clips/* answer 403, as for a key GIPHY has not approved for Clips
+	// Update drives /github/...: "" serves v9.9.0, "current" answers 404 (nothing published),
+	// "tamper" serves v9.9.0 with a digest that does not match the download.
+	Update string
 }
 
 const (
@@ -37,7 +42,63 @@ func Handler(o Options) http.Handler {
 	mux.HandleFunc("GET /giphy/v1/clips/{kind}", func(w http.ResponseWriter, r *http.Request) { giphyGifs(w, r, o, true) })
 	mux.HandleFunc("GET /klipy/api/v1/{key}/gifs/{kind}", func(w http.ResponseWriter, r *http.Request) { klipyGifs(w, r, o) })
 	mux.HandleFunc("GET /media/{file}", media)
+	mux.HandleFunc("GET /github/repos/scottkw/gifsmith/releases/latest", func(w http.ResponseWriter, r *http.Request) { githubLatest(w, r, o) })
+	mux.HandleFunc("GET /github/download/v9.9.0/Gifsmith-9.9.0-arm64.dmg", githubDMG)
 	return mux
+}
+
+// fakeDMG is the fixture release asset: 1 MiB of deterministic bytes (not a real disk image;
+// the server build's verifier is canned).
+var fakeDMG = func() []byte {
+	b := make([]byte, 1<<20)
+	for i := range b {
+		b[i] = byte(i * 7 % 251)
+	}
+	return b
+}()
+
+// githubLatest answers like GitHub's releases/latest: ETag "fixture-1", 304 on If-None-Match.
+func githubLatest(w http.ResponseWriter, r *http.Request, o Options) {
+	if o.Update == "current" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = fmt.Fprint(w, `{"message":"Not Found","status":"404"}`)
+		return
+	}
+	w.Header().Set("ETag", `"fixture-1"`)
+	if r.Header.Get("If-None-Match") == `"fixture-1"` {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	sum := sha256.Sum256(fakeDMG)
+	if o.Update == "tamper" {
+		sum = sha256.Sum256(fakeDMG[1:])
+	}
+	writeJSON(w, map[string]any{"tag_name": "v9.9.0", "draft": false, "prerelease": false, "assets": []map[string]any{{
+		"name": "Gifsmith-9.9.0-arm64.dmg", "size": len(fakeDMG), "state": "uploaded",
+		"digest":               "sha256:" + hex.EncodeToString(sum[:]),
+		"browser_download_url": "http://" + r.Host + "/github/download/v9.9.0/Gifsmith-9.9.0-arm64.dmg",
+	}}})
+}
+
+// githubDMG streams fakeDMG in 16 KiB chunks about 15 ms apart, so progress is visible.
+func githubDMG(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Length", strconv.Itoa(len(fakeDMG)))
+	f, _ := w.(http.Flusher)
+	for b := fakeDMG; len(b) > 0; b = b[min(len(b), 16<<10):] {
+		if _, err := w.Write(b[:min(len(b), 16<<10)]); err != nil {
+			return
+		}
+		if f != nil {
+			f.Flush()
+		}
+		select {
+		case <-time.After(15 * time.Millisecond):
+		case <-r.Context().Done():
+			return
+		}
+	}
 }
 
 func finerSearch(w http.ResponseWriter, r *http.Request, o Options) {
@@ -147,11 +208,19 @@ func giphyGifs(w http.ResponseWriter, r *http.Request, o Options, clips bool) {
 	if hasWord(words, "hugesize") { // over the 15 MB square crop limit
 		originalSize = "16000000"
 	}
+	// Non-default request parameters show in titles, so UAT can see what Go sent.
+	tag := ""
+	if r := q.Get("rating"); r != "" && r != "pg-13" {
+		tag = "[rating=" + r + "] "
+	}
+	if l := q.Get("lang"); kind == "search" && l != "" && l != "en" {
+		tag += "[lang=" + l + "] "
+	}
 	data := []item{}
 	for n := max(offset, 0) + 1; n <= total && len(data) < limit; n++ {
 		if clips {
 			id := "clip-" + strconv.Itoa(n)
-			data = append(data, item{Type: "video", ID: id, Slug: "clip-" + id, Title: "GIPHY clip " + strconv.Itoa(n), URL: "https://giphy.com/clips/clip-" + id, Images: map[string]rendition{
+			data = append(data, item{Type: "video", ID: id, Slug: "clip-" + id, Title: tag + "GIPHY clip " + strconv.Itoa(n), URL: "https://giphy.com/clips/clip-" + id, Images: map[string]rendition{
 				"fixed_width": {URL: media + id + "-200w.gif", Width: "200", Height: "112", Size: "1234"},
 				"original":    {URL: media + id + ".gif", Width: "480", Height: "270", Size: "4321"},
 			}, Video: map[string]any{"assets": clipAssets(media+id, hasWord(words, "no720"))}})
@@ -162,7 +231,7 @@ func giphyGifs(w http.ResponseWriter, r *http.Request, o Options, clips bool) {
 		if n%2 == 1 {
 			source = "https://example.org/source/" + id
 		}
-		data = append(data, item{Type: "gif", ID: id, Slug: "moment-" + id, Title: "GIPHY moment " + strconv.Itoa(n), URL: "https://giphy.com/gifs/moment-" + id, Source: source, Images: map[string]rendition{
+		data = append(data, item{Type: "gif", ID: id, Slug: "moment-" + id, Title: tag + "GIPHY moment " + strconv.Itoa(n), URL: "https://giphy.com/gifs/moment-" + id, Source: source, Images: map[string]rendition{
 			"fixed_width":  {URL: media + id + "-200w.gif", Width: "200", Height: "200", Size: "1234"},
 			"fixed_height": {URL: media + id + "-200h.gif", Width: "200", Height: "200", Size: "1234"},
 			"original":     {URL: media + id + ".gif", Width: "480", Height: "480", Size: originalSize},
@@ -222,6 +291,10 @@ func klipyGifs(w http.ResponseWriter, r *http.Request, o Options) {
 		File  map[string]map[string]gifFile `json:"file"`
 	}
 	media := "http://" + r.Host + "/media/"
+	tag := "" // a non-default locale shows in titles, so UAT can see what Go sent
+	if l := q.Get("locale"); l != "" && l != "us" {
+		tag = "[locale=" + l + "] "
+	}
 	data := []item{}
 	first := (page-1)*per + 1
 	for n := first; n <= total && n < first+per; n++ {
@@ -234,7 +307,7 @@ func klipyGifs(w http.ResponseWriter, r *http.Request, o Options) {
 		if n == 3 { // an object element the client must skip without failing the page
 			tags = []any{map[string]string{"name": "obj"}, "funny"}
 		}
-		data = append(data, item{ID: 8041071659142944 + int64(n), Slug: slug, Title: "Klipy moment " + strconv.Itoa(n), Type: "gif", Tags: tags, File: map[string]map[string]gifFile{
+		data = append(data, item{ID: 8041071659142944 + int64(n), Slug: slug, Title: tag + "Klipy moment " + strconv.Itoa(n), Type: "gif", Tags: tags, File: map[string]map[string]gifFile{
 			"sm": {"gif": {URL: media + name + "-sm.gif", Width: 220, Height: 220, Size: 1234}},
 			"md": {"gif": {URL: media + name + "-md.gif", Width: 320, Height: 320, Size: 3456}},
 			"hd": {"gif": {URL: media + name + "-hd.gif", Width: 498, Height: 498, Size: 5678}},

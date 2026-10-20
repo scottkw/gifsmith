@@ -7,7 +7,12 @@
 #   scripts/smoke-browser-loop.sh --serve         start server + Vite and keep them up for dev-browser
 #   scripts/smoke-browser-loop.sh --uat <file.js> start both, run the dev-browser script headless, need "UAT OK"
 #
-# FAKE_FINER=down (and FAKE_CLIPS, from plan 02-06) pass through to the fixture server.
+# FAKE_FINER=down (and FAKE_CLIPS, from plan 02-06) pass through to the fixture server;
+# FAKE_AUTOSTART=fail makes the server build's in-memory login item fail; FAKE_HOTKEY_FAIL=<accelerator>
+# makes that combo fail to register with the server build's fake Registrar; FAKE_PICK_FOLDER=<dir>
+# is what the server build's folder picker returns (bin/uat-picked, created fresh each run; "" = cancel).
+# FAKE_UPDATE=current (no published release) or tamper (digest mismatch) changes the fixture GitHub
+# releases answer; unset, it offers Gifsmith 9.9.0.
 # UAT_SEED_FAVORITES='<bytes>' seeds bin/uat-config/favorites.json (e.g. a corrupt file); a --uat
 # run then also fails if the app changed that file (an unreadable library file is never overwritten).
 set -euo pipefail
@@ -34,6 +39,10 @@ cd "$ROOT"
 if [ -n "$UAT_SCRIPT" ]; then
   RUN_VIA=$(sed -n 2p "$UAT_SCRIPT")
   case "$RUN_VIA" in *FAKE_CLIPS=denied*) : "${FAKE_CLIPS:=denied}" ;; esac
+  case "$RUN_VIA" in *FAKE_AUTOSTART=fail*) : "${FAKE_AUTOSTART:=fail}" ;; esac
+  case "$RUN_VIA" in *FAKE_HOTKEY_FAIL=*) : "${FAKE_HOTKEY_FAIL:=$(sed -E 's/.*FAKE_HOTKEY_FAIL=([^ ]+).*/\1/' <<<"$RUN_VIA")}" ;; esac
+  case "$RUN_VIA" in *FAKE_UPDATE=tamper*) : "${FAKE_UPDATE:=tamper}" ;; *FAKE_UPDATE=current*) : "${FAKE_UPDATE:=current}" ;; esac
+  case "$RUN_VIA" in *FAKE_PICK_FOLDER=*) : "${FAKE_PICK_FOLDER:=$(sed -E 's/.*FAKE_PICK_FOLDER=([^ ]+).*/\1/' <<<"$RUN_VIA")}" ;; esac
   case "$RUN_VIA" in *"UAT_SEED_FAVORITES='{not json'"*) : "${UAT_SEED_FAVORITES:={not json}" ;; esac
 fi
 
@@ -52,8 +61,8 @@ mkdir -p bin
 CGO_ENABLED=0 go build -tags server -o bin/gifsmith-server .
 # Fresh first-run state every run (UAT-only dirs; the real app uses the user's cache/config dirs).
 # The server build downloads into bin/uat-downloads, never ~/Downloads; Download never creates it.
-rm -rf bin/uat-config bin/uat-cache bin/uat-downloads
-mkdir -p bin/uat-downloads
+rm -rf bin/uat-config bin/uat-cache bin/uat-downloads bin/uat-picked
+mkdir -p bin/uat-downloads bin/uat-picked
 if [ -n "${UAT_SEED_FAVORITES:-}" ]; then
   mkdir -p bin/uat-config
   printf '%s' "$UAT_SEED_FAVORITES" >bin/uat-config/favorites.json
@@ -72,8 +81,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-WAILS_SERVER_PORT="$SERVER_PORT" FAKE_FINER="${FAKE_FINER:-}" FAKE_CLIPS="${FAKE_CLIPS:-}" \
-  bin/gifsmith-server >bin/smoke-server.log 2>&1 &
+WAILS_SERVER_PORT="$SERVER_PORT" FAKE_FINER="${FAKE_FINER:-}" FAKE_CLIPS="${FAKE_CLIPS:-}" FAKE_AUTOSTART="${FAKE_AUTOSTART:-}" \
+  FAKE_HOTKEY_FAIL="${FAKE_HOTKEY_FAIL:-}" FAKE_PICK_FOLDER="${FAKE_PICK_FOLDER:-}" FAKE_UPDATE="${FAKE_UPDATE:-}" bin/gifsmith-server >bin/smoke-server.log 2>&1 &
 PIDS+=("$!")
 # exec so the recorded PID is vite itself, not a wrapper subshell.
 (cd frontend && GIFSMITH_BACKEND="http://localhost:$SERVER_PORT" WAILS_VITE_PORT="$VITE_PORT" \
@@ -177,6 +186,17 @@ if [ "$CODE" = "200" ] || [ "$COUNT" != "2" ]; then
 fi
 echo "ActionService.Download(html media): HTTP $CODE $(cat "$BODY"), no new file"
 
+# Hide original file names: the next download is gifsmith-{id}.gif; the pref goes back off after.
+SETPREF_ID=$(method_id "$SVC/settingsservice.ts" SetPref)
+[ -n "$SETPREF_ID" ] || fail "could not find the SettingsService.SetPref method ID"
+CODE=$(call "$SETPREF_ID" '["hideFilenames","true"]')
+[ "$CODE" = "200" ] && grep -q '"hideFilenames":true' "$BODY" || fail "SetPref(hideFilenames, true): HTTP $CODE, body: $(cat "$BODY")"
+CODE=$(call "$DOWNLOAD_ID" "[$ITEM]")
+[ "$CODE" = "200" ] && grep -q '"name":"gifsmith-' "$BODY" || fail "Download with hidden names: HTTP $CODE, body: $(cat "$BODY")"
+echo "ActionService.Download with hideFilenames: HTTP 200 $(cat "$BODY")"
+CODE=$(call "$SETPREF_ID" '["hideFilenames","false"]')
+[ "$CODE" = "200" ] && grep -q '"hideFilenames":false' "$BODY" || fail "SetPref(hideFilenames, false): HTTP $CODE, body: $(cat "$BODY")"
+
 COPYTEXT_ID=$(method_id "$SVC/actionservice.ts" CopyText)
 [ -n "$COPYTEXT_ID" ] || fail "could not find the ActionService.CopyText method ID"
 CODE=$(call "$COPYTEXT_ID" "[$ITEM,\"link\"]")
@@ -247,6 +267,34 @@ CODE=$(call "$TREND_ID" '["klipy",""]')
 DUPS=$(grep -o '"id":"klipy-dup"' "$BODY" | wc -l | tr -d ' ')
 [ "$DUPS" = "2" ] || fail "Trending(klipy): klipy-dup appears $DUPS times, want 2 (Klipy pages are never deduped)"
 echo "SaveKey(klipy, fixture key): 200; Trending(klipy) keeps both klipy-dup items"
+# RELS-04: a Klipy file action is refused in Go before any staging (the gate ships closed).
+KLIPY_ITEM=$(node -e 'const p = JSON.parse(require("fs").readFileSync(0, "utf8")); process.stdout.write(JSON.stringify(p.items[0]))' <"$BODY")
+STAGED_BEFORE=$(find bin/uat-cache/staging -type f | wc -l | tr -d ' ')
+CODE=$(call "$COPY_ID" "[$KLIPY_ITEM]")
+STAGED_AFTER=$(find bin/uat-cache/staging -type f | wc -l | tr -d ' ')
+if [ "$CODE" = "200" ] || ! grep -q '"kind":"klipy_gated"' "$BODY" || [ "$STAGED_AFTER" != "$STAGED_BEFORE" ]; then
+  fail "ActionService.Copy(klipy item) while gated: HTTP $CODE, staged $STAGED_BEFORE -> $STAGED_AFTER, body: $(cat "$BODY")"
+fi
+echo "ActionService.Copy(klipy item): HTTP $CODE $(cat "$BODY"), nothing staged"
+
+# Keys pane calls: KeyStatus shows the last 4 only; TestKey is uncached; RemoveKey succeeds.
+STATUS_ID=$(method_id "$SET" KeyStatus)
+TEST_ID=$(method_id "$SET" TestKey)
+REMOVE_ID=$(method_id "$SET" RemoveKey)
+[ -n "$STATUS_ID" ] && [ -n "$TEST_ID" ] && [ -n "$REMOVE_ID" ] || fail "missing KeyStatus/TestKey/RemoveKey method IDs"
+CODE=$(call "$STATUS_ID" '[]')
+if [ "$CODE" != "200" ] || ! grep -q '"last4":"-123"' "$BODY" || grep -q 'uat-key-123' "$BODY"; then
+  fail "SettingsService.KeyStatus: HTTP $CODE, body: $(cat "$BODY")"
+fi
+echo "SettingsService.KeyStatus: HTTP 200 $(cat "$BODY")"
+CODE=$(call "$TEST_ID" '["giphy"]')
+[ "$CODE" = "200" ] || fail "SettingsService.TestKey(giphy): HTTP $CODE, body: $(cat "$BODY")"
+echo "SettingsService.TestKey(giphy): HTTP 200"
+CODE=$(call "$REMOVE_ID" '["klipy"]')
+[ "$CODE" = "200" ] || fail "SettingsService.RemoveKey(klipy): HTTP $CODE, body: $(cat "$BODY")"
+CODE=$(call "$PROV_ID" '[]')
+[ "$CODE" = "200" ] && grep -q '"id":"klipy","configured":false' "$BODY" || fail "Providers after RemoveKey(klipy): HTTP $CODE, body: $(cat "$BODY")"
+echo "SettingsService.RemoveKey(klipy): HTTP 200; Providers now $(cat "$BODY")"
 
 CODE=$(call "$LAST_ID" '["giphy"]')
 [ "$CODE" = "200" ] || fail "SetLastProvider(giphy): HTTP $CODE, body: $(cat "$BODY")"

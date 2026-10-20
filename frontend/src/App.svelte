@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { Events } from '@wailsio/runtime';
   import {
     actionError,
@@ -11,6 +11,7 @@
     copyText,
     download,
     openPage,
+    openSettings,
     openSource,
     hide,
     latest,
@@ -25,6 +26,7 @@
     removeRecent,
     removeSearch,
     requestAccessibility,
+    revealUpdates,
     saveSearch,
     search,
     setFavorite,
@@ -38,14 +40,19 @@
     type ProviderErr,
     type ProviderStatus,
     type Result,
+    type SettingsSnapshot,
     type TextKind,
+    type UpdateStatus,
   } from './lib/api';
-  import { actionErrorText, errorState, libraryErrorText, pagingMessage, providerName, revokedMessage } from './lib/errors';
+  import { updateToastText } from './lib/update';
+  import { actionErrorText, downloadedText, errorState, klipyGatedText, libraryErrorText, pagingMessage, providerName, revokedMessage } from './lib/errors';
   import { buildActions, type ActionId, type ActionRow } from './lib/actions';
-  import { COLS, move, nearEnd, routeKey } from './lib/grid';
+  import { move, nearEnd, routeKey } from './lib/grid';
   import { flatItems, moveSectioned, sections } from './lib/library';
   import { placeInDetails, placeMenu } from './lib/popover';
+  import { colsFor, effectiveAction, shortLabel, skeletonCount, tileHeight } from './lib/prefs';
   import { CHIP_MAX, SAVE_IDLE_MS, chipsVisible, shouldSave } from './lib/searches';
+  import { applyTheme } from './lib/theme';
   import { CLIPS_ACCESS_MAILTO, LIBRARY_TABS, SLOTS, libraryTab, slotById, type LibraryId, type SlotId } from './lib/providers';
   import ActionMenu from './components/ActionMenu.svelte';
   import DetailsPane from './components/DetailsPane.svelte';
@@ -64,6 +71,11 @@
   const CROP_BUSY_MS = 300; // a square crop shows its busy state only if it is still running then (D-16)
   const LIBRARY_SKELETON_MS = 300; // a library read slower than this shows the S2 skeleton
   const FAVORITE_TOAST_MS = 2000;
+  const KLIPY_GATED_TOAST_MS = 2000; // T11
+  // Reduce Motion follows macOS live (WebKit tracks it); no separate toggle (D-12).
+  const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+  let reducedMotion = $state(motionQuery.matches);
+  const FAVORITES_MAX = 1000; // library.FavoritesMax
   const UNDO_TOAST_MS = 5000;
   const AX_FAILED = "Couldn't ask macOS for Accessibility access. Try again.";
 
@@ -82,6 +94,7 @@
     errAt: number;
     pageErr: ProviderErr | null; // page 2+ error (S9a/S12a)
     pageErrAt: number;
+    stale: boolean; // fetched with old provider parameters: refetch the first page when next shown
   };
   const fresh = (): PState => ({
     status: 'idle',
@@ -95,8 +108,23 @@
     errAt: 0,
     pageErr: null,
     pageErrAt: 0,
+    stale: false,
   });
   const states = $state<Record<SlotId, PState>>({ giphy: fresh(), clips: fresh(), klipy: fresh(), finergifs: fresh() });
+  let { initial }: { initial: SettingsSnapshot } = $props();
+  // Provider parameters of the last snapshot; a change marks every provider tab stale.
+  const paramsOf = (s: SettingsSnapshot) => [s.giphyRating, s.pageSize, s.giphyLang, s.klipyCountry].join('|');
+  let params = untrack(() => paramsOf(initial));
+  // The latest settings: ↵/⌘↵ choices and the Klipy gate (RELS-04).
+  let prefs = $state(untrack(() => initial));
+  function onSettings(s: SettingsSnapshot) {
+    prefs = s;
+    applyTheme(s.theme);
+    downloadFolder = s.downloadDirName;
+    if (paramsOf(s) === params) return;
+    params = paramsOf(s);
+    for (const st of Object.values(states)) st.stale = st.status !== 'idle'; // results on screen stay until then
+  }
   let active = $state<SlotId>('giphy');
   // Key state comes only from GifService.Providers() (booleans); null until the first answer.
   let statuses = $state<Record<string, ProviderStatus> | null>(null);
@@ -116,10 +144,11 @@
   type ToastAction = { label: string; hint: string; run: () => void };
   let toastAction = $state<ToastAction | null>(null);
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
+  let announcedUpdate = ''; // the release the T12 toast already announced this launch
   let copying = $state(false); // one Copy/Paste in flight; a second Enter would paste twice
   let overlay = $state(false); // the selected tile's busy overlay; for a crop it waits CROP_BUSY_MS
   let needsAccessibility = $state(false);
-  let downloadFolder: string | undefined; // display name from the last download, for F4
+  let downloadFolder = untrack(() => initial.downloadDirName); // the download folder's display name, for F4
   // Paste hides the panel before ⌘V; a copied-only fallback message must survive to the next show.
   let keepStatus = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -134,6 +163,11 @@
 
   // Favorites / Recents (⌘5 / ⌘6) replace the provider grid while libTab is set; not persisted (D-22).
   let libTab = $state<LibraryId | null>(null);
+  // Grid size (D-09): Trending's size for a provider's trending list, Search results' for searches
+  // and the library tabs. A change remounts the grid (keys below); the selection index is kept.
+  const gridSize = $derived(libTab || cur.q ? prefs.gridSearch : prefs.gridTrending);
+  const cols = $derived(colsFor(gridSize));
+  const tile = $derived(tileHeight(gridSize));
   let library = $state<Library | null>(null); // null until the first load answers
   let libSlow = $state(false); // the load has not answered within LIBRARY_SKELETON_MS
   let libSeq = 0;
@@ -238,6 +272,7 @@
 
   onMount(async () => {
     input.focus();
+    motionQuery.addEventListener('change', (e) => (reducedMotion = e.matches));
     Events.On('panel:show', () => {
       clearTimeout(hideTimer); // a copy just before this show must not hide the panel again (02 IN-07)
       menuOpen = detailsOpen = false; // never reopen on their own
@@ -248,6 +283,7 @@
       keepStatus = false;
       needsAccessibility = false;
       refreshLibrary(); // a copy or paste while hidden may have changed Recents
+      if (!libTab && states[active].stale) show(active);
       if (card) setup?.focus();
       else {
         input.focus();
@@ -256,6 +292,21 @@
     });
     Events.On('panel:status', (e) => setStatus(String(e.data)));
     Events.On('providers:changed', refreshProviders);
+    Events.On('settings:changed', (e) => onSettings(e.data as SettingsSnapshot));
+    // T12: once per version per launch; an action toast survives panel:show, so one set while the
+    // panel is hidden is seen at the next open and clears on the next keystroke (D-29).
+    Events.On('update:status', (e) => {
+      const st = e.data as UpdateStatus;
+      if (st.state !== 'available' || st.latest === announcedUpdate) return;
+      announcedUpdate = st.latest;
+      setStatus(updateToastText(st.latest), '', { label: 'View', hint: '', run: revealUpdates }, 0);
+    });
+    // Open Favorites / Open Recents hotkeys: show that tab, or hide when it was already showing.
+    Events.On('panel:open-tab', (e) => {
+      const { tab, wasVisible } = e.data as { tab: LibraryId; wasVisible: boolean };
+      if (wasVisible && libTab === tab) hide();
+      else switchLib(tab);
+    });
     const [list, last] = await Promise.all([providers(), lastProvider()]);
     const st = byId(list);
     // Persisted slot; first run (or Clips without a GIPHY key) opens on GIPHY. Set with statuses in one step.
@@ -412,11 +463,13 @@
     else runFirst(p, q);
   }
 
-  // Shows p's own state, fetching only when what it holds belongs to another query.
+  // Shows p's own state, fetching only when what it holds belongs to another query or is stale.
   function show(p: SlotId) {
     const s = states[p];
     if (s.err?.kind === 'key_rejected') return; // S13: the card stays until a new key is saved
-    if (s.status !== 'idle' && s.q === wanted()) return;
+    const stale = s.stale;
+    s.stale = false;
+    if (!stale && s.status !== 'idle' && s.q === wanted()) return;
     load(p);
   }
 
@@ -557,18 +610,18 @@
         // In Details ← → step through the grid's items (clamped) and the pane follows; ↑ ↓ do nothing.
         if (detail && (a === 'up' || a === 'down')) return;
         // ↑ from the grid's first row, or ↓ with no grid, selects the first chip.
-        if (chips.length && !detail && ((a === 'up' && gridShown && selected < COLS) || (a === 'down' && !gridShown))) {
+        if (chips.length && !detail && ((a === 'up' && gridShown && selected < cols) || (a === 'down' && !gridShown))) {
           chip = 0;
           select(-1);
           return;
         }
         if (!items.length) return;
         if (libTab) {
-          select(moveSectioned(selected, a, libSections.map((s) => s.items.length)));
+          select(moveSectioned(selected, a, libSections.map((s) => s.items.length), cols));
           return;
         }
-        select(move(selected, a, items.length));
-        if (nearEnd(selected, items.length)) loadMore();
+        select(move(selected, a, items.length, cols));
+        if (nearEnd(selected, items.length, cols)) loadMore();
         return;
       case 'favorite':
       case 'details':
@@ -588,7 +641,7 @@
           else if (a === 'copy' && !libTab && errView?.tryAgain) retry();
           return;
         }
-        runAction(a);
+        runAction(effectiveAction(items[selected], a === 'copy' ? 'primary' : 'secondary', prefs));
         return;
       case 'copyLink':
       case 'copyMarkdown':
@@ -645,7 +698,11 @@
   // ⌘1–⌘6 from any field in the panel (search input or key field) switch provider or library tab.
   function onMainKeydown(e: KeyboardEvent) {
     const a = routeKey(e);
-    if (a.startsWith('slot')) {
+    // ⌘, from any panel context (search, setup card key field, action menu): Go hides the panel first.
+    if (a === 'settings') {
+      e.preventDefault();
+      openSettings();
+    } else if (a.startsWith('slot')) {
       e.preventDefault();
       const n = Number(a.slice(4));
       if (n <= SLOTS.length) switchTo(SLOTS[n - 1].id);
@@ -661,7 +718,15 @@
     const tile = document.getElementById(`tile-${selected}`);
     if (!g || !(tile || detail)) return;
     const inDetails = !!detail;
-    menuRows = buildActions({ gif: g, tab: libTab ?? 'provider', inDetails, favorited: favKeys.has(keyOf(g)) });
+    menuRows = buildActions({
+      gif: g,
+      tab: libTab ?? 'provider',
+      inDetails,
+      favorited: favKeys.has(keyOf(g)),
+      gated: !prefs.klipyFileActions,
+      primary: effectiveAction(g, 'primary', prefs),
+      secondary: effectiveAction(g, 'secondary', prefs),
+    });
     menuOpen = true;
     await tick(); // measure the rendered menu, then place it before the browser paints
     if (inDetails || !tile) {
@@ -669,10 +734,16 @@
       menu!.focus();
       return;
     }
-    // Library sections restart the column count at each section's first tile.
-    const col = (selected - (libSections.findLast((s) => s.start <= selected)?.start ?? 0)) % COLS;
-    menuAt = placeMenu(tile.getBoundingClientRect(), col, menu!.height(), { w: innerWidth, h: innerHeight });
+    menuAt = placeMenu(tile.getBoundingClientRect(), menu!.height(), { w: innerWidth, h: innerHeight });
     menu!.focus();
+  }
+
+  // P15: right-click on a tile selects it and opens the menu beside it (Details: in its Details spot).
+  async function contextMenu(i: number) {
+    if (menuOpen) closeMenu();
+    if (i >= 0) select(i);
+    await tick();
+    toggleMenu();
   }
 
   function closeMenu() {
@@ -738,10 +809,18 @@
     if (!g || !library) return;
     const k = keyOf(g);
     const on = !favKeys.has(k) && libTab !== 'favorites';
+    const full = library.favorites.length >= FAVORITES_MAX; // Go drops the oldest to make room (P23)
     const lib = await mutate(() => setFavorite(g, on), 'favorites', on ? k : undefined);
+    if (on && lib) setStatus(full ? 'Added to Favorites. Oldest favorite removed (limit 1,000).' : 'Added to Favorites', 'success', null, FAVORITE_TOAST_MS);
+    else removed(lib, 'Removed from Favorites', 'favorites', k);
+  }
+
+  // A removal offers Undo; one that changed nothing (canUndo false: Go held no such item, WR-03) has
+  // cleared Go's Undo slot, so an earlier Undo toast would restore nothing: clear it (P24, IN-06).
+  function removed(lib: Library | null, text: string, list: LibraryId, k: string) {
     if (!lib) return;
-    if (on) setStatus('Added to Favorites', 'success', null, FAVORITE_TOAST_MS);
-    else if (lib.canUndo) undoToast('Removed from Favorites', 'favorites', k); // false: Go held no such favorite (WR-03)
+    if (lib.canUndo) undoToast(text, list, k);
+    else if (toastAction?.label === 'Undo') setStatus('');
   }
 
   // ⌘⌫ on a library tab: Remove from Recents, or unfavorite on the Favorites tab. No confirmation.
@@ -749,11 +828,11 @@
     const g = items[selected];
     if (!g || !libTab) return;
     if (libTab === 'favorites') return toggleFavorite();
-    if ((await mutate(() => removeRecent(g), 'recents'))?.canUndo) undoToast('Removed from Recents', 'recents', keyOf(g));
+    removed(await mutate(() => removeRecent(g), 'recents'), 'Removed from Recents', 'recents', keyOf(g));
   }
 
   async function clearAll() {
-    if ((await mutate(clearRecents, 'recents'))?.canUndo) undoToast('Cleared Recents', 'recents', '');
+    removed(await mutate(clearRecents, 'recents'), 'Cleared Recents', 'recents', '');
   }
 
   // T8–T10: Undo restores the latest removal and reselects it ('' = the first item, after Clear Recents).
@@ -781,14 +860,14 @@
 
   // Go builds the text from the selected item; the webview only names the kind.
   function textAction(kind: TextKind, pasteIt = false) {
-    if (pasteIt && kind !== 'page') act((g) => pasteText(g, kind), true);
-    else act((g) => copyText(g, kind), false); // there is no Paste Page Link
+    if (pasteIt && kind !== 'page') act((g) => pasteText(g, kind), true, false, 'text');
+    else act((g) => copyText(g, kind), false, false, 'text'); // there is no Paste Page Link
   }
 
   // One copy or paste of the selected item at a time. A copy confirms in the footer and hides the
   // panel; a paste has hidden it already, unless it fell back to copying.
   // A square crop shows the overlay and `Cropping…` only if it is still running after 300 ms.
-  async function act(call: (g: Gif) => Promise<Result>, pasteIt: boolean, crop = false) {
+  async function act(call: (g: Gif) => Promise<Result>, pasteIt: boolean, crop = false, failAs: 'copy' | 'text' = 'copy') {
     const g = items[selected];
     if (copying || !g) return;
     copying = true;
@@ -813,7 +892,7 @@
         keepStatus = r.copied && !r.pasted && !r.needsAccessibility;
       }
     } catch (err) {
-      actionFailed(err, g);
+      actionFailed(err, g, failAs);
     } finally {
       clearTimeout(busyTimer);
       copying = overlay = false;
@@ -827,9 +906,10 @@
   }
 
   // Fixed copy keyed by Go's error kind, never the error's text. A busy refusal is silently ignored.
-  function actionFailed(err: unknown, g: Gif, action: 'copy' | 'download' = 'copy') {
+  function actionFailed(err: unknown, g: Gif, action: 'copy' | 'download' | 'text' = 'copy') {
     const kind = actionError(err)?.kind ?? '';
     if (kind === 'busy') setStatus('');
+    else if (kind === 'klipy_gated') setStatus(klipyGatedText, '', null, KLIPY_GATED_TOAST_MS);
     else setStatus(actionErrorText(kind, g, action, downloadFolder), 'error');
   }
 
@@ -838,14 +918,14 @@
   async function downloadItem() {
     const g = items[selected];
     if (copying || !g) return;
+    if (g.provider === 'klipy' && !prefs.klipyFileActions) return setStatus(klipyGatedText, '', null, KLIPY_GATED_TOAST_MS); // T11
     copying = overlay = true;
     setStatus('Downloading…');
     try {
       const r = await download(g);
-      downloadFolder = r.folder;
       // A Finder failure is logged in Go; the toast simply clears (UI-SPEC has no copy for it).
       const reveal = () => void showDownload().catch(() => {});
-      setStatus(`Downloaded to ${r.folder}`, 'success', { label: 'Show in Finder', hint: '⌘R', run: reveal }, DOWNLOAD_TOAST_MS);
+      setStatus(downloadedText(r.folder), 'success', { label: 'Show in Finder', hint: '⌘R', run: reveal }, DOWNLOAD_TOAST_MS);
     } catch (err) {
       actionFailed(err, g, 'download');
     } finally {
@@ -922,6 +1002,7 @@
           favorited={favKeys.has(keyOf(detail))}
           onopenpage={() => openItem(detail, openPage)}
           onopensource={() => openItem(detail, openSource)}
+          onmenu={() => contextMenu(-1)}
         />
       </div>
     {/if}
@@ -932,8 +1013,8 @@
       {#if libTab}
         {#if !library}
           {#if libSlow}
-            <div class="skeleton" aria-hidden="true">
-              {#each Array(8), i (i)}
+            <div class="skeleton" aria-hidden="true" style="--cols: {cols}; --tile: {tile}px">
+              {#each Array(skeletonCount(gridSize)), i (i)}
                 <div></div>
               {/each}
             </div>
@@ -957,14 +1038,18 @@
           <StateMessage heading="No matches" body="Nothing in {libName} matches “{query.trim()}”. Press Esc to clear the search." />
         {:else}
           <!-- Remounted when the row layout changes: the virtualizer reads row sizes only on a count change. -->
-          {#key `${libTab}:${libSections.map((s) => s.items.length).join(',')}`}
+          {#key `${libTab}:${gridSize}:${libSections.map((s) => s.items.length).join(',')}`}
             <LibraryGrid
               sections={libSections}
+              {cols}
+              {tile}
               {selected}
               {overlay}
               favorites={favKeys}
               badges={libTab !== 'favorites'}
+              reduced={reducedMotion}
               onselect={select}
+              onmenu={contextMenu}
               oncopy={(i) => {
                 select(i);
                 run('copy');
@@ -1011,8 +1096,8 @@
           onbutton={() => switchTo('giphy')}
         />
       {:else if active === 'clips' && !clipsEnabled && cur.status !== 'error'}
-        <div class="skeleton" aria-hidden="true">
-          {#each Array(8), i (i)}
+        <div class="skeleton" aria-hidden="true" style="--cols: {cols}; --tile: {tile}px">
+          {#each Array(skeletonCount(gridSize)), i (i)}
             <div></div>
           {/each}
         </div>
@@ -1022,16 +1107,20 @@
           body="The Finer Gifs Club has no trending list. Type at least 2 characters to search."
         />
       {:else if cur.items.length}
-        {#key `${active}:${cur.seq}`}
+        {#key `${active}:${cur.seq}:${gridSize}`}
           <ResultGrid
             items={cur.items}
+            {cols}
+            {tile}
             {selected}
             {overlay}
             favorites={favKeys}
+            reduced={reducedMotion}
             paging={cur.paging}
             pagingNote={pageView?.note}
             pagingRetry={pageView?.state?.tryAgain ?? true}
             onselect={select}
+            onmenu={contextMenu}
             oncopy={(i) => {
               select(i);
               run('copy');
@@ -1041,8 +1130,8 @@
           />
         {/key}
       {:else if cur.status === 'loading'}
-        <div class="skeleton" aria-hidden="true">
-          {#each Array(8), i (i)}
+        <div class="skeleton" aria-hidden="true" style="--cols: {cols}; --tile: {tile}px">
+          {#each Array(skeletonCount(gridSize)), i (i)}
             <div></div>
           {/each}
         </div>
@@ -1069,7 +1158,9 @@
 
   <Footer
     {attribution}
-    hints={detail ? 'details' : libTab ? 'library' : 'provider'}
+    hints={detail ? 'details' : libTab ? (items[selected] ? 'library' : 'none') : 'provider'}
+    primary={shortLabel(effectiveAction(items[selected], 'primary', prefs))}
+    secondary={shortLabel(effectiveAction(items[selected], 'secondary', prefs))}
     text={footerCenter}
     {tone}
     {needsAccessibility}
@@ -1077,6 +1168,10 @@
     actionLabel={toastAction?.label}
     actionHint={toastAction?.hint}
     onaction={runToastAction}
+    onback={() => {
+      detailsOpen = false; // the Esc path: selection kept
+      input.focus();
+    }}
   />
 </main>
 
@@ -1148,11 +1243,11 @@
     inset: 0;
     z-index: 1;
   }
-  /* S2: 8 skeleton tiles (2 rows) in grid geometry. */
+  /* S2: two rows of skeleton tiles in the current grid geometry. */
   .skeleton {
     display: grid;
-    grid-template-columns: repeat(4, 166px);
-    grid-auto-rows: 144px;
+    grid-template-columns: repeat(var(--cols), 1fr);
+    grid-auto-rows: var(--tile);
     gap: 8px;
     padding: 16px;
   }

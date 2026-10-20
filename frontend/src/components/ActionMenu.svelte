@@ -167,6 +167,10 @@
   .destructive .label {
     color: var(--destructive);
   }
+  /* P12: on the highlight fill the red drops below 4.5:1; the label goes to --text. */
+  .row.hi.destructive .label {
+    color: var(--text);
+  }
   .empty {
     height: 32px;
     display: flex;

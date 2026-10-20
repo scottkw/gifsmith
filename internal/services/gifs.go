@@ -69,6 +69,14 @@ func (s *GifService) call(op, p string, get func(provider.ID) (provider.Page, er
 	}
 	page, err := get(id)
 	logProviderErr(op, p, err)
+	var pe *provider.Error
+	if errors.As(err, &pe) && pe.Kind == provider.KeyRejected {
+		kp := id
+		if id == provider.Clips {
+			kp = provider.GIPHY // Clips use the GIPHY key
+		}
+		s.Keys.MarkRejected(kp) // the Keys pane shows Rejected, as the panel does
+	}
 	if err == nil && id == provider.GIPHY {
 		s.Clips.Trigger()
 	}

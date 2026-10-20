@@ -2,6 +2,8 @@ module gifsmith
 
 go 1.25.0
 
+toolchain go1.27.2
+
 require (
 	github.com/wailsapp/wails/v3 v3.0.0-beta.30
 	github.com/zalando/go-keyring v0.2.8

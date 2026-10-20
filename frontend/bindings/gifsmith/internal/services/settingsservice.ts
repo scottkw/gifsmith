@@ -11,11 +11,102 @@
 // @ts-ignore: Unused imports
 import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as provider$0 from "../provider/models.js";
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
+/**
+ * AccessibilityStatus reports the Automatic paste grant without prompting.
+ */
+export function AccessibilityStatus(): $CancellablePromise<boolean> {
+    return $Call.ByID(3542966547);
+}
+
+/**
+ * ApplyStartup runs once at launch: when the pref is on and the OS reports the login item off,
+ * register it again. It never disables. Risk (A4): IsEnabled also reports "off" for an item the user
+ * switched off in System Settings, so this re-registers it; verify natively what register does then.
+ */
+export function ApplyStartup(): $CancellablePromise<void> {
+    return $Call.ByID(4042654710);
+}
+
+/**
+ * Choices lists the Search-pane options; the webview names them.
+ */
+export function Choices(): $CancellablePromise<$models.Choices> {
+    return $Call.ByID(1231919149);
+}
+
+/**
+ * ChooseDownloadDir shows the folder picker and saves the picked folder only if
+ * ValidateDownloadDir accepts it; a cancel changes nothing. It takes no path from the webview.
+ */
+export function ChooseDownloadDir(): $CancellablePromise<$models.Snapshot> {
+    return $Call.ByID(2841931217);
+}
+
+/**
+ * DownloadDir is where the next download goes: the chosen folder, else DefaultDownloads.
+ * Download calls it each time, so a change made during a download applies to the next one.
+ */
+export function DownloadDir(): $CancellablePromise<string> {
+    return $Call.ByID(2980781418);
+}
+
+/**
+ * HideFilenames reports the Hide original file names choice.
+ */
+export function HideFilenames(): $CancellablePromise<boolean> {
+    return $Call.ByID(3262587179);
+}
+
+/**
+ * KeyStatus reports GIPHY then Klipy.
+ */
+export function KeyStatus(): $CancellablePromise<$models.KeyStatus[] | null> {
+    return $Call.ByID(1785105224);
+}
+
 /**
  * LastProvider is the persisted provider id, or "" on first run or an unreadable file.
  */
 export function LastProvider(): $CancellablePromise<string> {
     return $Call.ByID(3058216590);
+}
+
+/**
+ * Params are the provider parameters for the next request: the defaults overlaid with the
+ * stored choices. Clients call it on every request.
+ */
+export function Params(): $CancellablePromise<provider$0.Params> {
+    return $Call.ByID(3753961165);
+}
+
+/**
+ * RemoveKey deletes the stored key from the Keychain and drops what was fetched with it. Removing
+ * a key that is not there succeeds; a Keychain failure keeps the key.
+ */
+export function RemoveKey(p: string): $CancellablePromise<void> {
+    return $Call.ByID(1430588538, p);
+}
+
+/**
+ * ResetDownloadDir goes back to the default Downloads folder.
+ */
+export function ResetDownloadDir(): $CancellablePromise<$models.Snapshot> {
+    return $Call.ByID(1540146509);
+}
+
+/**
+ * ResumeHotkeys registers them again; also called when the Settings window hides or loses focus.
+ */
+export function ResumeHotkeys(): $CancellablePromise<void> {
+    return $Call.ByID(406630895);
 }
 
 /**
@@ -27,8 +118,59 @@ export function SaveKey(p: string, key: string): $CancellablePromise<void> {
 }
 
 /**
- * SetLastProvider persists the provider tab to reopen on next launch.
+ * SetHotkey binds slot to accel ("" clears favorites/recents) and stores the canonical form.
+ * Hotkeys resume first, so a recorder never leaves them suspended; the Store changes only after
+ * the Registrar accepted the new binding.
+ */
+export function SetHotkey(slot: string, accel: string): $CancellablePromise<$models.Snapshot> {
+    return $Call.ByID(3139730259, slot, accel);
+}
+
+/**
+ * SetLastProvider persists the provider tab to reopen on next launch (no event: a tab switch).
  */
 export function SetLastProvider(p: string): $CancellablePromise<void> {
     return $Call.ByID(2165858912, p);
+}
+
+/**
+ * SetLaunchAtLogin registers or removes the login item now and persists the choice for ApplyStartup.
+ */
+export function SetLaunchAtLogin(on: boolean): $CancellablePromise<$models.Snapshot> {
+    return $Call.ByID(374994992, on);
+}
+
+/**
+ * SetPref sets one allow-listed pref from the webview, validated here; an equal value is a no-op.
+ * Each write emits settings:changed with the full Snapshot so the panel and Settings converge.
+ * A provider parameter also flushes the affected providers' cached pages (never their 429 block).
+ */
+export function SetPref(name: string, value: string): $CancellablePromise<$models.Snapshot> {
+    return $Call.ByID(3385564000, name, value);
+}
+
+export function Snapshot(): $CancellablePromise<$models.Snapshot> {
+    return $Call.ByID(1374333671);
+}
+
+/**
+ * SuspendHotkeys unregisters every Gifsmith hotkey while a recorder is capturing keys.
+ */
+export function SuspendHotkeys(): $CancellablePromise<void> {
+    return $Call.ByID(1840460032);
+}
+
+/**
+ * TestHotkey makes slot's next press within 5 s emit hotkey:test {slot}.
+ */
+export function TestHotkey(slot: string): $CancellablePromise<void> {
+    return $Call.ByID(1519698761, slot);
+}
+
+/**
+ * TestKey makes one uncached first-page trending call with the stored key, inside the 429 budget
+ * (refused while blocked). Success seeds the trending cache; key_rejected marks the key rejected.
+ */
+export function TestKey(p: string): $CancellablePromise<void> {
+    return $Call.ByID(1694217650, p);
 }

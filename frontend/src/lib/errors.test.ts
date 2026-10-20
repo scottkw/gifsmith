@@ -1,6 +1,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { actionErrorText, libraryErrorText, errorState, pagingMessage, providerName, keyMessage, revokedMessage } from './errors.ts';
+import {
+  actionErrorText,
+  downloadedText,
+  folderErrorText,
+  klipyGatedText,
+  libraryErrorText,
+  errorState,
+  pagingMessage,
+  providerName,
+  keyMessage,
+  revokedMessage,
+  testKeyMessage,
+  keySavedText,
+  keyRemovedText,
+  keyRemoveFailedText,
+  hotkeyErrorText,
+} from './errors.ts';
 
 const NOW = Date.UTC(2026, 9, 17, 19, 0, 0);
 const SWITCH = 'Other providers still work: ⌘1–⌘4.';
@@ -173,7 +189,17 @@ test('page errors show F8 and a missing link shows F1', () => {
 test('Clips copy errors name the MP4 (F1 and F3 Clips variants)', () => {
   const clip = { provider: 'clips', isClip: true } as Parameters<typeof actionErrorText>[1];
   assert.equal(actionErrorText('download_failed', clip), "Couldn't copy this MP4. The download failed. Try again or pick another clip.");
-  assert.equal(actionErrorText('not_media', clip), "GIPHY Clips sent something that isn't an MP4. Nothing was saved. Try another GIF.");
+  assert.equal(actionErrorText('not_media', clip), "GIPHY Clips sent something that isn't an MP4. Nothing was saved. Try another clip.");
+});
+
+test('text copy/paste failures show F11 and invalid_item shows F12 (P25)', () => {
+  const g = { provider: 'giphy' } as Parameters<typeof actionErrorText>[1];
+  const F11 = "Couldn't copy to the clipboard. Try again.";
+  for (const k of ['copy_failed', 'no_link', 'not_allowed', '']) assert.equal(actionErrorText(k, g, 'text'), F11, k);
+  const F12 = "This GIF's details are incomplete. Pick another GIF.";
+  assert.equal(actionErrorText('invalid_item', g, 'text'), F12);
+  assert.equal(actionErrorText('invalid_item', g), F12);
+  assert.equal(actionErrorText('invalid_item', g, 'download'), F12);
 });
 
 test('download errors show F2, F3 and F4', () => {
@@ -199,4 +225,71 @@ test('square crop errors show F6 and F7', () => {
 test('library write failures show F5 for the list that changed', () => {
   assert.equal(libraryErrorText('favorites'), "Couldn't save your Favorites. Try again.");
   assert.equal(libraryErrorText('recents'), "Couldn't save your Recents. Try again.");
+});
+
+test('testKeyMessage: passed (K-T1) and rejected (K-T2)', () => {
+  assert.equal(testKeyMessage(null, 'GIPHY', NOW), 'GIPHY accepted the key.');
+  assert.equal(
+    testKeyMessage({ kind: 'key_rejected', provider: 'klipy', status: 404 }, 'Klipy', NOW),
+    'Klipy rejected the saved key. It may have been revoked. Change it to continue.',
+  );
+});
+
+test('testKeyMessage: rate limited (K-T3)', () => {
+  const rl = (retryAfterSec?: number) => testKeyMessage({ kind: 'rate_limited', provider: 'giphy', retryAfterSec }, 'GIPHY', NOW);
+  const base = "GIPHY's request limit was hit while testing the key. Try again ";
+  assert.equal(rl(30), base + 'in less than a minute.');
+  assert.equal(rl(600), base + 'in 10 minutes.');
+  assert.equal(rl(61), base + 'in 2 minutes.');
+  assert.equal(rl(), base + 'later this hour.');
+});
+
+test('testKeyMessage: network, timeout and http (K-T4)', () => {
+  for (const kind of ['network', 'timeout', 'http']) {
+    assert.equal(
+      testKeyMessage({ kind, provider: 'giphy', status: 503 }, 'GIPHY', NOW),
+      "Couldn't reach GIPHY to test the key. Check your connection, then try again.",
+    );
+  }
+});
+
+test('Keys pane save, remove and remove-failed texts (K-A, K-D, K-F)', () => {
+  assert.equal(keySavedText('Klipy'), 'Saved. Klipy is ready.');
+  assert.equal(keyRemovedText('GIPHY'), 'Removed. Add a key to use GIPHY again.');
+  assert.equal(keyRemoveFailedText(), "Couldn't remove the key from the macOS Keychain. Try again.");
+});
+
+test('hotkeyErrorText: H1, H2, H3, H4, H4b and H7 with the combo as glyphs', () => {
+  assert.equal(hotkeyErrorText('hotkey_no_modifier', 'H', ''), 'Include ⌘, ⌥ or ⌃ in the shortcut.');
+  assert.equal(hotkeyErrorText('hotkey_duplicate', 'Ctrl+Option+Cmd+F', 'Open Favorites'), '⌃⌥⌘F is already used for Open Favorites.');
+  assert.equal(hotkeyErrorText('hotkey_duplicate', 'Cmd+Ctrl+Option+G', 'Open Gifsmith'), '⌃⌥⌘G is already used for Open Gifsmith.');
+  assert.equal(hotkeyErrorText('hotkey_duplicate', 'Cmd+Ctrl+Option+R', 'Open Recents'), '⌃⌥⌘R is already used for Open Recents.');
+  assert.equal(hotkeyErrorText('hotkey_system', 'Cmd+Q', ''), '⌘Q is a macOS shortcut. Choose another one.');
+  assert.equal(hotkeyErrorText('hotkey_register_failed', 'Cmd+Ctrl+Option+J', ''), "macOS couldn't register ⌃⌥⌘J. Your previous shortcut still works.");
+  assert.equal(hotkeyErrorText('hotkey_register_failed_new', 'Cmd+Ctrl+Option+J', ''), "macOS couldn't register ⌃⌥⌘J. Try a different shortcut.");
+  assert.equal(hotkeyErrorText('test_failed', 'Cmd+Ctrl+Option+F', ''), 'Nothing happened. Another app may be using ⌃⌥⌘F. Try a different shortcut.');
+  assert.equal(hotkeyErrorText('prefs_write_failed', 'Cmd+Ctrl+Option+F', ''), "Couldn't save this setting. Try again.");
+});
+
+test('Downloads pane D5–D8 name the folder by display name', () => {
+  assert.equal(
+    folderErrorText('folder_fat', 'Stick'),
+    "Gifsmith can't save safely to Stick (exFAT or FAT drive). Choose a folder on a Mac-formatted drive.",
+  );
+  assert.equal(folderErrorText('folder_network', 'Share'), 'Share is on a network drive. Choose a folder on this Mac.');
+  assert.equal(folderErrorText('folder_unwritable', 'Locked'), "Gifsmith can't write to Locked. Choose another folder.");
+  assert.equal(folderErrorText('folder_missing', 'Gone'), 'This folder no longer exists. Choose another folder or reset to Downloads.');
+  assert.equal(folderErrorText('picker_failed', ''), "Couldn't save this setting. Try again.");
+});
+
+test('T6 and F4 use the folder display name, never a path', () => {
+  assert.equal(downloadedText('GIFs'), 'Downloaded to GIFs');
+  const g = { provider: 'finergifs' } as Parameters<typeof actionErrorText>[1];
+  const f4 = actionErrorText('folder_unwritable', g, 'download', 'GIFs');
+  assert.equal(f4, "Couldn't save to GIFs. Check that the folder exists and that Gifsmith can write to it.");
+  assert.ok(!f4.includes('/'));
+});
+
+test('T11: a gated Klipy download', () => {
+  assert.equal(klipyGatedText, "Klipy GIFs can't be downloaded yet.");
 });

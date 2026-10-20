@@ -11,8 +11,8 @@
 - [x] **SHEL-02**: Panel appears over full-screen apps, takes typing immediately, and does not steal focus from the app the user was in
 - [x] **SHEL-03**: Panel closes on Esc and on click-away
 - [x] **SHEL-04**: App lives in the menu bar with no Dock icon; menu offers Open, Settings, Quit
-- [ ] **SHEL-05**: User can enable launch at login
-- [ ] **SHEL-06**: User can open Favorites or Recents directly with their own hotkeys
+- [x] **SHEL-05**: User can enable launch at login
+- [x] **SHEL-06**: User can open Favorites or Recents directly with their own hotkeys
 
 ### Search
 
@@ -24,7 +24,7 @@
 - [x] **SRCH-06**: Searches are debounced so free keys (100 calls/hour) last; a rate-limit hit shows a clear message with when to retry
 - [x] **SRCH-07**: Network, timeout, and provider errors show a per-provider message; one provider failing never blocks the others
 - [x] **SRCH-08**: User sees recent searches when the box is empty and can rerun one
-- [ ] **SRCH-09**: User can set GIPHY content rating (default PG-13)
+- [x] **SRCH-09**: User can set GIPHY content rating (default PG-13)
 
 ### Onboarding & Compliance
 
@@ -43,7 +43,7 @@
 - [x] **ACTN-05**: User can download the GIF to a chosen folder (default Downloads)
 - [x] **ACTN-06**: User can copy or paste a center-cropped square version of a GIF (not offered for Clips)
 - [x] **ACTN-07**: User can open an action menu (⌘K) listing all actions for the selected GIF
-- [ ] **ACTN-08**: User can choose the default Enter action and a second ⌘Enter action in settings
+- [x] **ACTN-08**: User can choose the default Enter action and a second ⌘Enter action in settings
 - [x] **ACTN-09**: Clips are handled as MP4 (labelled accordingly, 720p default)
 - [x] **ACTN-10**: Temp files used for copy/paste/download are deleted promptly; Klipy temp files are deleted eagerly
 - [x] **ACTN-11**: Downloaded files are validated (real GIF/MP4, not an error page) and never overwrite or collide; optional hide-original-filename setting
@@ -58,19 +58,22 @@
 
 ### Settings
 
-- [ ] **SETT-01**: Settings open in their own window, where pasting into fields works
-- [ ] **SETT-02**: User can add, test, change (replace), and remove GIPHY and Klipy keys; each key row links to the provider's key sign-up page (GIPHY developer dashboard, Klipy Partner Panel)
-- [ ] **SETT-03**: User can rebind the global hotkeys; conflicts are reported and the old binding stays until the new one registers
-- [ ] **SETT-04**: User can set grid item size (search and trending), max results, download folder, hide filename, GIPHY and Klipy locales
-- [ ] **SETT-05**: Settings shows Accessibility permission status and a button to grant it
-- [ ] **SETT-06**: User can choose the window theme: Light, Dark, or System (default System, follows macOS appearance)
+- [x] **SETT-01**: Settings open in their own window, where pasting into fields works
+- [x] **SETT-02**: User can add, test, change (replace), and remove GIPHY and Klipy keys; each key row links to the provider's key sign-up page (GIPHY developer dashboard, Klipy Partner Panel)
+- [x] **SETT-03**: User can rebind the global hotkeys; conflicts are reported and the old binding stays until the new one registers
+- [x] **SETT-04**: User can set grid item size (search and trending), max results, download folder, hide filename, GIPHY and Klipy locales
+- [x] **SETT-05**: Settings shows Accessibility permission status and a button to grant it
+- [x] **SETT-06**: User can choose the window theme: Light, Dark, or System (default System, follows macOS appearance)
 
 ### Release
 
-- [ ] **RELS-01**: App ships as a Developer ID–signed, notarized DMG for macOS 13+ on Apple Silicon
-- [ ] **RELS-02**: App installs and runs on a clean user account (Gatekeeper, fresh permissions)
-- [ ] **RELS-03**: About screen credits the original MIT-licensed Raycast extension and authors
-- [ ] **RELS-04**: Klipy file actions are disabled (link/Markdown only) unless Klipy gives written clearance for temp file copies
+- [x] **RELS-01**: App ships as a Developer ID–signed, notarized DMG for macOS 13+ on Apple Silicon
+- [x] **RELS-02**: App installs and runs on a clean user account (Gatekeeper, fresh permissions)
+- [x] **RELS-03**: About screen credits the original MIT-licensed Raycast extension and authors
+- [x] **RELS-04**: Klipy file actions are disabled (link/Markdown only) unless Klipy gives written clearance for temp file copies
+- [x] **RELS-05**: App checks GitHub Releases (scottkw/gifsmith) for a newer version and alerts the user when one is available; Settings has a "Check for Updates…" button
+- [x] **RELS-06**: If the user chooses, the app downloads the new DMG, verifies its code signature and notarization, and opens it (no in-place self-replacement)
+- [ ] **RELS-07**: GitHub Actions runs the test suite on every push to main and every PR; pushing a vX.Y.Z tag builds, signs, notarizes and verifies the DMG and creates a draft GitHub Release with the DMG, .sha256 and notes
 
 ## v2 Requirements
 
@@ -96,7 +99,7 @@
 | Intel Macs | Apple Silicon only keeps the native build simple |
 | GIF recording/editing, stickers, AI | Not the core workflow |
 | Accounts, sync, telemetry, analytics pingbacks | Not needed; privacy |
-| In-app auto-updater | Wails updater is immature; revisit post-launch |
+| In-place self-replacing auto-install | Update flow downloads, verifies and opens the DMG instead (RELS-06); self-replacement revisited post-launch |
 | AI tool / MCP server | Not the core workflow |
 
 ## Traceability
@@ -107,8 +110,8 @@
 | SHEL-02 | Phase 1 | Complete |
 | SHEL-03 | Phase 1 | Complete |
 | SHEL-04 | Phase 1 | Complete |
-| SHEL-05 | Phase 4 | Pending |
-| SHEL-06 | Phase 4 | Pending |
+| SHEL-05 | Phase 4 | Complete |
+| SHEL-06 | Phase 4 | Complete |
 | SRCH-01 | Phase 2 | Complete |
 | SRCH-02 | Phase 2 | Complete |
 | SRCH-03 | Phase 2 | Complete |
@@ -117,7 +120,7 @@
 | SRCH-06 | Phase 2 | Complete |
 | SRCH-07 | Phase 2 | Complete |
 | SRCH-08 | Phase 3 | Complete |
-| SRCH-09 | Phase 4 | Pending |
+| SRCH-09 | Phase 4 | Complete |
 | ONBD-01 | Phase 2 | Complete |
 | ONBD-02 | Phase 2 | Complete |
 | ONBD-03 | Phase 2 | Complete |
@@ -130,7 +133,7 @@
 | ACTN-05 | Phase 3 | Complete |
 | ACTN-06 | Phase 3 | Complete |
 | ACTN-07 | Phase 3 | Complete |
-| ACTN-08 | Phase 4 | Pending |
+| ACTN-08 | Phase 4 | Complete |
 | ACTN-09 | Phase 3 | Complete |
 | ACTN-10 | Phase 3 | Complete |
 | ACTN-11 | Phase 3 | Complete |
@@ -139,22 +142,25 @@
 | LIBR-03 | Phase 3 | Complete |
 | LIBR-04 | Phase 3 | Complete |
 | LIBR-05 | Phase 3 | Complete |
-| SETT-01 | Phase 4 | Pending |
-| SETT-02 | Phase 4 | Pending |
-| SETT-03 | Phase 4 | Pending |
-| SETT-04 | Phase 4 | Pending |
-| SETT-05 | Phase 4 | Pending |
-| SETT-06 | Phase 4 | Pending |
-| RELS-01 | Phase 4 | Pending |
-| RELS-02 | Phase 4 | Pending |
-| RELS-03 | Phase 4 | Pending |
-| RELS-04 | Phase 4 | Pending |
+| SETT-01 | Phase 4 | Complete |
+| SETT-02 | Phase 4 | Complete |
+| SETT-03 | Phase 4 | Complete |
+| SETT-04 | Phase 4 | Complete |
+| SETT-05 | Phase 4 | Complete |
+| SETT-06 | Phase 4 | Complete |
+| RELS-01 | Phase 4 | Complete |
+| RELS-02 | Phase 4 | Complete |
+| RELS-03 | Phase 4 | Complete |
+| RELS-04 | Phase 4 | Complete |
+| RELS-05 | Phase 4 | Complete |
+| RELS-06 | Phase 4 | Complete |
+| RELS-07 | Phase 4 | Pending |
 
 **Coverage:**
-- v1 requirements: 46 total
-- Mapped to phases: 46 (Phase 1: 6, Phase 2: 12, Phase 3: 14, Phase 4: 14)
+- v1 requirements: 49 total
+- Mapped to phases: 49 (Phase 1: 6, Phase 2: 12, Phase 3: 14, Phase 4: 17)
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-10-17*
-*Last updated: 2026-10-17 after roadmap creation (traceability filled)*
+*Last updated: 2026-10-20 — added RELS-07 (GitHub Actions CI and tag-triggered draft releases from v1.0.1) at user request during Phase 4; 2026-10-18 — added RELS-05/06 (GitHub update check + verified DMG download)*

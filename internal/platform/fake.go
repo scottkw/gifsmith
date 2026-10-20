@@ -21,6 +21,8 @@ type Fake struct {
 	FrontmostErr error
 	// ActivateSetsFrontmost makes ActivateApp succeed; otherwise it is declined (Frontmost unchanged).
 	ActivateSetsFrontmost bool
+	// Lang and Region are what SystemLocale reports ("" = none, as in the server build).
+	Lang, Region string
 }
 
 func (f *Fake) Note(s string) {
@@ -85,4 +87,11 @@ func (f *Fake) RevealFile(path string) error {
 func (f *Fake) PasteShortcut() error {
 	f.Note("PasteShortcut")
 	return f.PasteErr
+}
+
+func (f *Fake) SystemLocale() (string, string) { return f.Lang, f.Region }
+
+func (f *Fake) SetAppearance(mode string) error {
+	f.Note("SetAppearance:" + mode)
+	return nil
 }

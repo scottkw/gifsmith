@@ -170,3 +170,34 @@ func (darwin) RevealFile(path string) error {
 	}
 	return nil
 }
+
+func (darwin) SetAppearance(mode string) error {
+	code, err := appearanceCode(mode)
+	if err != nil {
+		return err
+	}
+	C.gsSetAppearance(C.int(code))
+	return nil
+}
+
+func (darwin) SystemLocale() (string, string) {
+	cs := C.gsSystemLocale()
+	defer C.free(unsafe.Pointer(cs))
+	lang, region, _ := strings.Cut(C.GoString(cs), "|")
+	return lang, region
+}
+
+var errUnknownAppearance = errors.New("unknown appearance")
+
+// appearanceCode maps the theme pref to gsSetAppearance's mode: 0 system, 1 Aqua, 2 DarkAqua.
+func appearanceCode(mode string) (int, error) {
+	switch mode {
+	case "":
+		return 0, nil
+	case "light":
+		return 1, nil
+	case "dark":
+		return 2, nil
+	}
+	return 0, errUnknownAppearance
+}

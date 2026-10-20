@@ -218,9 +218,9 @@ func TestPasteWithoutAccessibility(t *testing.T) {
 	if !r.Copied || !r.NeedsAccessibility || r.Pasted || r.Message == "" {
 		t.Errorf("result = %+v, want Copied+NeedsAccessibility with a message", r)
 	}
-	// Point at the button, not a Settings path (macOS 27 has no Privacy & Security › Accessibility).
-	if !strings.Contains(r.Message, "Enable Automatic Paste…") || strings.Contains(r.Message, "System Settings") {
-		t.Errorf("message = %q, want it to name the Enable Automatic Paste… button and no Settings path", r.Message)
+	// T5a (P14): the T1 text; the Enable Automatic Paste… button beside it carries the call to action.
+	if r.Message != "Copied — press ⌘V to paste" {
+		t.Errorf("message = %q, want the T5a text", r.Message)
 	}
 	// App.svelte shows "Enable Automatic Paste…" off this exact JSON key (models.ts Result).
 	if b, _ := json.Marshal(r); !strings.Contains(string(b), `"needsAccessibility":true`) {
@@ -560,7 +560,7 @@ func TestPasteTextTrusted(t *testing.T) {
 func TestPasteTextWithoutAccessibility(t *testing.T) {
 	f := &platform.Fake{}
 	r, err := vendorService(f).PasteText(context.Background(), giphyGif, "link")
-	if err != nil || !r.Copied || r.Pasted || !r.NeedsAccessibility || !strings.Contains(r.Message, "Enable Automatic Paste…") {
+	if err != nil || !r.Copied || r.Pasted || !r.NeedsAccessibility || r.Message != "Copied — press ⌘V to paste" {
 		t.Errorf("%+v, %v; want copied only with the T5a message", r, err)
 	}
 	if slices.Contains(f.Calls, "hide") || slices.Contains(f.Calls, "PasteShortcut") {
@@ -642,6 +642,7 @@ func klipyService(t *testing.T, f *platform.Fake) (*ActionService, fixture, *tim
 	s.After = tm.after
 	base, _, _ := strings.Cut(fx.gif.DownloadURL, "/media/")
 	k := provider.Gif{Provider: provider.Klipy, ID: "8041071659142945", Title: "Klipy moment 1", DownloadURL: base + "/media/klipy-1-hd.gif"}
+	s.KlipyFileActions = true // the cleared build: these tests cover the D-19 grace delete
 	return s, fx, tm, k
 }
 
@@ -1305,5 +1306,65 @@ func TestRecentsErrorDoesNotFailAction(t *testing.T) {
 	r, err := s.Copy(context.Background(), fx.gif)
 	if err != nil || !r.Copied || len(rec.keys) != 1 {
 		t.Errorf("copy with failing Recents: %+v, %v, touches %q", r, err, rec.keys)
+	}
+}
+
+func TestDownloadHideFilenames(t *testing.T) {
+	s, fx, dl := downloadService(t, &platform.Fake{})
+	s.HideFilenames = func() bool { return true }
+	for _, want := range []string{"gifsmith-office-1.gif", "gifsmith-office-1 (2).gif"} {
+		r, err := s.Download(context.Background(), fx.gif)
+		if err != nil || r.Name != want || !exists(filepath.Join(dl, want)) {
+			t.Fatalf("Download with hidden names = %+v, %v; want %s saved", r, err, want)
+		}
+	}
+}
+
+func TestDownloadDeletedFolder(t *testing.T) {
+	s, fx, dl := downloadService(t, &platform.Fake{})
+	if err := os.Remove(dl); err != nil {
+		t.Fatal(err)
+	}
+	r, err := s.Download(context.Background(), fx.gif)
+	if actionKind(err) != "folder_unwritable" || r != (DownloadResult{}) {
+		t.Errorf("Download into a deleted folder = %+v, %v; want folder_unwritable and an empty result", r, err)
+	}
+}
+
+// RELS-04: until KlipyFileActionsCleared, every Klipy file action is refused before any staging,
+// HTTP or pasteboard call; text actions still work.
+func TestGatedKlipyFileActions(t *testing.T) {
+	ctx := context.Background()
+	for name, run := range map[string]func(*ActionService, provider.Gif) error{
+		"copy":        func(s *ActionService, g provider.Gif) error { _, err := s.Copy(ctx, g); return err },
+		"paste":       func(s *ActionService, g provider.Gif) error { _, err := s.Paste(ctx, g); return err },
+		"download":    func(s *ActionService, g provider.Gif) error { _, err := s.Download(ctx, g); return err },
+		"copySquare":  func(s *ActionService, g provider.Gif) error { _, err := s.CopySquare(ctx, g); return err },
+		"pasteSquare": func(s *ActionService, g provider.Gif) error { _, err := s.PasteSquare(ctx, g); return err },
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := &platform.Fake{Trusted: true, Frontmost: prevApp}
+			s, fx, _, k := klipyService(t, f)
+			s.KlipyFileActions = false
+			dl := t.TempDir()
+			s.DownloadsDir = func() string { return dl }
+			if err := run(s, k); actionKind(err) != "klipy_gated" {
+				t.Fatalf("err = %v, want kind klipy_gated", err)
+			}
+			staged, _ := os.ReadDir(fx.dir)
+			saved, _ := os.ReadDir(dl)
+			if len(staged)+len(saved) != 0 || fx.hits.Load() != 0 || len(f.Calls) != 0 {
+				t.Errorf("gated %s: %d staged, %d saved, %d requests, calls %q; want none", name, len(staged), len(saved), fx.hits.Load(), f.Calls)
+			}
+		})
+	}
+}
+
+func TestGatedKlipyTextStillWorks(t *testing.T) {
+	f := &platform.Fake{}
+	s, _, _, k := klipyService(t, f)
+	s.KlipyFileActions = false
+	if r, err := s.CopyText(context.Background(), k, "link"); err != nil || r.Message != "Copied link" {
+		t.Errorf("CopyText(klipy, link) while gated = %+v, %v", r, err)
 	}
 }

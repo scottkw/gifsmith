@@ -13,5 +13,7 @@ export default defineConfig({
     strictPort: true,
     proxy: backend ? { "/wails": { target: backend, ws: true } } : undefined,
   },
+  // Two pages: the panel (index.html) and the Settings window (settings.html).
+  build: { rolldownOptions: { input: { main: "index.html", settings: "settings.html" } } },
   plugins: [svelte(), wails("./bindings")],
 });

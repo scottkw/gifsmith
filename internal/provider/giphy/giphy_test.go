@@ -251,10 +251,11 @@ func TestRequestParams(t *testing.T) {
 				t.Errorf("%s: %s = %q, want %q", tc.path, k, v.Get(k), want)
 			}
 		}
-		for _, k := range []string{"lang", "random_id"} {
-			if v.Has(k) {
-				t.Errorf("%s: unexpected param %s", tc.path, k)
-			}
+		if v.Has("random_id") {
+			t.Errorf("%s: unexpected param random_id", tc.path)
+		}
+		if wantLang := strings.HasSuffix(tc.path, "/search"); v.Has("lang") != wantLang || (wantLang && v.Get("lang") != "en") {
+			t.Errorf("%s: lang = %q (present %v), want en on search only", tc.path, v.Get("lang"), v.Has("lang"))
 		}
 	}
 	if q := last().Query(); q.Has("q") {
@@ -562,5 +563,104 @@ func TestClipsRendition(t *testing.T) {
 		if g.DownloadURL != "https://media.giphy.com/c/"+tc.want+".mp4" || g.Height != h || g.Width != h*10 || g.Size != 0 {
 			t.Errorf("%v: got %s %dx%d size %d, want %s", tc.assets, g.DownloadURL, g.Width, g.Height, g.Size, tc.want)
 		}
+	}
+}
+
+// Rating comes from Params on every request; nil Params sends the declared defaults.
+func TestParamsRating(t *testing.T) {
+	c, _, last := stubClient(t, 200, nil, page(1, 1))
+	c.Params = func() provider.Params { p := provider.DefaultParams(); p.Rating = "g"; return p }
+	for _, call := range []func() error{
+		func() error { _, err := c.Search(context.Background(), "cat", ""); return err },
+		func() error { _, err := c.Trending(context.Background(), ""); return err },
+	} {
+		if err := call(); err != nil {
+			t.Fatal(err)
+		}
+		if got := last().Query().Get("rating"); got != "g" {
+			t.Errorf("%s: rating = %q, want g", last().Path, got)
+		}
+	}
+	c.Params = nil
+	if _, err := c.Trending(context.Background(), ""); err != nil {
+		t.Fatal(err)
+	}
+	if v := last().Query(); v.Get("rating") != "pg-13" || v.Get("limit") != "24" {
+		t.Errorf("nil Params: rating %q limit %q, want pg-13 24", v.Get("rating"), v.Get("limit"))
+	}
+}
+
+func sized(n int) func() provider.Params {
+	return func() provider.Params { p := provider.DefaultParams(); p.PageSize = n; return p }
+}
+
+func TestPageSizeLimit(t *testing.T) {
+	for _, n := range []int{36, 48} {
+		c, _, last := stubClient(t, 200, nil, page(1, 1))
+		c.Params = sized(n)
+		if _, err := c.Search(context.Background(), "cat", ""); err != nil {
+			t.Fatal(err)
+		}
+		if got := last().Query().Get("limit"); got != strconv.Itoa(n) {
+			t.Errorf("PageSize %d: limit = %s", n, got)
+		}
+	}
+}
+
+// "More results" follows the size actually requested, never the old 24 constant.
+func TestPageSizeMore(t *testing.T) {
+	for _, tc := range []struct {
+		n    int
+		want string
+	}{{36, "36"}, {30, ""}} {
+		c, _, _ := stubClient(t, 200, nil, page(tc.n, -1))
+		c.Params = sized(36)
+		p, err := c.Search(context.Background(), "cat", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.Next != tc.want {
+			t.Errorf("%d-item page at size 36: Next %q, want %q", tc.n, p.Next, tc.want)
+		}
+	}
+}
+
+// Language goes on search only (GIFs and Clips), never on trending.
+func TestLangSearchOnly(t *testing.T) {
+	de := func() provider.Params { p := provider.DefaultParams(); p.Lang = "de"; return p }
+	c, _, last := stubClient(t, 200, nil, page(1, 1))
+	c.Params = de
+	if _, err := c.Search(context.Background(), "katze", ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := last().Query().Get("lang"); got != "de" {
+		t.Errorf("search lang = %q, want de", got)
+	}
+	if _, err := c.Trending(context.Background(), ""); err != nil {
+		t.Fatal(err)
+	}
+	if last().Query().Has("lang") {
+		t.Errorf("trending sent lang=%q", last().Query().Get("lang"))
+	}
+	cl, _, lastClip := stubClient(t, 200, nil, clipsBody(true))
+	cl.Clips, cl.Params = true, de
+	if _, err := cl.Search(context.Background(), "katze", ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := lastClip().Query().Get("lang"); got != "de" {
+		t.Errorf("clips search lang = %q, want de", got)
+	}
+}
+
+func TestLanguages(t *testing.T) {
+	seen := map[string]bool{}
+	for _, l := range Languages {
+		if seen[l] {
+			t.Errorf("duplicate %q", l)
+		}
+		seen[l] = true
+	}
+	if len(Languages) == 0 || !seen["en"] || !seen["de"] || !seen["zh-TW"] {
+		t.Errorf("Languages = %v, want en, de and zh-TW among them", Languages)
 	}
 }

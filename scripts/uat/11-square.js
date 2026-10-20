@@ -56,7 +56,7 @@ if (seen.length) fail("a fast crop showed its busy state: " + JSON.stringify(see
 
 // Paste Square GIF: the server Fake is untrusted, so it copies only (T5a) and offers Enable.
 await menuRun("paste square");
-await page.locator("footer .center", { hasText: "Copied — press ⌘V to paste. To paste automatically" }).waitFor({ timeout: 10000 });
+await page.locator("footer .center", { hasText: "Copied — press ⌘V to paste" }).waitFor({ timeout: 10000 });
 if (!(await page.getByRole("button", { name: "Enable Automatic Paste…" }).count())) fail("no Enable Automatic Paste… after Paste Square GIF");
 
 // GIPHY: a claimed size over 15 MB is refused with F7; the panel and grid stay.

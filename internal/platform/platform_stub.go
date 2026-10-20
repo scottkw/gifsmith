@@ -19,3 +19,5 @@ func (stub) AccessibilityTrusted(bool) bool   { return false }
 func (stub) OpenAccessibilitySettings() error { return ErrUnsupported }
 func (stub) PasteShortcut() error             { return ErrUnsupported }
 func (stub) RevealFile(string) error          { return ErrUnsupported }
+func (stub) SetAppearance(string) error       { return ErrUnsupported }
+func (stub) SystemLocale() (string, string)   { return "", "" }

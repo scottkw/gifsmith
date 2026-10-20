@@ -24,6 +24,8 @@ type Client struct {
 	Key     func() (string, bool)
 	HTTP    *http.Client
 	Clips   bool // GIPHY Clips endpoints: provider ID clips, DownloadURL is the clip's MP4 (clipRendition)
+	// Params is read on every request (page size, rating, language); nil = provider.DefaultParams().
+	Params func() provider.Params
 }
 
 // flexInt accepts "200", 200, "" and null: GIPHY sends some numerics as strings.
@@ -95,7 +97,9 @@ func (c *Client) Search(ctx context.Context, q, cursor string) (provider.Page, e
 	if r := []rune(q); len(r) > maxQueryRunes {
 		q = string(r[:maxQueryRunes])
 	}
-	return c.get(ctx, c.path("search"), url.Values{"q": {q}}, cursor, searchOffsetCap)
+	// lang helps non-English search; GIPHY trending is not localized, so it is sent on search only.
+	v := url.Values{"q": {q}, "lang": {provider.ParamsOf(c.Params).Lang}}
+	return c.get(ctx, c.path("search"), v, cursor, searchOffsetCap)
 }
 
 func (c *Client) Trending(ctx context.Context, cursor string) (provider.Page, error) {
@@ -110,6 +114,7 @@ func (c *Client) ProbeClips(ctx context.Context) error {
 	if !ok || key == "" {
 		return &provider.Error{Kind: provider.KeyMissing, Provider: provider.Clips}
 	}
+	// A one-item yes/no probe: the user's rating does not change the answer, so it stays fixed.
 	v := url.Values{"api_key": {key}, "limit": {"1"}, "rating": {"pg-13"}}
 	var body any
 	_, err := httpx.GetJSON(ctx, c.HTTP, provider.Clips, c.BaseURL+"/v1/clips/trending?"+v.Encode(), &body)
@@ -166,10 +171,12 @@ func (c *Client) get(ctx context.Context, path string, v url.Values, cursor stri
 	if !ok || key == "" {
 		return provider.Page{}, &provider.Error{Kind: provider.KeyMissing, Provider: c.id()}
 	}
+	prm := provider.ParamsOf(c.Params)
+	limit := min(prm.PageSize, 50)
 	v.Set("api_key", key)
-	v.Set("limit", strconv.Itoa(provider.PageSize))
+	v.Set("limit", strconv.Itoa(limit))
 	v.Set("offset", strconv.Itoa(offset))
-	v.Set("rating", "pg-13") // always sent: Clips search defaults to R
+	v.Set("rating", prm.Rating) // always sent: Clips search defaults to R
 	if c.Clips {
 		v.Set("bundle", "clips_grid_picker")
 	} else {
@@ -209,7 +216,7 @@ func (c *Client) get(ctx context.Context, path string, v url.Values, cursor stri
 		items = append(items, g)
 	}
 	next := offset + len(items)
-	more := len(items) == provider.PageSize
+	more := len(items) == limit // the size requested, not a constant
 	if total := int(r.Pagination.TotalCount); total > 0 {
 		more = next < total
 	}

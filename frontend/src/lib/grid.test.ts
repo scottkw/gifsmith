@@ -3,35 +3,35 @@ import assert from 'node:assert/strict';
 import { move, nearEnd, routeKey } from './grid.ts';
 
 test('move left/right wraps across rows and clamps at the ends', () => {
-  assert.equal(move(0, 'left', 10), 0);
-  assert.equal(move(9, 'right', 10), 9);
-  assert.equal(move(3, 'right', 10), 4);
-  assert.equal(move(4, 'left', 10), 3);
+  assert.equal(move(0, 'left', 10, 4), 0);
+  assert.equal(move(9, 'right', 10, 4), 9);
+  assert.equal(move(3, 'right', 10, 4), 4);
+  assert.equal(move(4, 'left', 10, 4), 3);
 });
 
 test('move up by a row, first row does nothing', () => {
-  assert.equal(move(2, 'up', 10), 2);
-  assert.equal(move(6, 'up', 10), 2);
+  assert.equal(move(2, 'up', 10, 4), 2);
+  assert.equal(move(6, 'up', 10, 4), 2);
 });
 
 test('move down by a row, last full row falls to the last tile', () => {
-  assert.equal(move(1, 'down', 10), 5);
-  assert.equal(move(5, 'down', 10), 9);
-  assert.equal(move(2, 'down', 6), 5);
-  assert.equal(move(3, 'down', 6), 5);
-  assert.equal(move(4, 'down', 6), 4);
-  assert.equal(move(9, 'down', 10), 9);
+  assert.equal(move(1, 'down', 10, 4), 5);
+  assert.equal(move(5, 'down', 10, 4), 9);
+  assert.equal(move(2, 'down', 6, 4), 5);
+  assert.equal(move(3, 'down', 6, 4), 5);
+  assert.equal(move(4, 'down', 6, 4), 4);
+  assert.equal(move(9, 'down', 10, 4), 9);
 });
 
 test('move on one or zero tiles stays at 0', () => {
-  assert.equal(move(0, 'down', 1), 0);
-  assert.equal(move(0, 'right', 0), 0);
+  assert.equal(move(0, 'down', 1, 4), 0);
+  assert.equal(move(0, 'right', 0, 4), 0);
 });
 
 test('nearEnd is true within the last 8 tiles', () => {
-  assert.equal(nearEnd(15, 24), false);
-  assert.equal(nearEnd(16, 24), true);
-  assert.equal(nearEnd(0, 3), true);
+  assert.equal(nearEnd(15, 24, 4), false);
+  assert.equal(nearEnd(16, 24, 4), true);
+  assert.equal(nearEnd(0, 3, 4), true);
 });
 
 const key = (k: string, o: Partial<{ metaKey: boolean; shiftKey: boolean; isComposing: boolean; keyCode: number; repeat: boolean }> = {}) =>
@@ -112,4 +112,18 @@ test('routeKey maps Cmd+I (no Shift) to details', () => {
   assert.equal(key('I', { metaKey: true }), 'details');
   assert.equal(key('i'), 'none');
   assert.equal(key('i', { metaKey: true, shiftKey: true }), 'none');
+});
+
+test('routeKey maps Cmd+, to settings, not plain or shifted comma', () => {
+  assert.equal(key(',', { metaKey: true }), 'settings');
+  assert.equal(key(','), 'none');
+  assert.equal(key(',', { metaKey: true, shiftKey: true }), 'none');
+});
+
+test('move and nearEnd take the column count (Small 5, Large 3)', () => {
+  assert.equal(move(7, 'down', 20, 5), 12);
+  assert.equal(move(2, 'up', 20, 3), 2); // the top row stays
+  assert.equal(move(5, 'up', 20, 3), 2);
+  assert.equal(nearEnd(15, 20, 5), true);
+  assert.equal(nearEnd(9, 20, 5), false);
 });

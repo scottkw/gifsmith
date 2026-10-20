@@ -10,6 +10,12 @@ vars:
   SIGN_IDENTITY: "Developer ID Application: Ken Scott (S2K7P43927)"
   INSTALL_PATH:
     sh: echo "$HOME/Applications/Gifsmith.app"
+  # Release (D-13, D-14). Keep VERSION equal to Info.plist and services.Version
+  # (internal/services/version_test.go checks both, and DMG_NAME against the updater).
+  VERSION: "1.0.0"
+  NOTARY_PROFILE: "gifsmith-notary"
+  RELEASE_DIR: "{{.BIN_DIR}}/release"
+  DMG_NAME: "Gifsmith-{{.VERSION}}-arm64.dmg"
 
 tasks:
   build:
@@ -175,6 +181,7 @@ tasks:
         fi
       - cp "{{.BIN_DIR}}/{{.APP_NAME}}" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS"
       - cp build/darwin/Info.plist "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents"
+      - cp LICENSE "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources/LICENSE"
       - task: '{{if eq OS "darwin"}}codesign:adhoc{{else}}codesign:skip{{end}}'
 
   codesign:adhoc:
@@ -229,6 +236,53 @@ tasks:
       - ditto "{{.BIN_DIR}}/{{.APP_NAME}}.app" "{{.INSTALL_PATH}}"
       - ': > "{{.ROOT_DIR}}/{{.BIN_DIR}}/install-dev.log"'
       - open --stderr "{{.ROOT_DIR}}/{{.BIN_DIR}}/install-dev.log" "{{.INSTALL_PATH}}"
+
+  release:build:
+    summary: Developer ID-signed arm64 Gifsmith.app and DMG in bin/release, verified (no notarization)
+    cmds:
+      - task: release:assemble
+        vars:
+          NOTARIZE: "false"
+
+  release:
+    summary: Signed, notarized and stapled arm64 Gifsmith.app and DMG in bin/release, verified
+    preconditions:
+      - sh: xcrun notarytool history --keychain-profile "{{.NOTARY_PROFILE}}" >/dev/null 2>&1
+        msg: 'No working notary profile "gifsmith-notary": resolve the Apple Developer agreement and run notarytool store-credentials (see .planning/phases/04-settings-shell-polish-release/04-KLIPY-EMAIL.md)'
+    cmds:
+      - task: release:assemble
+        vars:
+          NOTARIZE: "true"
+
+  release:assemble:
+    summary: Shared release steps; NOTARIZE=true adds notarize + staple for the app and the DMG
+    internal: true
+    deps:
+      - task: package
+        vars:
+          ARCH: arm64
+    cmds:
+      - case "{{.RELEASE_DIR}}" in */release) ;; *) echo "refusing to use release dir '{{.RELEASE_DIR}}'"; exit 1;; esac
+      - rm -rf "{{.RELEASE_DIR}}"
+      - mkdir -p "{{.RELEASE_DIR}}"
+      # Finder shows the bundle name; APP_NAME is lowercase.
+      - ditto "{{.BIN_DIR}}/{{.APP_NAME}}.app" "{{.RELEASE_DIR}}/Gifsmith.app"
+      - wails3 tool sign --input "{{.RELEASE_DIR}}/Gifsmith.app" --identity "{{.SIGN_IDENTITY}}" --hardened-runtime{{if eq .NOTARIZE "true"}} --notarize --keychain-profile "{{.NOTARY_PROFILE}}"{{end}}
+      # Two-representation TIFF so the background is sharp on Retina displays.
+      - tiffutil -cathidpicheck build/darwin/dmg-background.png build/darwin/dmg-background@2x.png -out "{{.BIN_DIR}}/dmg-background.tiff"
+      - >-
+        wails3 tool package --format dmg --name Gifsmith --out "{{.RELEASE_DIR}}"
+        --background "{{.BIN_DIR}}/dmg-background.tiff"
+        --volume-icon build/darwin/icons.icns
+        --file-icon build/darwin/dmg-file-icon.icns
+        --window-width 540 --window-height 380
+        --files "LICENSE=LICENSE"
+      - mv "{{.RELEASE_DIR}}/Gifsmith.dmg" "{{.RELEASE_DIR}}/{{.DMG_NAME}}"
+      - codesign --force --sign "{{.SIGN_IDENTITY}}" --timestamp "{{.RELEASE_DIR}}/{{.DMG_NAME}}"
+      - '{{if eq .NOTARIZE "true"}}xcrun notarytool submit "{{.RELEASE_DIR}}/{{.DMG_NAME}}" --keychain-profile "{{.NOTARY_PROFILE}}" --wait{{else}}true{{end}}'
+      - '{{if eq .NOTARIZE "true"}}xcrun stapler staple "{{.RELEASE_DIR}}/{{.DMG_NAME}}"{{else}}true{{end}}'
+      - cd "{{.RELEASE_DIR}}" && shasum -a 256 "{{.DMG_NAME}}" > "{{.DMG_NAME}}.sha256"
+      - bash scripts/verify-release.sh {{if eq .NOTARIZE "true"}}--notarized {{end}}"{{.RELEASE_DIR}}"
 
   sign:
     summary: Signs the application bundle with Developer ID

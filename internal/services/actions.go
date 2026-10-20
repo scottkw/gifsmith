@@ -39,6 +39,11 @@ type Result struct {
 	Message            string `json:"message"`
 }
 
+// KlipyFileActionsCleared records Klipy's written clearance for file actions (Copy, Paste, Download,
+// Copy/Paste Square), which keep a copy of KLIPY media; see 04-KLIPY-EMAIL.md. It is never a pref
+// and has no UI: flip it only after that written answer, in a rebuild and release.
+const KlipyFileActionsCleared = false
+
 type ActionService struct {
 	Platform platform.Platform
 	Staging  *staging.Store
@@ -46,8 +51,12 @@ type ActionService struct {
 	Previous func() platform.App
 	Sleep    func(time.Duration)         // nil means time.Sleep
 	After    func(time.Duration, func()) // nil means time.AfterFunc
-	// DownloadsDir is the download destination (desktop ~/Downloads; Phase 4's picker replaces it).
+	// DownloadsDir is the download folder, read at each Download (SettingsService.DownloadDir).
 	DownloadsDir func() string
+	// HideFilenames names downloads gifsmith-{id} instead of the title slug; nil means off.
+	HideFilenames func() bool
+	// KlipyFileActions lets file actions run on Klipy items; main sets it from KlipyFileActionsCleared.
+	KlipyFileActions bool
 	// Recents records every successful copy or paste (D-07); nil records nothing.
 	Recents      interface{ Touch(provider.Gif) error }
 	busy         sync.Mutex    // one action at a time: no racing pasteboard writes, no double ⌘V
@@ -89,9 +98,22 @@ func stageErr(err error) error {
 	return actionErr("download_failed")
 }
 
+// gated refuses a Klipy file action until KlipyFileActions (RELS-04): checked before the busy lock,
+// staging, HTTP or the pasteboard. Text actions (links, Markdown) never call it.
+func (a *ActionService) gated(g provider.Gif) error {
+	if g.Provider == provider.Klipy && !a.KlipyFileActions {
+		log.Printf("klipy file action refused (not cleared)")
+		return actionErr("klipy_gated")
+	}
+	return nil
+}
+
 // Copy puts the selected GIF (a Clip's MP4) on the clipboard as a file. The panel stays open:
 // the frontend shows the confirmation, then hides it.
 func (a *ActionService) Copy(ctx context.Context, g provider.Gif) (Result, error) {
+	if err := a.gated(g); err != nil {
+		return Result{}, err
+	}
 	if !a.busy.TryLock() {
 		return Result{}, ErrBusy
 	}
@@ -110,6 +132,9 @@ func (a *ActionService) Copy(ctx context.Context, g provider.Gif) (Result, error
 // Paste copies the GIF, hides the panel and posts one ⌘V to the previous app.
 // Without Accessibility it only copies and keeps the panel open with instructions.
 func (a *ActionService) Paste(ctx context.Context, g provider.Gif) (Result, error) {
+	if err := a.gated(g); err != nil {
+		return Result{}, err
+	}
 	if !a.busy.TryLock() {
 		return Result{}, ErrBusy
 	}
@@ -158,7 +183,7 @@ func (a *ActionService) paste(put func() error, okMsg string) (Result, error) {
 	}
 	if !a.Platform.AccessibilityTrusted(false) {
 		log.Printf("paste: accessibility not trusted, copied only (UI shows Enable Automatic Paste…)")
-		return Result{Copied: true, NeedsAccessibility: true, Message: "Copied — press ⌘V to paste. To paste automatically, click Enable Automatic Paste… and turn on Gifsmith."}, nil
+		return Result{Copied: true, NeedsAccessibility: true, Message: "Copied — press ⌘V to paste"}, nil // T5a: the button's title explains
 	}
 	sleep := a.Sleep
 	if sleep == nil {
@@ -393,6 +418,9 @@ type DownloadResult struct {
 // Download saves the selected GIF (a Clip's MP4) into the download folder; the panel stays open.
 // It never goes through staging, the pasteboard or Recents (D-17, D-07).
 func (a *ActionService) Download(ctx context.Context, g provider.Gif) (DownloadResult, error) {
+	if err := a.gated(g); err != nil {
+		return DownloadResult{}, err
+	}
 	if !a.busy.TryLock() {
 		return DownloadResult{}, ErrBusy
 	}
@@ -404,8 +432,7 @@ func (a *ActionService) Download(ctx context.Context, g provider.Gif) (DownloadR
 	if dir == "" {
 		return DownloadResult{}, actionErr("folder_unwritable")
 	}
-	// hide is the Phase 4 Settings toggle (SETT-04); FileStem already implements both names.
-	path, err := a.Staging.Save(ctx, g, dir, false)
+	path, err := a.Staging.Save(ctx, g, dir, a.HideFilenames != nil && a.HideFilenames())
 	if err != nil {
 		log.Printf("download %s: %v", g.Provider, err)
 		return DownloadResult{}, stageErr(err)
@@ -446,6 +473,9 @@ const (
 // CopySquare puts a center-cropped square copy of the GIF on the clipboard as a file (D-16).
 // The panel stays open: the frontend shows the confirmation, then hides it.
 func (a *ActionService) CopySquare(ctx context.Context, g provider.Gif) (Result, error) {
+	if err := a.gated(g); err != nil {
+		return Result{}, err
+	}
 	if !a.busy.TryLock() {
 		return Result{}, ErrBusy
 	}
@@ -622,6 +652,9 @@ func framePixels(r io.Reader) (int64, error) {
 // PasteSquare copies the square GIF like CopySquare, then pastes it like Paste. A pasted Klipy
 // square file gets the same grace delete as a pasted Klipy GIF (D-19).
 func (a *ActionService) PasteSquare(ctx context.Context, g provider.Gif) (Result, error) {
+	if err := a.gated(g); err != nil {
+		return Result{}, err
+	}
 	if !a.busy.TryLock() {
 		return Result{}, ErrBusy
 	}

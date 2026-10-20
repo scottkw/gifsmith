@@ -138,17 +138,46 @@ Plans:
 
 ### Phase 4: Settings, Shell Polish & Release
 
-**Goal**: Everything is configurable from a proper Settings window with hotkeys that can be rebound and launch at login, and a stranger can install a signed, notarized build on a clean Mac and use it within vendor and license obligations.
+**Goal**: Everything is configurable from a proper Settings window with hotkeys that can be rebound and launch at login, and a stranger can install a signed, notarized build on a clean Mac and use it within vendor and license obligations, and it tells the user when a newer release is available on GitHub, offering a verified download of the new DMG.
 **Depends on**: Phase 3
-**Requirements**: SETT-01, SETT-02, SETT-03, SETT-04, SETT-05, SETT-06, SRCH-09, ACTN-08, SHEL-05, SHEL-06, RELS-01, RELS-02, RELS-03, RELS-04
+**Requirements**: SETT-01, SETT-02, SETT-03, SETT-04, SETT-05, SETT-06, SRCH-09, ACTN-08, SHEL-05, SHEL-06, RELS-01, RELS-02, RELS-03, RELS-04, RELS-05, RELS-06, RELS-07
 **Success Criteria** (what must be TRUE):
   1. Choosing Settings from the menu bar menu opens a separate Settings window where pasting into fields works. There the user can add, test, change, and remove GIPHY and Klipy keys (each with a link to that provider's key sign-up page), and see Accessibility permission status with a button to grant it.
   2. The user can rebind the global hotkeys; a conflict is reported and the old binding stays until the new one registers. Favorites and Recents each open directly with their own hotkeys, and the user can turn launch at login on or off. (manual, user-verified)
   3. The user can set grid item size (search and trending), max results, download folder, hide filename, GIPHY and Klipy locales, GIPHY content rating (default PG-13), the default Enter and ⌘Enter actions, and the window theme (Light, Dark, or System), and changes take effect on next use.
   4. A Developer ID–signed, notarized DMG installs and runs on a clean user account (Gatekeeper accepts it, permissions start fresh) on macOS 13+ Apple Silicon. (manual, user-verified)
   5. The About screen credits the original MIT-licensed Raycast extension and its authors, and Klipy file actions stay disabled (link and Markdown only) unless written clearance from Klipy is recorded.
+  6. The app checks GitHub Releases for a newer version, alerts the user, and Settings has a "Check for Updates…" button; if the user accepts, it downloads the new DMG, verifies its checksum, Developer ID signature and notarization, and opens it (no self-replacement). (added 2026-10-18)
+  7. GitHub Actions tests every push to main and every PR without secrets, and pushing a vX.Y.Z tag (from v1.0.1; v1.0.0 ships from the local notarized build) builds, Developer ID-signs, notarizes, staples and verifies the DMG and creates a draft GitHub Release with the DMG, its .sha256 and the release notes; a dry run of the release workflow is green before the first tag. (added 2026-10-20)
 
-**Plans**: TBD
+**Plans:** 7/8 plans executed
+
+Plans:
+
+**Wave 1**
+- [x] 04-01-PLAN.md — Tracer: Theme from a real Settings window through one prefs Store to both webviews and NSApp appearance; window behaviour, ⌘,, Open at login, Automatic paste status, Klipy email + Apple agreement steps
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 04-02-PLAN.md — Content rating, page size, GIPHY language and Klipy country as per-request Params (Flush keeps 429 blocks); Keys pane add/test/change/remove with last-4 status
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 04-03-PLAN.md — Rebindable hotkeys with rollback, Favorites/Recents hotkeys, suspend-while-recording, 5 s Test; Phase 3 polish and Reduce Motion stills
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 04-04-PLAN.md — Validated download folder + hide filenames, configurable ↵/⌘↵ with the Klipy file-action gate (Go const), grid sizes and menu placement, Phase 4 UI backstops
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 04-07-PLAN.md — GitHub update check (launch + 24 h, Settings "Check for Updates…", tray alert); download → SHA-256 digest → codesign + Team ID + spctl → open DMG; no self-replacement
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [x] 04-05-PLAN.md — Signed arm64 DMG pipeline (release:build, notarized release, verify script, new background), About credits, README, release notes; blocking notary-profile checkpoint
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [x] 04-06-PLAN.md — Full regression, notarized release run and verification, dev install for native UAT, clean-account install, draft GitHub Release
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [ ] 04-08-PLAN.md — GitHub Actions: CI tests on push/PR, vX.Y.Z tag → signed, notarized, verified draft release (from v1.0.1), workflow_dispatch dry run; user-set `release` environment secrets
+
 **UI hint**: yes
 
 **Manual verification**: Criteria 2 and 4 need user-run native checks (global shortcut registration, login item, clean-account install). Klipy clearance (developers@klipy.com) is a pre-release gate and must be requested before this phase's release work.
@@ -165,4 +194,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Native Spike & Signed Dev Loop | 4/4 | Complete    | 2026-10-17 |
 | 2. Providers, Search UI & First Run | 6/6 | Complete    | 2026-10-17 |
 | 3. Action Pipeline & Library | 8/8 | Complete    | 2026-10-18 |
-| 4. Settings, Shell Polish & Release | 0/TBD | Not started | - |
+| 4. Settings, Shell Polish & Release | 7/8 | In Progress | - |

@@ -21,6 +21,8 @@ type Client struct {
 	BaseURL string // https://api.klipy.com
 	Key     func() (string, bool)
 	HTTP    *http.Client
+	// Params is read on every request (page size, country); nil = provider.DefaultParams().
+	Params func() provider.Params
 }
 
 // Dimensions and size are display-only, so decoded loosely.
@@ -115,8 +117,10 @@ func (c *Client) get(ctx context.Context, kind string, v url.Values, cursor stri
 		return provider.Page{}, &provider.Error{Kind: provider.KeyRejected, Provider: provider.Klipy}
 	}
 	v.Set("page", strconv.Itoa(page))
-	v.Set("per_page", strconv.Itoa(provider.PageSize))
+	prm := provider.ParamsOf(c.Params)
+	v.Set("per_page", strconv.Itoa(min(max(prm.PageSize, 8), 50))) // Klipy accepts 8..50
 	v.Set("content_filter", "medium")
+	v.Set("locale", prm.Country) // a request parameter only: Klipy results are never filtered here
 
 	var r response
 	u := c.BaseURL + "/api/v1/" + url.PathEscape(key) + "/gifs/" + kind + "?" + v.Encode()

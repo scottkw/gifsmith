@@ -5,16 +5,20 @@ import {
   LibraryService,
   PanelService,
   SettingsService,
+  UpdateService,
   type DownloadResult,
   type ProviderStatus,
   type Result,
+  type KeyStatus,
+  type Snapshot as SettingsSnapshot,
+  type UpdateStatus,
 } from '../../bindings/gifsmith/internal/services';
 import type { Gif, Page } from '../../bindings/gifsmith/internal/provider';
 import type { Entry, Snapshot } from '../../bindings/gifsmith/internal/library';
 import { Browser, CancelError, type CancellablePromise } from '@wailsio/runtime';
-import { CLIPS_ACCESS_MAILTO, GIPHY_KEY_URL, KLIPY_KEY_URL } from './providers';
+import { ABOUT_URLS, CLIPS_ACCESS_MAILTO, GIPHY_KEY_URL, KLIPY_KEY_URL } from './providers';
 
-export type { DownloadResult, Entry, Gif, Page, ProviderStatus, Result };
+export type { DownloadResult, Entry, Gif, KeyStatus, Page, ProviderStatus, Result, SettingsSnapshot, UpdateStatus };
 
 export const search = (p: string, q: string, cursor: string) => GifService.Search(p, q, cursor);
 export const trending = (p: string, cursor: string) => GifService.Trending(p, cursor);
@@ -22,13 +26,57 @@ export const trending = (p: string, cursor: string) => GifService.Trending(p, cu
 export const providers = async () => (await GifService.Providers()) ?? [];
 export const lastProvider = () => SettingsService.LastProvider();
 export const setLastProvider = (p: string) => SettingsService.SetLastProvider(p);
+// Settings: every change applies at once; Go validates and answers with the full snapshot.
+export const snapshot = () => SettingsService.Snapshot();
+export const setPref = (name: string, value: string) => SettingsService.SetPref(name, value);
+// The Search-pane choices Go allows, and what Match System resolves to now.
+export const choices = () => SettingsService.Choices();
+// Registers or removes the login item now; rejects with cause.kind autostart_failed | not_in_applications.
+export const setLaunchAtLogin = (on: boolean) => SettingsService.SetLaunchAtLogin(on);
+// Downloads: Go shows the native folder picker and validates the pick; no path crosses from the
+// webview. Rejects with cause.kind folder_missing | folder_fat | folder_network | folder_unwritable
+// (cause.folder names it) or picker_failed; a cancel resolves to the unchanged snapshot.
+export const chooseDownloadDir = () => SettingsService.ChooseDownloadDir();
+export const resetDownloadDir = () => SettingsService.ResetDownloadDir();
+// The Automatic paste grant, read without prompting.
+export const accessibilityStatus = () => SettingsService.AccessibilityStatus();
+// Go's services.SettingsError arrives as err.cause: { kind, slot? }.
+export const settingsError = (e: unknown): { kind: string; slot?: string; folder?: string } | null => providerError(e);
 // Verifies with a real trending call, then stores in the Keychain; rejects with a provider cause.
 export const saveKey = (p: string, key: string) => SettingsService.SaveKey(p, key);
+// Keys pane: status carries the last 4 characters at most; Test is one uncached trending call;
+// Remove deletes the Keychain item (rejects with cause.kind keychain_delete_failed).
+export const keyStatus = async () => (await SettingsService.KeyStatus()) ?? [];
+export const testKey = (p: string) => SettingsService.TestKey(p);
+export const removeKey = (p: string) => SettingsService.RemoveKey(p);
+// Hotkeys: Go validates, registers (re-registering the old binding on failure) and stores; rejects
+// with cause.kind hotkey_* (hotkey_duplicate names the other slot). The calls run one at a time, in
+// order, so a late Suspend can never land after the Resume that ends a recording.
+let hotkeyCalls: Promise<unknown> = Promise.resolve();
+function inOrder<T>(f: () => Promise<T>): Promise<T> {
+  const p = hotkeyCalls.then(f);
+  hotkeyCalls = p.catch(() => {});
+  return p;
+}
+export const setHotkey = (slot: string, accel: string) => inOrder(() => SettingsService.SetHotkey(slot, accel));
+export const suspendHotkeys = () => inOrder(() => SettingsService.SuspendHotkeys());
+export const resumeHotkeys = () => inOrder(() => SettingsService.ResumeHotkeys());
+// Arms slot for 5 s: a press emits hotkey:test {slot} before its normal action.
+export const testHotkey = (slot: string) => SettingsService.TestHotkey(slot);
+// Updates (RELS-05/06): Go asks GitHub; state changes also arrive as the update:status event.
+// Failures reject with cause.kind update_check_failed | update_download_failed | update_verify_failed | update_open_failed.
+export const updateStatus = () => UpdateService.Status();
+export const checkForUpdates = () => UpdateService.Check();
+// Downloads, verifies and opens the available release's DMG; nothing is installed in place.
+export const downloadUpdate = () => UpdateService.Download();
+// Opens Settings at General → Updates (the panel toast's View action).
+export const revealUpdates = () => UpdateService.Reveal();
+export const updateError = (e: unknown): { kind: string } | null => providerError(e);
 // Re-probes Clips once when its result is unknown; resolves to the state, rejects with the probe's cause.
 export const checkClips = () => GifService.CheckClips();
 
 // The webview may only ask the OS to open these fixed URLs.
-const EXTERNAL = new Set([GIPHY_KEY_URL, KLIPY_KEY_URL, CLIPS_ACCESS_MAILTO]);
+const EXTERNAL = new Set<string>([GIPHY_KEY_URL, KLIPY_KEY_URL, CLIPS_ACCESS_MAILTO, ...Object.values(ABOUT_URLS)]);
 export function openExternal(url: string) {
   if (!EXTERNAL.has(url)) throw new Error('refusing to open an unlisted URL');
   return Browser.OpenURL(url);
@@ -90,6 +138,7 @@ export const download = (g: Gif) => ActionService.Download(g);
 export const showDownload = () => ActionService.ShowDownload();
 export const requestAccessibility = () => ActionService.RequestAccessibility();
 export const hide = () => PanelService.Hide();
+export const openSettings = () => PanelService.OpenSettings();
 
 // Favorites, Recents and recent searches: local files only, never a provider request (D-09).
 // Go never sends null lists; the generated types allow it, so normalize once here.

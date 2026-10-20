@@ -9,11 +9,13 @@
     favorited,
     onopenpage,
     onopensource,
+    onmenu,
   }: {
     gif: Gif;
     favorited: boolean;
     onopenpage: () => void;
     onopensource: () => void;
+    onmenu: () => void; // right-click on the preview opens the action menu (P15)
   } = $props();
 
   const title = $derived(gif.title || 'Untitled GIF');
@@ -28,7 +30,14 @@
 </script>
 
 <div class="details" id="details" role="region" aria-label="Details">
-  <div class="preview">
+  <div
+    class="preview"
+    role="presentation"
+    oncontextmenu={(e) => {
+      e.preventDefault();
+      onmenu();
+    }}
+  >
     <img src={gif.mediumUrl || gif.previewUrl} alt={title} decoding="async" draggable="false" />
     {#if gif.isClip}
       <span class="badge" aria-hidden="true">MP4</span>
@@ -89,8 +98,7 @@
     border-radius: 4px;
     background: var(--scrim);
     color: #fff;
-    font-size: 12px;
-    line-height: 16px;
+    font: var(--label);
   }
   .meta {
     width: 340px;

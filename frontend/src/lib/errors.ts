@@ -1,6 +1,7 @@
 // Provider error -> UI-SPEC copy rows (E1–E5f, E2, E6). No Svelte or DOM imports so node --test can
 // load it. Copy is built only from the provider name and the HTTP status: never a URL, body or key.
 import type { Gif, ProviderErr } from './api';
+import { glyphs } from './hotkeys.ts';
 
 export type ErrorState = { id: 'E1' | 'E3' | 'E4' | 'E5' | 'E5f'; heading: string; body: string; tryAgain: boolean; retryAt?: number };
 
@@ -83,13 +84,15 @@ export function pagingMessage(e: ProviderErr, now: number, receivedAt = now): st
 export function keyMessage(e: ProviderErr | null, providerLabel: string, now: number): string {
   if (!e) return "Couldn't save the key to the macOS Keychain. Try again.";
   if (e.kind === 'key_rejected') return `${providerLabel} rejected that key. Check that you copied the whole key, then try again.`;
-  if (e.kind === 'rate_limited') {
-    const left = remaining(e, now, now);
-    const n = Math.ceil((left ?? 0) / 60);
-    const when = left === null ? 'later this hour' : left < 60 ? 'in less than a minute' : `in ${n} ${n === 1 ? 'minute' : 'minutes'}`;
-    return `${providerLabel}'s request limit was hit while checking the key. Try again ${when}.`;
-  }
+  if (e.kind === 'rate_limited') return `${providerLabel}'s request limit was hit while checking the key. Try again ${retryWhen(e, now)}.`;
   return `Couldn't reach ${providerLabel} to check the key. Check your connection, then try again.`;
+}
+
+// K3's {when}: the error arrived at `now`.
+function retryWhen(e: ProviderErr, now: number): string {
+  const left = remaining(e, now, now);
+  const n = Math.ceil((left ?? 0) / 60);
+  return left === null ? 'later this hour' : left < 60 ? 'in less than a minute' : `in ${n} ${n === 1 ? 'minute' : 'minutes'}`;
 }
 
 // K6: a stored key rejected during search or trending (S13).
@@ -97,12 +100,14 @@ export function revokedMessage(providerLabel: string): string {
   return `${providerLabel} rejected your saved key. It may have been revoked. Paste a new key to continue.`;
 }
 
-// Copy/paste/open/download/crop failures (UI-SPEC F1–F4, F6–F8), keyed by Go's ActionError kind; '' = no
-// typed cause. A Clip's file is its MP4, so F1–F3 name the MP4 for Clips. `folder` is the download
-// folder's display name, never a path.
-export function actionErrorText(kind: string, g: Gif, action: 'copy' | 'download' = 'copy', folder = 'Downloads'): string {
+// Copy/paste/open/download/crop failures (UI-SPEC F1–F4, F6–F8, F11, F12), keyed by Go's ActionError
+// kind; '' = no typed cause. A Clip's file is its MP4, so F1–F3 name the MP4 for Clips. `folder` is the
+// download folder's display name, never a path. 'text' = a link/Markdown/page-link copy or paste.
+export function actionErrorText(kind: string, g: Gif, action: 'copy' | 'download' | 'text' = 'copy', folder = 'Downloads'): string {
+  if (kind === 'invalid_item') return "This GIF's details are incomplete. Pick another GIF.";
+  if (action === 'text') return "Couldn't copy to the clipboard. Try again.";
   const what = g.isClip ? 'an MP4' : 'a GIF';
-  if (kind === 'not_media') return `${providerName(g.provider)} sent something that isn't ${what}. Nothing was saved. Try another GIF.`;
+  if (kind === 'not_media') return `${providerName(g.provider)} sent something that isn't ${what}. Nothing was saved. Try another ${g.isClip ? 'clip' : 'GIF'}.`;
   if (action === 'download') {
     if (kind === 'folder_unwritable') return `Couldn't save to ${folder}. Check that the folder exists and that Gifsmith can write to it.`;
     return `Couldn't download this ${g.isClip ? 'MP4' : 'GIF'}. Check your connection, then try again.`;
@@ -114,7 +119,61 @@ export function actionErrorText(kind: string, g: Gif, action: 'copy' | 'download
   return "Couldn't copy this GIF. The download failed. Try again or pick another GIF.";
 }
 
+// Downloads pane D5–D8 under Save to, keyed by Go's SettingsError kind; `folder` is the display name.
+export function folderErrorText(kind: string, folder: string): string {
+  switch (kind) {
+    case 'folder_fat':
+      return `Gifsmith can't save safely to ${folder} (exFAT or FAT drive). Choose a folder on a Mac-formatted drive.`;
+    case 'folder_network':
+      return `${folder} is on a network drive. Choose a folder on this Mac.`;
+    case 'folder_unwritable':
+      return `Gifsmith can't write to ${folder}. Choose another folder.`;
+    case 'folder_missing':
+      return 'This folder no longer exists. Choose another folder or reset to Downloads.';
+  }
+  return "Couldn't save this setting. Try again.";
+}
+
+// T11: ⌘S (or any file action reaching Go) on a Klipy item while file actions are gated.
+export const klipyGatedText = "Klipy GIFs can't be downloaded yet.";
+
+// T6: a finished download names the folder by display name only.
+export const downloadedText = (folder: string) => `Downloaded to ${folder}`;
+
 // F5: a library write failed (favorite, remove, Clear Recents, Undo); the list keeps its pre-change state.
 export function libraryErrorText(list: 'favorites' | 'recents'): string {
   return `Couldn't save your ${list === 'favorites' ? 'Favorites' : 'Recents'}. Try again.`;
+}
+
+// Keys pane (UI-SPEC K-T1..K-T4): the result of Test; null = the test passed.
+export function testKeyMessage(e: ProviderErr | null, providerLabel: string, now: number): string {
+  if (!e) return `${providerLabel} accepted the key.`;
+  if (e.kind === 'key_rejected') return `${providerLabel} rejected the saved key. It may have been revoked. Change it to continue.`;
+  if (e.kind === 'rate_limited') return `${providerLabel}'s request limit was hit while testing the key. Try again ${retryWhen(e, now)}.`;
+  return `Couldn't reach ${providerLabel} to test the key. Check your connection, then try again.`;
+}
+
+// Keys pane K-A, K-D, K-F.
+export const keySavedText = (providerLabel: string) => `Saved. ${providerLabel} is ready.`;
+export const keyRemovedText = (providerLabel: string) => `Removed. Add a key to use ${providerLabel} again.`;
+export const keyRemoveFailedText = () => "Couldn't remove the key from the macOS Keychain. Try again.";
+
+// Hotkeys pane H1–H4b, H7, keyed by Go's SettingsError kind ('test_failed' = H7); the combo shows as glyphs.
+export function hotkeyErrorText(kind: string, accel: string, otherSlotLabel: string): string {
+  const combo = glyphs(accel);
+  switch (kind) {
+    case 'hotkey_no_modifier':
+      return 'Include ⌘, ⌥ or ⌃ in the shortcut.';
+    case 'hotkey_duplicate':
+      return `${combo} is already used for ${otherSlotLabel}.`;
+    case 'hotkey_system':
+      return `${combo} is a macOS shortcut. Choose another one.`;
+    case 'hotkey_register_failed':
+      return `macOS couldn't register ${combo}. Your previous shortcut still works.`;
+    case 'hotkey_register_failed_new':
+      return `macOS couldn't register ${combo}. Try a different shortcut.`;
+    case 'test_failed':
+      return `Nothing happened. Another app may be using ${combo}. Try a different shortcut.`;
+  }
+  return "Couldn't save this setting. Try again.";
 }

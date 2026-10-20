@@ -1,15 +1,23 @@
 package services
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"log"
+	"os"
+	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"unicode"
 	"unicode/utf8"
 
+	"gifsmith/internal/platform"
 	"gifsmith/internal/provider"
+	"gifsmith/internal/provider/giphy"
+	"gifsmith/internal/provider/klipy"
 	"gifsmith/internal/search"
 	"gifsmith/internal/settings"
 )
@@ -19,14 +27,26 @@ var errNoKeyProvider = errors.New("this provider does not use a key")
 // SettingsService saves verified keys and the last provider. No bound method
 // returns a key; errors and log lines name the provider and kind only.
 type SettingsService struct {
-	Keys      *settings.Keys
-	Dir       string // holds settings.json
-	Svc       *search.Service
-	NewClient func(p provider.ID, key string) provider.Provider // a client using exactly this candidate key
-	Emit      func(name string)
-	Clips     *search.Clips
+	Keys         *settings.Keys
+	Store        *settings.Store // the only owner of settings.json
+	Platform     platform.Platform
+	Svc          *search.Service
+	NewClient    func(p provider.ID, key string) provider.Provider // a client using exactly this candidate key
+	Emit         func(name string, data ...any)
+	Clips        *search.Clips
+	ApplyTheme   func(theme string) // native appearance + window backgrounds; nil in tests
+	Autostart    Autostarter
+	Executable   func() (string, error) // os.Executable; injectable for the not-in-Applications check
+	Hotkeys      *Hotkeys
+	OnOpenHotkey func(accel string) // tray key equivalent for Open Gifsmith; nil in tests
+	// PickFolder shows the native folder picker starting in start; "" and nil is a cancel.
+	// The only source of a download folder: no bound method takes a path from the webview.
+	PickFolder       func(start string) (string, error)
+	DefaultDownloads string // ~/Downloads (bin/uat-downloads in the UAT build)
+	KlipyFileActions bool   // main sets it from KlipyFileActionsCleared; never a pref
 
-	mu sync.Mutex // serializes SaveKey end to end: a verify never interleaves with another save's write
+	mu   sync.Mutex // serializes SaveKey, TestKey and RemoveKey end to end: the Keychain ends in the last call's state
+	hkMu sync.Mutex // serializes SetHotkey: the Store ends with what is registered
 }
 
 // validKey bounds what a key may contain: Klipy puts it in a URL path, GIPHY in a query.
@@ -48,12 +68,9 @@ func kindOf(err error) string {
 // SaveKey verifies key with a real first-page trending call and stores it only if that succeeds.
 // The verified page seeds the trending cache, so verification costs no extra request.
 func (s *SettingsService) SaveKey(ctx context.Context, p, key string) error {
-	id, ok := provider.ParseID(p)
-	if !ok {
-		return errUnknownProvider
-	}
-	if id != provider.GIPHY && id != provider.Klipy {
-		return errNoKeyProvider
+	id, err := keyProvider(p)
+	if err != nil {
+		return err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -86,25 +103,539 @@ func (s *SettingsService) SaveKey(ctx context.Context, p, key string) error {
 	return nil
 }
 
-// LastProvider is the persisted provider id, or "" on first run or an unreadable file.
-func (s *SettingsService) LastProvider(ctx context.Context) string {
-	prefs, err := settings.LoadPrefs(s.Dir)
-	if err != nil {
-		log.Printf("settings unreadable, treating as first run: %v", err)
-		return ""
-	}
-	if _, ok := provider.ParseID(prefs.LastProvider); !ok {
-		return ""
-	}
-	return prefs.LastProvider
+// KeyStatus is one provider's key state for the Keys pane: never more than the last 4 characters.
+type KeyStatus struct {
+	Provider string `json:"provider"`
+	Status   string `json:"status"` // saved | not_set | rejected
+	Last4    string `json:"last4,omitempty"`
 }
 
-// SetLastProvider persists the provider tab to reopen on next launch.
+// KeyStatus reports GIPHY then Klipy.
+func (s *SettingsService) KeyStatus(ctx context.Context) []KeyStatus {
+	out := make([]KeyStatus, 0, 2)
+	for _, id := range []provider.ID{provider.GIPHY, provider.Klipy} {
+		ks := KeyStatus{Provider: string(id), Status: "not_set"}
+		if key, ok := s.Keys.Get(id); ok {
+			r := []rune(key)
+			ks.Status, ks.Last4 = "saved", string(r[max(0, len(r)-4):])
+			if s.Keys.Rejected(id) {
+				ks.Status = "rejected"
+			}
+		}
+		out = append(out, ks)
+	}
+	return out
+}
+
+// keyProvider accepts only the providers that use a key.
+func keyProvider(p string) (provider.ID, error) {
+	id, ok := provider.ParseID(p)
+	if !ok {
+		return "", errUnknownProvider
+	}
+	if id != provider.GIPHY && id != provider.Klipy {
+		return "", errNoKeyProvider
+	}
+	return id, nil
+}
+
+// TestKey makes one uncached first-page trending call with the stored key, inside the 429 budget
+// (refused while blocked). Success seeds the trending cache; key_rejected marks the key rejected.
+func (s *SettingsService) TestKey(ctx context.Context, p string) error {
+	id, err := keyProvider(p)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key, ok := s.Keys.Get(id)
+	if !ok {
+		return &provider.Error{Kind: provider.KeyMissing, Provider: id}
+	}
+	var page provider.Page
+	err = s.Svc.Guard(id, func() error {
+		var err error
+		page, err = s.NewClient(id, key).Trending(ctx, "")
+		return err
+	})
+	if err != nil {
+		log.Printf("key test for %s: %s", id, kindOf(err))
+		if kindOf(err) == string(provider.KeyRejected) {
+			s.Keys.MarkRejected(id)
+			s.emit("providers:changed")
+		}
+		return err
+	}
+	s.Svc.Seed(id, "", page)
+	log.Printf("key test for %s: ok", id)
+	if s.Keys.Rejected(id) {
+		s.Keys.ClearRejected(id)
+		s.emit("providers:changed")
+	}
+	return nil
+}
+
+// RemoveKey deletes the stored key from the Keychain and drops what was fetched with it. Removing
+// a key that is not there succeeds; a Keychain failure keeps the key.
+func (s *SettingsService) RemoveKey(ctx context.Context, p string) error {
+	id, err := keyProvider(p)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.Keys.Delete(id); err != nil {
+		log.Printf("key not removed for %s: keychain delete failed", id)
+		return errKeychainDelete
+	}
+	s.Svc.Invalidate(id)
+	if id == provider.GIPHY {
+		s.Clips.Reset() // no key, so no probe until a new key passes a GIFs call
+	}
+	log.Printf("key removed for %s", id)
+	s.emit("providers:changed")
+	return nil
+}
+
+func (s *SettingsService) emit(name string, data ...any) {
+	if s.Emit != nil {
+		s.Emit(name, data...)
+	}
+}
+
+// Autostarter is the login item (*application.AutostartManager in the app, a fake in the UAT build).
+type Autostarter interface {
+	Enable() error
+	Disable() error
+	IsEnabled() (bool, error)
+}
+
+// Snapshot is the settings the webviews render. Never a key.
+type Snapshot struct {
+	Theme         string           `json:"theme"`
+	LaunchAtLogin bool             `json:"launchAtLogin"`
+	GiphyRating   string           `json:"giphyRating"`  // resolved: never ""
+	PageSize      int              `json:"pageSize"`     // resolved: never 0
+	GiphyLang     string           `json:"giphyLang"`    // "" = Match System
+	KlipyCountry  string           `json:"klipyCountry"` // "" = Match System
+	Hotkeys       settings.Hotkeys `json:"hotkeys"`      // canonical; Open always set
+	// The download folder: full path for display and title only, its name, whether it is the
+	// default Downloads folder, and whether it is missing now.
+	DownloadDir        string `json:"downloadDir"`
+	DownloadDirName    string `json:"downloadDirName"`
+	DownloadDirDefault bool   `json:"downloadDirDefault"`
+	DownloadDirMissing bool   `json:"downloadDirMissing"`
+	HideFilenames      bool   `json:"hideFilenames"`
+	PrimaryAction      string `json:"primaryAction"`    // resolved: never ""
+	SecondaryAction    string `json:"secondaryAction"`  // resolved: never ""
+	GridSearch         string `json:"gridSearch"`       // resolved: never ""
+	GridTrending       string `json:"gridTrending"`     // resolved: never ""
+	KlipyFileActions   bool   `json:"klipyFileActions"` // read-only: KlipyFileActionsCleared
+	UpdateCheck        bool   `json:"updateCheck"`      // automatic update checks on (= !UpdateCheckOff)
+	Version            string `json:"version"`          // services.Version, shown in About
+}
+
+// Choices are the allowed Search-pane values, with what Match System resolves to now.
+type Choices struct {
+	Ratings        []string `json:"ratings"`
+	PageSizes      []int    `json:"pageSizes"`
+	Languages      []string `json:"languages"`
+	Countries      []string `json:"countries"`
+	SystemLanguage string   `json:"systemLanguage"`
+	SystemCountry  string   `json:"systemCountry"`
+}
+
+// Choices lists the Search-pane options; the webview names them.
+func (s *SettingsService) Choices(ctx context.Context) Choices {
+	lang, country := s.systemParams()
+	return Choices{Ratings: provider.Ratings, PageSizes: provider.PageSizes, Languages: giphy.Languages, Countries: klipy.Countries,
+		SystemLanguage: lang, SystemCountry: country}
+}
+
+// systemParams is what Match System means now: the macOS language mapped to a GIPHY code
+// (else English) and the macOS region if it is a known country (else the United States).
+func (s *SettingsService) systemParams() (lang, country string) {
+	l, r := s.Platform.SystemLocale()
+	lang, country = giphyLang(l), strings.ToLower(r)
+	if !slices.Contains(klipy.Countries, country) {
+		country = provider.DefaultParams().Country
+	}
+	return lang, country
+}
+
+// giphyLang maps a BCP 47 tag ("pt-BR", "zh-Hant-TW") to a GIPHY lang code, or "en".
+func giphyLang(tag string) string {
+	parts := strings.Split(strings.ReplaceAll(tag, "_", "-"), "-")
+	code := strings.ToLower(parts[0])
+	switch code {
+	case "zh":
+		for _, p := range parts[1:] {
+			if p == "Hant" || p == "TW" || p == "HK" || p == "MO" {
+				return "zh-TW"
+			}
+		}
+		return "zh-CN"
+	case "nb", "nn":
+		code = "no"
+	case "fil":
+		code = "tl"
+	case "iw":
+		code = "he"
+	}
+	if slices.Contains(giphy.Languages, code) {
+		return code
+	}
+	return provider.DefaultParams().Lang
+}
+
+// Params are the provider parameters for the next request: the defaults overlaid with the
+// stored choices. Clients call it on every request.
+func (s *SettingsService) Params() provider.Params { return s.paramsOf(s.Store.Get()) }
+
+func (s *SettingsService) paramsOf(p settings.Prefs) provider.Params {
+	prm := provider.DefaultParams()
+	if p.GiphyRating != "" {
+		prm.Rating = p.GiphyRating
+	}
+	if p.PageSize != 0 {
+		prm.PageSize = p.PageSize
+	}
+	prm.Lang, prm.Country = p.GiphyLang, p.KlipyCountry
+	if prm.Lang == "" || prm.Country == "" { // Match System, resolved per request
+		lang, country := s.systemParams()
+		prm.Lang, prm.Country = cmp.Or(prm.Lang, lang), cmp.Or(prm.Country, country)
+	}
+	return prm
+}
+
+func (s *SettingsService) Snapshot(ctx context.Context) Snapshot { return s.snapshotOf(s.Store.Get()) }
+
+// snapshotOf reports launchAtLogin from the OS, not the pref: the checkbox shows what will happen.
+func (s *SettingsService) snapshotOf(p settings.Prefs) Snapshot {
+	on, err := s.Autostart.IsEnabled()
+	if err != nil {
+		log.Printf("autostart: status failed")
+	}
+	prm := s.paramsOf(p)
+	dir, _ := filepath.Abs(cmp.Or(p.DownloadDir, s.DefaultDownloads))
+	fi, statErr := os.Stat(dir)
+	return Snapshot{Theme: p.Theme, LaunchAtLogin: on && err == nil, GiphyRating: prm.Rating, PageSize: prm.PageSize,
+		GiphyLang: p.GiphyLang, KlipyCountry: p.KlipyCountry, Hotkeys: s.Hotkeys.Bindings(),
+		DownloadDir: dir, DownloadDirName: filepath.Base(dir), DownloadDirDefault: p.DownloadDir == "",
+		DownloadDirMissing: statErr != nil || !fi.IsDir(), HideFilenames: p.HideFilenames,
+		PrimaryAction: cmp.Or(p.PrimaryAction, settings.DefaultPrimary), SecondaryAction: cmp.Or(p.SecondaryAction, settings.DefaultSecondary),
+		GridSearch: cmp.Or(p.GridSearch, "medium"), GridTrending: cmp.Or(p.GridTrending, "medium"), KlipyFileActions: s.KlipyFileActions,
+		UpdateCheck: !p.UpdateCheckOff, Version: Version}
+}
+
+var errUnchanged = errors.New("unchanged")
+
+// SetPref sets one allow-listed pref from the webview, validated here; an equal value is a no-op.
+// Each write emits settings:changed with the full Snapshot so the panel and Settings converge.
+// A provider parameter also flushes the affected providers' cached pages (never their 429 block).
+func (s *SettingsService) SetPref(ctx context.Context, name, value string) (Snapshot, error) {
+	var set func(*settings.Prefs)
+	var flush []provider.ID
+	switch name {
+	case "theme":
+		set = func(p *settings.Prefs) { p.Theme = value }
+	case "hideFilenames":
+		if value != "true" && value != "false" {
+			return s.Snapshot(ctx), errInvalidValue
+		}
+		set = func(p *settings.Prefs) { p.HideFilenames = value == "true" }
+	case "updateCheck": // stored inverted: the zero value means automatic checks on
+		if value != "true" && value != "false" {
+			return s.Snapshot(ctx), errInvalidValue
+		}
+		set = func(p *settings.Prefs) { p.UpdateCheckOff = value == "false" }
+	case "primaryAction", "secondaryAction":
+		if !slices.Contains(settings.Actions, value) {
+			return s.Snapshot(ctx), errInvalidValue
+		}
+		// Choosing the other key's action swaps the two, so ↵ and ⌘↵ always differ.
+		set = func(p *settings.Prefs) {
+			pri, sec := cmp.Or(p.PrimaryAction, settings.DefaultPrimary), cmp.Or(p.SecondaryAction, settings.DefaultSecondary)
+			if name == "primaryAction" {
+				if value == sec {
+					sec = pri
+				}
+				pri = value
+			} else {
+				if value == pri {
+					pri = sec
+				}
+				sec = value
+			}
+			p.PrimaryAction, p.SecondaryAction = defaultAsEmpty(pri, settings.DefaultPrimary), defaultAsEmpty(sec, settings.DefaultSecondary)
+		}
+	case "gridSearch", "gridTrending": // layout only: no cache flush
+		if !slices.Contains(settings.GridSizes, value) {
+			return s.Snapshot(ctx), errInvalidValue
+		}
+		v := defaultAsEmpty(value, "medium")
+		set = func(p *settings.Prefs) {
+			if name == "gridSearch" {
+				p.GridSearch = v
+			} else {
+				p.GridTrending = v
+			}
+		}
+	case "giphyRating":
+		if !slices.Contains(provider.Ratings, value) {
+			return s.Snapshot(ctx), errInvalidValue
+		}
+		set = func(p *settings.Prefs) { p.GiphyRating = defaultAsEmpty(value, provider.DefaultParams().Rating) }
+		flush = []provider.ID{provider.GIPHY} // Clips share GIPHY's budget, so their pages go too
+	case "pageSize":
+		n, err := strconv.Atoi(value)
+		if err != nil || strconv.Itoa(n) != value || !slices.Contains(provider.PageSizes, n) {
+			return s.Snapshot(ctx), errInvalidValue
+		}
+		if n == provider.DefaultPageSize {
+			n = 0
+		}
+		set = func(p *settings.Prefs) { p.PageSize = n }
+		flush = []provider.ID{provider.GIPHY, provider.Klipy, provider.FinerGifs}
+	case "giphyLang": // "" = Match System
+		if value != "" && !slices.Contains(giphy.Languages, value) {
+			return s.Snapshot(ctx), errInvalidValue
+		}
+		set = func(p *settings.Prefs) { p.GiphyLang = value }
+		flush = []provider.ID{provider.GIPHY}
+	case "klipyCountry": // "" = Match System
+		if value != "" && !slices.Contains(klipy.Countries, value) {
+			return s.Snapshot(ctx), errInvalidValue
+		}
+		set = func(p *settings.Prefs) { p.KlipyCountry = value }
+		flush = []provider.ID{provider.Klipy}
+	default:
+		return s.Snapshot(ctx), errInvalidValue
+	}
+	p, err := s.Store.Update(func(p *settings.Prefs) error {
+		before := *p
+		set(p)
+		if len(p.Normalize()) > 0 {
+			return errInvalidValue
+		}
+		if *p == before {
+			return errUnchanged
+		}
+		return nil
+	})
+	switch {
+	case errors.Is(err, errUnchanged):
+		return s.snapshotOf(p), nil
+	case errors.Is(err, errInvalidValue):
+		return s.snapshotOf(p), err
+	case err != nil:
+		log.Printf("settings write failed: %s", name)
+		return s.snapshotOf(p), errPrefsWriteFailed
+	}
+	if name == "theme" && s.ApplyTheme != nil {
+		s.ApplyTheme(p.Theme)
+	}
+	for _, id := range flush {
+		s.Svc.Flush(id)
+	}
+	snap := s.snapshotOf(p)
+	if s.Emit != nil {
+		s.Emit("settings:changed", snap)
+	}
+	return snap, nil
+}
+
+// defaultAsEmpty stores the default as "", so choosing it when nothing is stored is a no-op.
+func defaultAsEmpty(v, def string) string {
+	if v == def {
+		return ""
+	}
+	return v
+}
+
+// LastProvider is the persisted provider id, or "" on first run or an unreadable file.
+func (s *SettingsService) LastProvider(ctx context.Context) string {
+	lp := s.Store.Get().LastProvider
+	if _, ok := provider.ParseID(lp); !ok {
+		return ""
+	}
+	return lp
+}
+
+// SetLastProvider persists the provider tab to reopen on next launch (no event: a tab switch).
 func (s *SettingsService) SetLastProvider(ctx context.Context, p string) error {
 	id, err := parse(p)
 	if err != nil {
 		return err
 	}
-	// No lock: each write is its own temp file + rename, so the last one wins whole.
-	return settings.SavePrefs(s.Dir, settings.Prefs{LastProvider: string(id)})
+	if _, err := s.Store.Update(func(p *settings.Prefs) error { p.LastProvider = string(id); return nil }); err != nil {
+		log.Printf("settings write failed: lastProvider")
+		return errPrefsWriteFailed
+	}
+	return nil
+}
+
+// SetLaunchAtLogin registers or removes the login item now and persists the choice for ApplyStartup.
+func (s *SettingsService) SetLaunchAtLogin(ctx context.Context, on bool) (Snapshot, error) {
+	if on {
+		// A copy run from the DMG or a translocated path would register a login item that goes away.
+		exe, err := s.Executable()
+		if err == nil && (strings.Contains(exe, "/AppTranslocation/") || strings.HasPrefix(exe, "/Volumes/")) {
+			log.Printf("autostart: not enabled, the app is not in Applications")
+			return s.Snapshot(ctx), errNotInApplications
+		}
+	}
+	op, apply := "disable", s.Autostart.Disable
+	if on {
+		op, apply = "enable", s.Autostart.Enable
+	}
+	if err := apply(); err != nil {
+		log.Printf("autostart: %s failed", op)
+		return s.Snapshot(ctx), errAutostartFailed
+	}
+	p, err := s.Store.Update(func(p *settings.Prefs) error { p.LaunchAtLogin = on; return nil })
+	if err != nil {
+		log.Printf("settings write failed: launchAtLogin")
+		return s.snapshotOf(p), errPrefsWriteFailed
+	}
+	snap := s.snapshotOf(p)
+	if s.Emit != nil {
+		s.Emit("settings:changed", snap)
+	}
+	return snap, nil
+}
+
+// ApplyStartup runs once at launch: when the pref is on and the OS reports the login item off,
+// register it again. It never disables. Risk (A4): IsEnabled also reports "off" for an item the user
+// switched off in System Settings, so this re-registers it; verify natively what register does then.
+func (s *SettingsService) ApplyStartup() {
+	if !s.Store.Get().LaunchAtLogin {
+		return
+	}
+	on, err := s.Autostart.IsEnabled()
+	switch {
+	case err != nil:
+		log.Printf("autostart: status failed at startup")
+	case on:
+		log.Printf("autostart: login item registered")
+	default:
+		if err := s.Autostart.Enable(); err != nil {
+			log.Printf("autostart: re-enable at startup failed")
+			return
+		}
+		log.Printf("autostart: re-enabled at startup")
+	}
+}
+
+// AccessibilityStatus reports the Automatic paste grant without prompting.
+func (s *SettingsService) AccessibilityStatus(ctx context.Context) bool {
+	return s.Platform.AccessibilityTrusted(false)
+}
+
+// SetHotkey binds slot to accel ("" clears favorites/recents) and stores the canonical form.
+// Hotkeys resume first, so a recorder never leaves them suspended; the Store changes only after
+// the Registrar accepted the new binding.
+func (s *SettingsService) SetHotkey(ctx context.Context, slot, accel string) (Snapshot, error) {
+	s.hkMu.Lock()
+	defer s.hkMu.Unlock()
+	s.Hotkeys.Resume()
+	if err := s.Hotkeys.Bind(slot, accel); err != nil {
+		return s.Snapshot(ctx), err
+	}
+	b := s.Hotkeys.Bindings()
+	c := *slotOf(&b, slot)
+	p, err := s.Store.Update(func(p *settings.Prefs) error {
+		before := p.Hotkeys
+		*slotOf(&p.Hotkeys, slot) = c
+		if slot == "open" {
+			p.Hotkeys.Open = defaultAsEmpty(c, DefaultOpenHotkey)
+		}
+		if p.Hotkeys == before {
+			return errUnchanged
+		}
+		return nil
+	})
+	switch {
+	case errors.Is(err, errUnchanged):
+		return s.snapshotOf(p), nil
+	case err != nil:
+		log.Printf("settings write failed: hotkeys.%s", slot)
+		return s.snapshotOf(p), errPrefsWriteFailed
+	}
+	if slot == "open" && s.OnOpenHotkey != nil {
+		s.OnOpenHotkey(c)
+	}
+	snap := s.snapshotOf(p)
+	s.emit("settings:changed", snap)
+	return snap, nil
+}
+
+// SuspendHotkeys unregisters every Gifsmith hotkey while a recorder is capturing keys.
+func (s *SettingsService) SuspendHotkeys(ctx context.Context) { s.Hotkeys.Suspend() }
+
+// ResumeHotkeys registers them again; also called when the Settings window hides or loses focus.
+func (s *SettingsService) ResumeHotkeys(ctx context.Context) { s.Hotkeys.Resume() }
+
+// TestHotkey makes slot's next press within 5 s emit hotkey:test {slot}.
+func (s *SettingsService) TestHotkey(ctx context.Context, slot string) error {
+	return s.Hotkeys.ArmTest(slot)
+}
+
+// DownloadDir is where the next download goes: the chosen folder, else DefaultDownloads.
+// Download calls it each time, so a change made during a download applies to the next one.
+func (s *SettingsService) DownloadDir() string {
+	return cmp.Or(s.Store.Get().DownloadDir, s.DefaultDownloads)
+}
+
+// HideFilenames reports the Hide original file names choice.
+func (s *SettingsService) HideFilenames() bool { return s.Store.Get().HideFilenames }
+
+// ChooseDownloadDir shows the folder picker and saves the picked folder only if
+// ValidateDownloadDir accepts it; a cancel changes nothing. It takes no path from the webview.
+func (s *SettingsService) ChooseDownloadDir(ctx context.Context) (Snapshot, error) {
+	if s.PickFolder == nil {
+		return s.Snapshot(ctx), errPickerFailed
+	}
+	dir, err := s.PickFolder(s.DownloadDir())
+	if err != nil {
+		log.Printf("folder picker: %v", err)
+		return s.Snapshot(ctx), errPickerFailed
+	}
+	if dir == "" {
+		return s.Snapshot(ctx), nil
+	}
+	if dir, err = filepath.Abs(dir); err != nil {
+		return s.Snapshot(ctx), errPickerFailed
+	}
+	if err := ValidateDownloadDir(dir, Statfs); err != nil {
+		log.Printf("download folder refused: %v", err) // fixed text, no path
+		return s.Snapshot(ctx), err
+	}
+	def, _ := filepath.Abs(s.DefaultDownloads)
+	return s.setDownloadDir(defaultAsEmpty(dir, def))
+}
+
+// ResetDownloadDir goes back to the default Downloads folder.
+func (s *SettingsService) ResetDownloadDir(ctx context.Context) (Snapshot, error) {
+	return s.setDownloadDir("")
+}
+
+func (s *SettingsService) setDownloadDir(dir string) (Snapshot, error) {
+	p, err := s.Store.Update(func(p *settings.Prefs) error {
+		if p.DownloadDir == dir {
+			return errUnchanged
+		}
+		p.DownloadDir = dir
+		return nil
+	})
+	switch {
+	case errors.Is(err, errUnchanged):
+		return s.snapshotOf(p), nil
+	case err != nil:
+		log.Printf("settings write failed: downloadDir")
+		return s.snapshotOf(p), errPrefsWriteFailed
+	}
+	snap := s.snapshotOf(p)
+	s.emit("settings:changed", snap)
+	return snap, nil
 }

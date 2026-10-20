@@ -1,10 +1,15 @@
 package settings
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"gifsmith/internal/provider"
@@ -80,6 +85,7 @@ type failingStore struct{}
 
 func (failingStore) Get(string) (string, error) { return "", errors.New("boom") }
 func (failingStore) Set(string, string) error   { return errors.New("boom") }
+func (failingStore) Delete(string) error        { return errors.New("boom") }
 
 func TestKeysStoreFailures(t *testing.T) {
 	k := NewKeys(failingStore{})
@@ -114,18 +120,38 @@ func TestKeyringStoreErrors(t *testing.T) {
 	}
 }
 
-func TestPrefsRoundTrip(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "com.kenscott.gifsmith")
-	p, err := LoadPrefs(dir)
-	if err != nil || p != (Prefs{}) {
-		t.Fatalf("missing dir: %+v, %v; want zero Prefs, nil", p, err)
-	}
-	if err := SavePrefs(dir, Prefs{LastProvider: "klipy"}); err != nil {
+func readPrefsFile(t *testing.T, dir string) map[string]any {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(dir, "settings.json"))
+	if err != nil {
 		t.Fatal(err)
 	}
-	p, err = LoadPrefs(dir)
-	if err != nil || p.LastProvider != "klipy" {
-		t.Fatalf("LoadPrefs = %+v, %v", p, err)
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatalf("settings.json = %q: %v", b, err)
+	}
+	return m
+}
+
+func TestStoreFirstRunAndWrite(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "com.kenscott.gifsmith")
+	s := OpenStore(dir)
+	if got := s.Get(); got != (Prefs{}) {
+		t.Fatalf("first run Get = %+v, want zero Prefs", got)
+	}
+	if _, err := os.Stat(dir); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("OpenStore created %s (err %v); first run writes nothing", dir, err)
+	}
+	p, err := s.Update(func(p *Prefs) error { p.Theme = "dark"; return nil })
+	if err != nil || p.Theme != "dark" || s.Get().Theme != "dark" {
+		t.Fatalf("Update = %+v, %v; Get = %+v", p, err, s.Get())
+	}
+	m := readPrefsFile(t, dir)
+	if m["theme"] != "dark" {
+		t.Errorf("settings.json theme = %v, want dark", m["theme"])
+	}
+	if _, ok := m["lastProvider"]; !ok {
+		t.Errorf("settings.json lacks lastProvider: %v", m)
 	}
 	fi, err := os.Stat(filepath.Join(dir, "settings.json"))
 	if err != nil {
@@ -138,15 +164,115 @@ func TestPrefsRoundTrip(t *testing.T) {
 	if len(entries) != 1 {
 		t.Errorf("dir holds %d entries, want only settings.json (no temp files)", len(entries))
 	}
+	if got := OpenStore(dir).Get(); got.Theme != "dark" {
+		t.Errorf("reopened Get = %+v, want theme dark", got)
+	}
 }
 
-func TestPrefsInvalidJSON(t *testing.T) {
+// Each Update changes only what its mutator touches: the old SavePrefs(Prefs{...}) erased the rest.
+func TestStoreUpdateKeepsOtherFields(t *testing.T) {
+	dir := t.TempDir()
+	s := OpenStore(dir)
+	if _, err := s.Update(func(p *Prefs) error { p.LastProvider = "klipy"; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Update(func(p *Prefs) error { p.Theme = "light"; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	m := readPrefsFile(t, dir)
+	if m["lastProvider"] != "klipy" || m["theme"] != "light" {
+		t.Errorf("settings.json = %v, want lastProvider klipy and theme light", m)
+	}
+}
+
+func TestStoreUnknownEnumResets(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(`{"lastProvider":"giphy","theme":"neon"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := OpenStore(dir).Get()
+	if got.Theme != "" || got.LastProvider != "giphy" {
+		t.Errorf("Get = %+v, want theme reset to \"\" and lastProvider giphy kept", got)
+	}
+	if !strings.Contains(buf.String(), "theme") {
+		t.Errorf("log %q does not name the reset field", buf.String())
+	}
+}
+
+func TestStoreUnreadableIsFirstRun(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte("{nope"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := LoadPrefs(dir); err == nil {
-		t.Error("invalid JSON loaded without error")
+	if got := OpenStore(dir).Get(); got != (Prefs{}) {
+		t.Errorf("unreadable file: Get = %+v, want zero Prefs", got)
+	}
+	if buf.Len() == 0 {
+		t.Error("unreadable settings file was not logged")
+	}
+}
+
+func TestStoreWriteFailureKeepsPrefs(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(dir, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := OpenStore(dir) // the "dir" is a file: every write fails
+	if _, err := s.Update(func(p *Prefs) error { p.Theme = "dark"; return nil }); err == nil {
+		t.Fatal("Update into a file-as-dir succeeded")
+	}
+	if got := s.Get(); got != (Prefs{}) {
+		t.Errorf("Get after a failed write = %+v, want unchanged zero Prefs", got)
+	}
+	mutErr := errors.New("refused")
+	if _, err := OpenStore(t.TempDir()).Update(func(p *Prefs) error { p.Theme = "dark"; return mutErr }); !errors.Is(err, mutErr) {
+		t.Errorf("mutator error = %v, want it returned", err)
+	}
+}
+
+func TestStoreLaunchAtLoginRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := OpenStore(dir).Update(func(p *Prefs) error { p.LaunchAtLogin = true; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if m := readPrefsFile(t, dir); m["launchAtLogin"] != true {
+		t.Errorf("settings.json = %v, want launchAtLogin true", m)
+	}
+	if !OpenStore(dir).Get().LaunchAtLogin {
+		t.Error("reopened store lost launchAtLogin")
+	}
+}
+
+func TestStoreConcurrentUpdates(t *testing.T) {
+	dir := t.TempDir()
+	s := OpenStore(dir)
+	var wg sync.WaitGroup
+	for i := range 50 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var err error
+			if i%2 == 0 {
+				_, err = s.Update(func(p *Prefs) error { p.LastProvider = "klipy"; return nil })
+			} else {
+				_, err = s.Update(func(p *Prefs) error { p.Theme = "dark"; return nil })
+			}
+			if err != nil {
+				t.Error(err)
+			}
+			_ = s.Get()
+		}()
+	}
+	wg.Wait()
+	m := readPrefsFile(t, dir)
+	if m["lastProvider"] != "klipy" || m["theme"] != "dark" {
+		t.Errorf("settings.json = %v, want both fields after concurrent updates", m)
 	}
 }
 
@@ -194,5 +320,191 @@ func TestWriteJSONAtomicFailureKeepsPrevious(t *testing.T) {
 	ents, _ := os.ReadDir(dir)
 	if len(ents) != 2 {
 		t.Errorf("dir holds %d entries, want list.json and busy.json only (no temp files)", len(ents))
+	}
+}
+
+func TestStoreNormalizeSearchPrefs(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(`{"giphyRating":"x","pageSize":30,"giphyLang":"xx","klipyCountry":"zz"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := OpenStore(dir).Get()
+	if got.GiphyRating != "" || got.PageSize != 0 || got.GiphyLang != "" || got.KlipyCountry != "" {
+		t.Errorf("Get = %+v, want every search pref reset", got)
+	}
+	for _, f := range []string{"giphyRating", "pageSize", "giphyLang", "klipyCountry"} {
+		if !strings.Contains(buf.String(), "reset "+f) {
+			t.Errorf("log %q does not name %s", buf.String(), f)
+		}
+	}
+	ok := Prefs{GiphyRating: "r", PageSize: 48, GiphyLang: "zh-TW", KlipyCountry: "de"}
+	if p := ok; len(p.Normalize()) != 0 || p != ok {
+		t.Errorf("valid prefs %+v were reset", ok)
+	}
+}
+
+func TestMemoryStoreDelete(t *testing.T) {
+	s := NewMemoryStore()
+	_ = s.Set("giphy", "uat-key-123")
+	if err := s.Delete("giphy"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Get("giphy"); !errors.Is(err, ErrNoKey) {
+		t.Errorf("Get after Delete: %v, want ErrNoKey", err)
+	}
+	if err := s.Delete("giphy"); err != nil {
+		t.Errorf("Delete of an absent account = %v, want nil", err)
+	}
+}
+
+func TestKeyringStoreDelete(t *testing.T) {
+	keyring.MockInit() // in-memory provider: never touches the login Keychain
+	s := KeyringStore{Service: "gifsmith-test"}
+	if err := s.Set("giphy", "SECRETKEY123"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Delete("giphy"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Get("giphy"); !errors.Is(err, ErrNoKey) {
+		t.Errorf("Get after Delete: %v, want ErrNoKey", err)
+	}
+	if err := s.Delete("giphy"); err != nil {
+		t.Errorf("Delete of an absent item = %v, want nil (ErrNotFound maps to nil)", err)
+	}
+	keyring.MockInitWithError(errors.New("security: SECRETKEY123 exit status 45"))
+	err := s.Delete("giphy")
+	if err == nil || err.Error() != "keychain delete failed" {
+		t.Errorf("Delete on a failing Keychain = %v, want the fixed text", err)
+	}
+}
+
+func TestKeysDeleteAndRejected(t *testing.T) {
+	k := NewKeys(NewMemoryStore())
+	if err := k.Set(provider.GIPHY, "uat-key-123"); err != nil {
+		t.Fatal(err)
+	}
+	k.MarkRejected(provider.GIPHY)
+	if !k.Rejected(provider.GIPHY) || k.Rejected(provider.Klipy) {
+		t.Fatal("MarkRejected(giphy) not recorded for GIPHY only")
+	}
+	_ = k.Set(provider.GIPHY, "uat-key-456")
+	if k.Rejected(provider.GIPHY) {
+		t.Error("Set did not clear Rejected")
+	}
+	k.MarkRejected(provider.GIPHY)
+	if err := k.Delete(provider.GIPHY); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := k.Get(provider.GIPHY); ok || k.Rejected(provider.GIPHY) {
+		t.Error("Delete left the key or the rejected flag")
+	}
+	f := NewKeys(failingStore{})
+	f.m[provider.GIPHY] = "uat-key-123"
+	if err := f.Delete(provider.GIPHY); err == nil {
+		t.Fatal("Delete succeeded on a failing store")
+	}
+	if v, ok := f.Get(provider.GIPHY); !ok || v != "uat-key-123" {
+		t.Error("a failed store delete changed the cache")
+	}
+}
+
+func TestStoreNormalizeHotkeys(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	dir := t.TempDir()
+	stored := `{"hotkeys":{"open":"Cmd+Q","favorites":"Ctrl+Option+Cmd+F","recents":"Cmd+Ctrl+Option+F"}}`
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(stored), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := OpenStore(dir).Get().Hotkeys; got != (Hotkeys{Favorites: "Cmd+Ctrl+Option+F"}) {
+		t.Errorf("Hotkeys = %+v, want Open reset, Favorites canonical, Recents (a duplicate) reset", got)
+	}
+	for _, f := range []string{"hotkeys.open", "hotkeys.recents"} {
+		if !strings.Contains(buf.String(), "reset "+f) {
+			t.Errorf("log %q does not name %s", buf.String(), f)
+		}
+	}
+	for _, c := range []struct {
+		in, want Hotkeys
+		reset    []string
+	}{
+		{Hotkeys{Open: "garbage"}, Hotkeys{}, []string{"hotkeys.open"}},
+		{Hotkeys{Open: "Shift+G"}, Hotkeys{}, []string{"hotkeys.open"}},
+		{Hotkeys{Favorites: "Ctrl+Option+Cmd+G"}, Hotkeys{}, []string{"hotkeys.favorites"}}, // equals the default Open
+		{Hotkeys{Open: "Cmd+Ctrl+Option+H", Recents: "Cmd+Ctrl+Option+H"}, Hotkeys{Open: "Cmd+Ctrl+Option+H"}, []string{"hotkeys.recents"}},
+		{Hotkeys{Open: "Cmd+Ctrl+Option+G"}, Hotkeys{}, nil}, // the default is stored as ""
+		{Hotkeys{Open: "Cmd+Ctrl+Option+H", Favorites: "Cmd+Ctrl+Option+G"}, Hotkeys{Open: "Cmd+Ctrl+Option+H", Favorites: "Cmd+Ctrl+Option+G"}, nil},
+	} {
+		p := Prefs{Hotkeys: c.in}
+		reset := p.Normalize()
+		if p.Hotkeys != c.want || !slices.Equal(reset, c.reset) {
+			t.Errorf("Normalize(%+v) = %+v, reset %v; want %+v, %v", c.in, p.Hotkeys, reset, c.want, c.reset)
+		}
+	}
+}
+
+func TestStoreNormalizeDownloadDir(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(`{"downloadDir":"bin/somewhere"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := OpenStore(dir).Get().DownloadDir; got != "" {
+		t.Errorf("relative DownloadDir kept as %q, want reset to \"\"", got)
+	}
+	if !strings.Contains(buf.String(), "reset downloadDir") {
+		t.Errorf("log %q does not name downloadDir", buf.String())
+	}
+	ok := Prefs{DownloadDir: "/Users/someone/GIFs"}
+	if p := ok; len(p.Normalize()) != 0 || p != ok {
+		t.Errorf("absolute DownloadDir %+v was reset", ok)
+	}
+}
+
+func TestNormalizeDefaultActionsAndGrid(t *testing.T) {
+	for _, c := range []struct{ in, want Prefs }{
+		{Prefs{PrimaryAction: "copySquare", SecondaryAction: "nope"}, Prefs{}},
+		{Prefs{PrimaryAction: "copyLink", SecondaryAction: "copyLink"}, Prefs{PrimaryAction: "copyLink"}},
+		{Prefs{PrimaryAction: "paste"}, Prefs{}}, // paste collides with the default ⌘↵: primary goes back to copy
+		{Prefs{GridSearch: "huge", GridTrending: "small"}, Prefs{GridTrending: "small"}},
+	} {
+		p := c.in
+		if p.Normalize(); p != c.want {
+			t.Errorf("Normalize(%+v) = %+v, want %+v", c.in, p, c.want)
+		}
+	}
+	ok := Prefs{PrimaryAction: "download", SecondaryAction: "pasteMarkdown", GridSearch: "large", GridTrending: "small"}
+	if p := ok; len(p.Normalize()) != 0 || p != ok {
+		t.Errorf("valid prefs %+v were reset", ok)
+	}
+}
+
+// updateCheckOff's zero value means automatic update checks are on (D-28).
+func TestStoreUpdateCheckOff(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "com.kenscott.gifsmith")
+	if OpenStore(dir).Get().UpdateCheckOff {
+		t.Fatal("a missing file loads with automatic checks off")
+	}
+	if _, err := OpenStore(dir).Update(func(p *Prefs) error { p.UpdateCheckOff = true; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if m := readPrefsFile(t, dir); m["updateCheckOff"] != true {
+		t.Errorf("settings.json = %v, want updateCheckOff true", m)
+	}
+	if !OpenStore(dir).Get().UpdateCheckOff {
+		t.Error("updateCheckOff not kept")
+	}
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(`{"lastProvider":"giphy"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if OpenStore(dir).Get().UpdateCheckOff {
+		t.Error("a file without the key loads with automatic checks off")
 	}
 }

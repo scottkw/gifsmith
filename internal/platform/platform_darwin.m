@@ -201,6 +201,26 @@ int gsActivate(int pid) {
     return ok;
 }
 
+// 0 = follow the system (nil), 1 = Aqua, 2 = DarkAqua; app-wide, so both windows and their
+// WKWebViews (prefers-color-scheme) follow it.
+void gsSetAppearance(int mode) {
+    onMain(^{ @autoreleasepool {
+        NSAppearance *a = nil;
+        if (mode == 1) a = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
+        if (mode == 2) a = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+        NSApp.appearance = a;
+    }});
+}
+
+// "lang|region", strdup'd (the caller frees). NSLocale is thread-safe, so no main-thread hop.
+char *gsSystemLocale(void) {
+    @autoreleasepool {
+        NSString *lang = NSLocale.preferredLanguages.firstObject ?: @"";
+        NSString *region = NSLocale.currentLocale.countryCode ?: @"";
+        return strdup([NSString stringWithFormat:@"%@|%@", lang, region].UTF8String);
+    }
+}
+
 int gsOpenAXSettings(void) {
     __block int ok = 0;
     onMain(^{ @autoreleasepool {
