@@ -25,6 +25,8 @@ type Shell struct {
 	// settings is a normal titled window, created hidden once and never closed.
 	settings *application.WebviewWindow
 	openItem *application.MenuItem // tray "Open Gifsmith"; shows the Open hotkey
+	// updateItem is the tray "Update to Gifsmith {latest}…" item, hidden until a check finds one.
+	updateItem *application.MenuItem
 	// OnSettingsInactive runs when Settings hides or loses focus (main: resume suspended hotkeys).
 	// Set before app.Run.
 	OnSettingsInactive func()
@@ -106,6 +108,7 @@ func New(app *application.App, plat platform.Platform, trayIcon []byte) *Shell {
 	s.openItem = menu.Add("Open Gifsmith").OnClick(func(*application.Context) { s.Show() })
 	// Key equivalents are display only: a tray menu takes keys only while it is open.
 	menu.Add("Settings…").SetAccelerator("CmdOrCtrl+,").OnClick(func(*application.Context) { s.OpenSettings() })
+	s.updateItem = menu.Add("Update to Gifsmith…").SetHidden(true).OnClick(func(*application.Context) { s.RevealUpdates() })
 	menu.AddSeparator()
 	menu.Add("Quit Gifsmith").SetAccelerator("CmdOrCtrl+Q").OnClick(func(*application.Context) { app.Quit() })
 	tray.SetMenu(menu)
@@ -170,6 +173,23 @@ func (s *Shell) ShowTab(tab string) {
 // SetOpenAccelerator shows accel as the tray Open Gifsmith key equivalent.
 func (s *Shell) SetOpenAccelerator(accel string) {
 	application.InvokeSync(func() { s.openItem.SetAccelerator(accel) }) // AppKit: main thread only
+}
+
+// SetUpdate shows the tray item for version ("" hides it). The MenuItem setters dispatch to the
+// main thread themselves, so this takes no lock.
+func (s *Shell) SetUpdate(version string) {
+	if version == "" {
+		s.updateItem.SetHidden(true)
+		return
+	}
+	s.updateItem.SetLabel("Update to Gifsmith " + version + "…")
+	s.updateItem.SetHidden(false)
+}
+
+// RevealUpdates opens Settings at General with the Updates section in view.
+func (s *Shell) RevealUpdates() {
+	s.app.Event.Emit("settings:reveal", "updates")
+	s.OpenSettings()
 }
 
 func (s *Shell) settingsInactive() {

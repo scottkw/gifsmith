@@ -32,6 +32,13 @@ export function Download(): $CancellablePromise<$models.UpdateStatus> {
     return $Call.ByID(3960671023);
 }
 
+/**
+ * Reveal opens Settings at General → Updates (the panel toast's View action).
+ */
+export function Reveal(): $CancellablePromise<void> {
+    return $Call.ByID(3944592734);
+}
+
 export function Status(): $CancellablePromise<$models.UpdateStatus> {
     return $Call.ByID(294379533);
 }

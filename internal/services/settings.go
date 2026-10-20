@@ -323,7 +323,8 @@ func (s *SettingsService) snapshotOf(p settings.Prefs) Snapshot {
 		DownloadDir: dir, DownloadDirName: filepath.Base(dir), DownloadDirDefault: p.DownloadDir == "",
 		DownloadDirMissing: statErr != nil || !fi.IsDir(), HideFilenames: p.HideFilenames,
 		PrimaryAction: cmp.Or(p.PrimaryAction, settings.DefaultPrimary), SecondaryAction: cmp.Or(p.SecondaryAction, settings.DefaultSecondary),
-		GridSearch: cmp.Or(p.GridSearch, "medium"), GridTrending: cmp.Or(p.GridTrending, "medium"), KlipyFileActions: s.KlipyFileActions}
+		GridSearch: cmp.Or(p.GridSearch, "medium"), GridTrending: cmp.Or(p.GridTrending, "medium"), KlipyFileActions: s.KlipyFileActions,
+		UpdateCheck: !p.UpdateCheckOff}
 }
 
 var errUnchanged = errors.New("unchanged")
@@ -342,6 +343,11 @@ func (s *SettingsService) SetPref(ctx context.Context, name, value string) (Snap
 			return s.Snapshot(ctx), errInvalidValue
 		}
 		set = func(p *settings.Prefs) { p.HideFilenames = value == "true" }
+	case "updateCheck": // stored inverted: the zero value means automatic checks on
+		if value != "true" && value != "false" {
+			return s.Snapshot(ctx), errInvalidValue
+		}
+		set = func(p *settings.Prefs) { p.UpdateCheckOff = value == "false" }
 	case "primaryAction", "secondaryAction":
 		if !slices.Contains(settings.Actions, value) {
 			return s.Snapshot(ctx), errInvalidValue

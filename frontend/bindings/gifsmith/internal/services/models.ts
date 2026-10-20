@@ -120,6 +120,11 @@ export interface Snapshot {
      * read-only: KlipyFileActionsCleared
      */
     "klipyFileActions": boolean;
+
+    /**
+     * automatic update checks on (= !UpdateCheckOff)
+     */
+    "updateCheck": boolean;
 }
 
 /**

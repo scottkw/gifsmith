@@ -71,6 +71,8 @@ func wire() deps {
 		UpdateAllow: func(u *url.URL) bool { return u.Scheme == "http" && u.Host == host },
 		UpdateDir:   updateDir,
 		UpdateRun:   cannedVerify,
+		// The fixture's default answer is "available": automatic checks would toast every UAT run.
+		UpdateAuto: false,
 	}
 }
 

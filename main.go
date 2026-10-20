@@ -52,6 +52,7 @@ type deps struct {
 	UpdateAllow           func(*url.URL) bool                // allowed update download URLs and redirects
 	UpdateDir             string                             // update DMGs: the app cache's updates folder
 	UpdateRun             update.Runner                      // codesign/spctl/xattr; canned in the UAT build
+	UpdateAuto            bool                               // launch + 24 h checks; off in the UAT build (its fixture always has an update)
 }
 
 func main() {
@@ -169,6 +170,8 @@ func main() {
 	panel.HideFunc = sh.Hide
 	panel.OpenSettingsFunc = sh.OpenSettings
 	settingsSvc.ApplyTheme = sh.ApplyTheme
+	updates.OnAvailable = sh.SetUpdate
+	updates.RevealFunc = sh.RevealUpdates
 	// The stored theme drives native appearance and window backgrounds before any window shows.
 	// Hotkeys register once the app runs, so an OS rejection comes back to Start instead of the error handler.
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
@@ -176,6 +179,9 @@ func main() {
 		settingsSvc.ApplyStartup()
 		hk.Start(store.Get().Hotkeys)
 		sh.SetOpenAccelerator(hk.Bindings().Open)
+		if d.UpdateAuto { // about 10 s after launch, then daily, while the Settings box is on (D-28)
+			go services.RunAutoUpdates(app.Context(), updates, func() bool { return !store.Get().UpdateCheckOff }, 10*time.Second, 24*time.Hour)
+		}
 	})
 	if d.Registrar != nil {
 		hk.Start(store.Get().Hotkeys) // the server build's fake: server mode never fires ApplicationStarted (and has no tray)

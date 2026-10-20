@@ -95,6 +95,12 @@ func (u *UpdateService) Check(ctx context.Context) (UpdateStatus, error) {
 		newer, err = update.Compare(rel.Version, u.Current)
 	}
 
+	var avail string
+	defer func() { // after the unlock below: the tray setter waits on the main thread
+		if avail != "" && u.OnAvailable != nil {
+			u.OnAvailable(avail)
+		}
+	}()
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	switch {
@@ -107,7 +113,7 @@ func (u *UpdateService) Check(ctx context.Context) (UpdateStatus, error) {
 		log.Printf("update: no published release")
 	case newer > 0:
 		log.Printf("update: %s available", rel.Version)
-		u.rel = rel
+		u.rel, avail = rel, rel.Version
 		return u.set(UpdateStatus{State: "available", Latest: rel.Version}), nil
 	default:
 		log.Printf("update: up to date")
@@ -179,7 +185,27 @@ func (u *UpdateService) Download(context.Context) (UpdateStatus, error) {
 	return u.set(UpdateStatus{State: "opened", Latest: rel.Version}), nil
 }
 
-func (u *UpdateService) Reveal() {}
+// Reveal opens Settings at General → Updates (the panel toast's View action).
+func (u *UpdateService) Reveal() {
+	if u.RevealFunc != nil {
+		u.RevealFunc()
+	}
+}
 
+// RunAutoUpdates checks after delay and then every every while enabled() holds; failures only
+// log (Check does). A package func, not a method, so Wails never binds it to JS.
 func RunAutoUpdates(ctx context.Context, u *UpdateService, enabled func() bool, delay, every time.Duration) {
+	t := time.NewTimer(delay)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+		if enabled() {
+			_, _ = u.Check(ctx)
+		}
+		t.Reset(every)
+	}
 }

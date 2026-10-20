@@ -44,5 +44,6 @@ func wire() deps {
 		UpdateAllow:  update.GitHubAllow,
 		UpdateDir:    filepath.Join(cache, "com.kenscott.gifsmith", "updates"),
 		UpdateRun:    update.ExecRunner,
+		UpdateAuto:   true,
 	}
 }
