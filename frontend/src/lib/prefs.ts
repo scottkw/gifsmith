@@ -48,3 +48,8 @@ export function effectiveAction(g: Gif | undefined, which: 'primary' | 'secondar
 
 // Footer short label of an action (UI-SPEC "Footer hints").
 export const shortLabel = (id: ActionId): string => DEFAULT_ACTIONS.find((a) => a.id === id)?.short ?? id;
+
+// Grid size (UI-SPEC "Grid size"): columns, tile height and skeleton tiles; '' or unknown = medium.
+export const colsFor = (size: string): number => 4;
+export const tileHeight = (size: string): number => 144;
+export const skeletonCount = (size: string): number => 8;

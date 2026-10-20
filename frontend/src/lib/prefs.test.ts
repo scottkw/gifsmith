@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { countryOptions, DEFAULT_ACTIONS, effectiveAction, languageOptions, ratingLabel, shortLabel } from './prefs.ts';
+import { colsFor, countryOptions, DEFAULT_ACTIONS, skeletonCount, tileHeight, effectiveAction, languageOptions, ratingLabel, shortLabel } from './prefs.ts';
 import type { Gif } from './api';
 
 test('languageOptions puts Match System first, then languages by English name', () => {
@@ -60,4 +60,10 @@ test('DEFAULT_ACTIONS lists the seven choices in Settings order; shortLabel name
     DEFAULT_ACTIONS.map((a) => shortLabel(a.id)),
     ['Copy', 'Paste', 'Copy Link', 'Paste Link', 'Copy Markdown', 'Paste Markdown', 'Download'],
   );
+});
+
+test('colsFor, tileHeight and skeletonCount per grid size; unknown is Medium', () => {
+  assert.deepEqual(['small', 'medium', 'large', ''].map(colsFor), [5, 4, 3, 4]);
+  assert.deepEqual(['small', 'medium', 'large', ''].map(tileHeight), [112, 144, 192, 144]);
+  assert.deepEqual(['small', 'medium', 'large', ''].map(skeletonCount), [10, 8, 6, 8]);
 });
