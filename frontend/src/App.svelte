@@ -477,7 +477,7 @@
     menuOpen = detailsOpen = false;
     chip = -1;
     if (p !== active || libTab) {
-      if (p !== active) setLastProvider(p);
+      if (p !== active) setLastProvider(p).catch(() => {}); // prefs_unreadable is reported in Settings › General
       active = p;
       libTab = null;
       clearTransient();
