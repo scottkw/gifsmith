@@ -1,7 +1,7 @@
 ---
 phase: 01-native-spike-signed-dev-loop
 verified: 2026-10-20T19:21:04Z
-status: gaps_found
+status: passed
 score: 15/16 must-haves verified (1 failed: SC5 per-app paste matrix breadth; 0 behavior-unverified, 0 uncertain, 0 deferred)
 covered_files:
   - ".planning/phases/01-native-spike-signed-dev-loop/01-01-PLAN.md"
@@ -46,7 +46,12 @@ covered_files:
   - "wire_desktop.go"
 covered_digest: "v3:sha256:fafa3b4069af346673e555f0a7dc466a07d32dfde120bf304ce494a3a7ec123d"
 behavior_unverified: 0
-overrides_applied: 0
+overrides_applied: 1
+overrides:
+  - must_have: "ROADMAP SC5: a committed paste matrix records the result per target app (Slack, Messages, Mail, Discord, Notes, Telegram, Safari/Chrome composers)"
+    reason: "GO WITH FALLBACKS (2026-10-17) limit 2; v1.0.0 shipped with file-URL paste verified in TextEdit, Notes, Mail, Messages; remaining apps tracked as 1.0.1 tech debt in v1.0-MILESTONE-AUDIT.md"
+    accepted_by: "Ken Scott (chose 'Complete milestone, accept debt incl. paste-matrix cells' 2026-10-20)"
+    accepted_at: "2026-10-20T20:40:00Z"
 re_verification:
   previous_status: passed
   previous_score: "12/16 (1 deferred to Phase 4, 2 present but behavior-unverified, 1 uncertain)"
@@ -77,7 +82,7 @@ gaps:
 
 **Phase Goal:** The three unproven native behaviors work on this Mac (typing into a non-activating panel, full-screen overlay, and copy/paste of a GIF file into the previous app), from a stable signed identity, so the architecture is confirmed before any real UI is built.
 **Verified:** 2026-10-20T19:21:04Z
-**Status:** gaps_found (one documentation/evidence gap; no code gap)
+**Status:** passed (1 override: SC5 per-app matrix breadth accepted as 1.0.1 debt by the user, 2026-10-20)
 **Re-verification:** Yes. **Re-verified 2026-10-20 after Phase 4**, against branch `gsd/phase-04-settings-shell-polish-release` HEAD 7874dc6 (same code as main). The previous report (2026-10-17, `passed`) was flagged stale because Phase 4 changed code it covers.
 
 ## Re-verification note (2026-10-20, after Phase 4)
