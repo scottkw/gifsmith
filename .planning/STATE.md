@@ -2,38 +2,35 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: Gifsmith MVP
-current_phase: 4
-status: completed
+status: Awaiting next milestone
 stopped_at: Phase 4 complete — all phases complete
-last_updated: "2026-10-20T19:04:45.046Z"
+last_updated: "2026-10-20T19:23:33.623Z"
 last_activity: 2026-10-20
-last_activity_desc: Phase 4 complete
-state_head: d070922cbb553c1e7da7d9ec855fc18b55edae5b
+last_activity_desc: Milestone v1.0 completed and archived
+state_head: 13e57a5336575fb9d38dba58f9a56b3c43df2a03
 progress:
   total_phases: 4
   completed_phases: 4
   total_plans: 26
   completed_plans: 26
-  percent: 100
+current_phase: 4
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-18)
+See: .planning/PROJECT.md (updated 2026-10-20)
 
 **Core value:** Hotkey → type → Enter puts the right GIF on the clipboard (or into the frontmost app) in seconds, without Raycast.
-**Current focus:** Phase 4 — Settings, Shell Polish & Release
+**Current focus:** Planning next milestone (v1.0.0 shipped 2026-10-20; 1.0.1 candidates in milestones/v1.0-MILESTONE-AUDIT.md)
 
 ## Current Position
 
-Phase: 4
-Plan: Not started
-Status: All phases complete
-Last activity: 2026-10-20 — Phase 4 complete
-
-Progress: [██████████] 100% (3/4 phases; 18/18 planned plans complete)
+Phase: Milestone v1.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-10-20 — Milestone v1.0 completed and archived
 
 ## Performance Metrics
 
@@ -209,10 +206,14 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 | Category | Item | Status | Deferred At | Milestone |
 |----------|------|--------|-------------|-----------|
-| *(none)* | | | | |
+| deferred_items | 04/deferred-items.md: scripts/uat/18-backstops.js intermittent CancelledRejectionError page error (UAT flaky ~1 in 4; fix in App.svelte search cancel path) | acknowledged | 2026-10-20 | v1.0 |
 
 ## Session Continuity
 
 Last session: 2026-10-20T15:22:21.686Z
 Stopped at: Phase 4 complete — all phases complete
 Resume file: None
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
