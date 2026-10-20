@@ -33,6 +33,10 @@ if (!(await reset.isDisabled())) fail("Reset to Default enabled on the default")
 await B.getByText("macOS doesn't warn when another app uses the same shortcut. Use Test to check yours.").waitFor();
 await saveScreenshot(await B.screenshot(), "gifsmith-17-hotkeys-default.png");
 
+// The accessible name stays "{label} shortcut"; the bound combo is the description, spoken.
+const described = () => open.evaluate((el) => el.getAttribute("aria-describedby").split(" ").map((id) => document.getElementById(id)?.textContent ?? "").join(" "));
+if (!(await described()).includes("Control Option Command G")) fail(`recorder description: ${await described()}`);
+
 // Esc cancels: the old combo stays, and an H1 from that recording goes with it.
 await open.click();
 await waitText(open, "Type shortcut…");

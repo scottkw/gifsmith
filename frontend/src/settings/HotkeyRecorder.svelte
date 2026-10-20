@@ -3,7 +3,7 @@
   // the whole recording so the current combo is captured, not fired; every way out resumes them.
   // The field shows a new combo only after Go registered it.
   import { resumeHotkeys, setHotkey, settingsError, suspendHotkeys, type SettingsSnapshot } from '../lib/api';
-  import { accelFromEvent, canonical, DENYLIST, glyphs, type Slot } from '../lib/hotkeys';
+  import { accelFromEvent, canonical, DENYLIST, glyphs, spoken, type Slot } from '../lib/hotkeys';
 
   let {
     slot,
@@ -99,6 +99,8 @@
   }
 </script>
 
+<!-- aria-label replaces the content as the name, so the value and the recording state are the description -->
+<span id="{describedby}-value" class="sr-only">{recording ? 'Recording. Type a shortcut.' : value ? spoken(value) : 'Not set'}</span>
 <div
   class="recorder"
   class:recording
@@ -106,7 +108,8 @@
   role="button"
   tabindex="0"
   aria-label="{label} shortcut"
-  aria-describedby={describedby}
+  aria-describedby="{describedby}-value {describedby}"
+  aria-pressed={recording}
   onclick={start}
   {onkeydown}
   {onkeyup}
@@ -116,6 +119,14 @@
 </div>
 
 <style>
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
   .recorder {
     box-sizing: border-box;
     width: 160px;
