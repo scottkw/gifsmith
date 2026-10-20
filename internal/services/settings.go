@@ -232,6 +232,7 @@ type Snapshot struct {
 	GridTrending       string `json:"gridTrending"`     // resolved: never ""
 	KlipyFileActions   bool   `json:"klipyFileActions"` // read-only: KlipyFileActionsCleared
 	UpdateCheck        bool   `json:"updateCheck"`      // automatic update checks on (= !UpdateCheckOff)
+	Version            string `json:"version"`          // services.Version, shown in About
 }
 
 // Choices are the allowed Search-pane values, with what Match System resolves to now.
@@ -324,7 +325,7 @@ func (s *SettingsService) snapshotOf(p settings.Prefs) Snapshot {
 		DownloadDirMissing: statErr != nil || !fi.IsDir(), HideFilenames: p.HideFilenames,
 		PrimaryAction: cmp.Or(p.PrimaryAction, settings.DefaultPrimary), SecondaryAction: cmp.Or(p.SecondaryAction, settings.DefaultSecondary),
 		GridSearch: cmp.Or(p.GridSearch, "medium"), GridTrending: cmp.Or(p.GridTrending, "medium"), KlipyFileActions: s.KlipyFileActions,
-		UpdateCheck: !p.UpdateCheckOff}
+		UpdateCheck: !p.UpdateCheckOff, Version: Version}
 }
 
 var errUnchanged = errors.New("unchanged")

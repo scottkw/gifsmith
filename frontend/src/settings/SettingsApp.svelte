@@ -4,6 +4,7 @@
   import { Events } from '@wailsio/runtime';
   import { onMount, tick, untrack } from 'svelte';
   import type { SettingsSnapshot } from '../lib/api';
+  import AboutPane from './AboutPane.svelte';
   import DownloadsPane from './DownloadsPane.svelte';
   import GeneralPane, { pendingReveal } from './GeneralPane.svelte';
   import HotkeysPane from './HotkeysPane.svelte';
@@ -12,13 +13,14 @@
 
   let { initial }: { initial: SettingsSnapshot } = $props();
 
-  // UI-SPEC order (General, Keys, Hotkeys, Search, Downloads, About); only built panes are listed.
+  // UI-SPEC order (General, Keys, Hotkeys, Search, Downloads, About).
   const PANES = [
     { id: 'general', name: 'General', component: GeneralPane },
     { id: 'keys', name: 'Keys', component: KeysPane },
     { id: 'hotkeys', name: 'Hotkeys', component: HotkeysPane },
     { id: 'search', name: 'Search', component: SearchPane },
     { id: 'downloads', name: 'Downloads', component: DownloadsPane },
+    { id: 'about', name: 'About', component: AboutPane },
   ];
 
   let active = $state(0);

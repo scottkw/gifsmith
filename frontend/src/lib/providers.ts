@@ -17,6 +17,14 @@ export const KLIPY_KEY_URL = 'https://partner.klipy.com';
 // C2: GIPHY grants Clips access by email (D-21); pre-addressed with a subject.
 export const CLIPS_ACCESS_MAILTO = 'mailto:clips@giphy.com?subject=GIPHY%20Clips%20API%20access%20request';
 
+// Settings → About links; each is also in openExternal's allow-list.
+export const ABOUT_URLS = {
+  website: 'https://github.com/scottkw/gifsmith',
+  issues: 'https://github.com/scottkw/gifsmith/issues',
+  license: 'https://github.com/scottkw/gifsmith/blob/main/LICENSE',
+  extension: 'https://github.com/raycast/extensions/tree/main/extensions/gif-search',
+} as const;
+
 export const SLOTS: readonly Slot[] = [
   { id: 'giphy', label: 'GIPHY', shortcut: '⌘1', placeholder: 'Search GIPHY', attribution: 'giphy', keyProvider: 'giphy', keyLabel: 'GIPHY', getKeyUrl: GIPHY_KEY_URL },
   { id: 'clips', label: 'Clips', shortcut: '⌘2', placeholder: 'Search GIPHY Clips', attribution: 'giphy' },

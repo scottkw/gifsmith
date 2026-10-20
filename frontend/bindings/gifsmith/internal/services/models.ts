@@ -125,6 +125,11 @@ export interface Snapshot {
      * automatic update checks on (= !UpdateCheckOff)
      */
     "updateCheck": boolean;
+
+    /**
+     * services.Version, shown in About
+     */
+    "version": string;
 }
 
 /**

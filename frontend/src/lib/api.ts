@@ -16,7 +16,7 @@ import {
 import type { Gif, Page } from '../../bindings/gifsmith/internal/provider';
 import type { Entry, Snapshot } from '../../bindings/gifsmith/internal/library';
 import { Browser, CancelError, type CancellablePromise } from '@wailsio/runtime';
-import { CLIPS_ACCESS_MAILTO, GIPHY_KEY_URL, KLIPY_KEY_URL } from './providers';
+import { ABOUT_URLS, CLIPS_ACCESS_MAILTO, GIPHY_KEY_URL, KLIPY_KEY_URL } from './providers';
 
 export type { DownloadResult, Entry, Gif, KeyStatus, Page, ProviderStatus, Result, SettingsSnapshot, UpdateStatus };
 
@@ -76,7 +76,7 @@ export const updateError = (e: unknown): { kind: string } | null => providerErro
 export const checkClips = () => GifService.CheckClips();
 
 // The webview may only ask the OS to open these fixed URLs.
-const EXTERNAL = new Set([GIPHY_KEY_URL, KLIPY_KEY_URL, CLIPS_ACCESS_MAILTO]);
+const EXTERNAL = new Set<string>([GIPHY_KEY_URL, KLIPY_KEY_URL, CLIPS_ACCESS_MAILTO, ...Object.values(ABOUT_URLS)]);
 export function openExternal(url: string) {
   if (!EXTERNAL.has(url)) throw new Error('refusing to open an unlisted URL');
   return Browser.OpenURL(url);
