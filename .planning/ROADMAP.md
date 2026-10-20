@@ -149,7 +149,7 @@ Plans:
   5. The About screen credits the original MIT-licensed Raycast extension and its authors, and Klipy file actions stay disabled (link and Markdown only) unless written clearance from Klipy is recorded.
   6. The app checks GitHub Releases for a newer version, alerts the user, and Settings has a "Check for Updates…" button; if the user accepts, it downloads the new DMG, verifies its checksum, Developer ID signature and notarization, and opens it (no self-replacement). (added 2026-10-18)
 
-**Plans:** 5/7 plans executed
+**Plans:** 6/7 plans executed
 
 Plans:
 
@@ -169,7 +169,7 @@ Plans:
 - [x] 04-07-PLAN.md — GitHub update check (launch + 24 h, Settings "Check for Updates…", tray alert); download → SHA-256 digest → codesign + Team ID + spctl → open DMG; no self-replacement
 
 **Wave 6** *(blocked on Wave 5 completion)*
-- [ ] 04-05-PLAN.md — Signed arm64 DMG pipeline (release:build, notarized release, verify script, new background), About credits, README, release notes; blocking notary-profile checkpoint
+- [x] 04-05-PLAN.md — Signed arm64 DMG pipeline (release:build, notarized release, verify script, new background), About credits, README, release notes; blocking notary-profile checkpoint
 
 **Wave 7** *(blocked on Wave 6 completion)*
 - [ ] 04-06-PLAN.md — Full regression, notarized release run and verification, dev install for native UAT, clean-account install, draft GitHub Release
@@ -190,4 +190,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Native Spike & Signed Dev Loop | 4/4 | Complete    | 2026-10-17 |
 | 2. Providers, Search UI & First Run | 6/6 | Complete    | 2026-10-17 |
 | 3. Action Pipeline & Library | 8/8 | Complete    | 2026-10-18 |
-| 4. Settings, Shell Polish & Release | 5/7 | In Progress | - |
+| 4. Settings, Shell Polish & Release | 6/7 | In Progress | - |

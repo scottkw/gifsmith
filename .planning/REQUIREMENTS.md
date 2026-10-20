@@ -69,8 +69,8 @@
 
 - [ ] **RELS-01**: App ships as a Developer ID–signed, notarized DMG for macOS 13+ on Apple Silicon
 - [ ] **RELS-02**: App installs and runs on a clean user account (Gatekeeper, fresh permissions)
-- [ ] **RELS-03**: About screen credits the original MIT-licensed Raycast extension and authors
-- [ ] **RELS-04**: Klipy file actions are disabled (link/Markdown only) unless Klipy gives written clearance for temp file copies
+- [x] **RELS-03**: About screen credits the original MIT-licensed Raycast extension and authors
+- [x] **RELS-04**: Klipy file actions are disabled (link/Markdown only) unless Klipy gives written clearance for temp file copies
 - [x] **RELS-05**: App checks GitHub Releases (scottkw/gifsmith) for a newer version and alerts the user when one is available; Settings has a "Check for Updates…" button
 - [x] **RELS-06**: If the user chooses, the app downloads the new DMG, verifies its code signature and notarization, and opens it (no in-place self-replacement)
 
@@ -149,8 +149,8 @@
 | SETT-06 | Phase 4 | Complete |
 | RELS-01 | Phase 4 | Pending |
 | RELS-02 | Phase 4 | Pending |
-| RELS-03 | Phase 4 | Pending |
-| RELS-04 | Phase 4 | Pending |
+| RELS-03 | Phase 4 | Complete |
+| RELS-04 | Phase 4 | Complete |
 | RELS-05 | Phase 4 | Complete |
 | RELS-06 | Phase 4 | Complete |
 
