@@ -150,7 +150,7 @@ Plans:
   6. The app checks GitHub Releases for a newer version, alerts the user, and Settings has a "Check for Updates…" button; if the user accepts, it downloads the new DMG, verifies its checksum, Developer ID signature and notarization, and opens it (no self-replacement). (added 2026-10-18)
   7. GitHub Actions tests every push to main and every PR without secrets, and pushing a vX.Y.Z tag (from v1.0.1; v1.0.0 ships from the local notarized build) builds, Developer ID-signs, notarizes, staples and verifies the DMG and creates a draft GitHub Release with the DMG, its .sha256 and the release notes; a dry run of the release workflow is green before the first tag. (added 2026-10-20)
 
-**Plans:** 7/8 plans executed
+**Plans:** 8/8 plans executed
 
 Plans:
 
@@ -176,7 +176,7 @@ Plans:
 - [x] 04-06-PLAN.md — Full regression, notarized release run and verification, dev install for native UAT, clean-account install, draft GitHub Release
 
 **Wave 8** *(blocked on Wave 7 completion)*
-- [ ] 04-08-PLAN.md — GitHub Actions: CI tests on push/PR, vX.Y.Z tag → signed, notarized, verified draft release (from v1.0.1), workflow_dispatch dry run; user-set `release` environment secrets
+- [x] 04-08-PLAN.md — GitHub Actions: CI tests on push/PR, vX.Y.Z tag → signed, notarized, verified draft release (from v1.0.1), workflow_dispatch dry run; user-set `release` environment secrets
 
 **UI hint**: yes
 
@@ -194,4 +194,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Native Spike & Signed Dev Loop | 4/4 | Complete    | 2026-10-17 |
 | 2. Providers, Search UI & First Run | 6/6 | Complete    | 2026-10-17 |
 | 3. Action Pipeline & Library | 8/8 | Complete    | 2026-10-18 |
-| 4. Settings, Shell Polish & Release | 7/8 | In Progress | - |
+| 4. Settings, Shell Polish & Release | 8/8 | In Progress | - |
