@@ -95,4 +95,29 @@ export interface Snapshot {
     "downloadDirDefault": boolean;
     "downloadDirMissing": boolean;
     "hideFilenames": boolean;
+
+    /**
+     * resolved: never ""
+     */
+    "primaryAction": string;
+
+    /**
+     * resolved: never ""
+     */
+    "secondaryAction": string;
+
+    /**
+     * resolved: never ""
+     */
+    "gridSearch": string;
+
+    /**
+     * resolved: never ""
+     */
+    "gridTrending": string;
+
+    /**
+     * read-only: KlipyFileActionsCleared
+     */
+    "klipyFileActions": boolean;
 }

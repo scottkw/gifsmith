@@ -264,6 +264,15 @@ CODE=$(call "$TREND_ID" '["klipy",""]')
 DUPS=$(grep -o '"id":"klipy-dup"' "$BODY" | wc -l | tr -d ' ')
 [ "$DUPS" = "2" ] || fail "Trending(klipy): klipy-dup appears $DUPS times, want 2 (Klipy pages are never deduped)"
 echo "SaveKey(klipy, fixture key): 200; Trending(klipy) keeps both klipy-dup items"
+# RELS-04: a Klipy file action is refused in Go before any staging (the gate ships closed).
+KLIPY_ITEM=$(node -e 'const p = JSON.parse(require("fs").readFileSync(0, "utf8")); process.stdout.write(JSON.stringify(p.items[0]))' <"$BODY")
+STAGED_BEFORE=$(find bin/uat-cache/staging -type f | wc -l | tr -d ' ')
+CODE=$(call "$COPY_ID" "[$KLIPY_ITEM]")
+STAGED_AFTER=$(find bin/uat-cache/staging -type f | wc -l | tr -d ' ')
+if [ "$CODE" = "200" ] || ! grep -q '"kind":"klipy_gated"' "$BODY" || [ "$STAGED_AFTER" != "$STAGED_BEFORE" ]; then
+  fail "ActionService.Copy(klipy item) while gated: HTTP $CODE, staged $STAGED_BEFORE -> $STAGED_AFTER, body: $(cat "$BODY")"
+fi
+echo "ActionService.Copy(klipy item): HTTP $CODE $(cat "$BODY"), nothing staged"
 
 # Keys pane calls: KeyStatus shows the last 4 only; TestKey is uncached; RemoveKey succeeds.
 STATUS_ID=$(method_id "$SET" KeyStatus)

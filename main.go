@@ -90,6 +90,9 @@ func main() {
 	}, PickFolder: d.PickFolder, DefaultDownloads: d.DownloadsDir}
 	actions.DownloadsDir = settingsSvc.DownloadDir // read at call time: a new folder applies to the next download
 	actions.HideFilenames = settingsSvc.HideFilenames
+	// RELS-04: Klipy file actions stay refused until a rebuild records Klipy's written clearance.
+	actions.KlipyFileActions = services.KlipyFileActionsCleared
+	settingsSvc.KlipyFileActions = services.KlipyFileActionsCleared
 
 	var sh *shell.Shell // set below, before app.Run; a second launch arrives only after Run starts
 	// No ApplicationShouldTerminateAfterLastWindowClosed: the hidden panel counts as closed.

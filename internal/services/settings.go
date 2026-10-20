@@ -320,7 +320,9 @@ func (s *SettingsService) snapshotOf(p settings.Prefs) Snapshot {
 	return Snapshot{Theme: p.Theme, LaunchAtLogin: on && err == nil, GiphyRating: prm.Rating, PageSize: prm.PageSize,
 		GiphyLang: p.GiphyLang, KlipyCountry: p.KlipyCountry, Hotkeys: s.Hotkeys.Bindings(),
 		DownloadDir: dir, DownloadDirName: filepath.Base(dir), DownloadDirDefault: p.DownloadDir == "",
-		DownloadDirMissing: statErr != nil || !fi.IsDir(), HideFilenames: p.HideFilenames}
+		DownloadDirMissing: statErr != nil || !fi.IsDir(), HideFilenames: p.HideFilenames,
+		PrimaryAction: cmp.Or(p.PrimaryAction, settings.DefaultPrimary), SecondaryAction: cmp.Or(p.SecondaryAction, settings.DefaultSecondary),
+		GridSearch: cmp.Or(p.GridSearch, "medium"), GridTrending: cmp.Or(p.GridTrending, "medium"), KlipyFileActions: s.KlipyFileActions}
 }
 
 var errUnchanged = errors.New("unchanged")
@@ -339,6 +341,38 @@ func (s *SettingsService) SetPref(ctx context.Context, name, value string) (Snap
 			return s.Snapshot(ctx), errInvalidValue
 		}
 		set = func(p *settings.Prefs) { p.HideFilenames = value == "true" }
+	case "primaryAction", "secondaryAction":
+		if !slices.Contains(settings.Actions, value) {
+			return s.Snapshot(ctx), errInvalidValue
+		}
+		// Choosing the other key's action swaps the two, so ↵ and ⌘↵ always differ.
+		set = func(p *settings.Prefs) {
+			pri, sec := cmp.Or(p.PrimaryAction, settings.DefaultPrimary), cmp.Or(p.SecondaryAction, settings.DefaultSecondary)
+			if name == "primaryAction" {
+				if value == sec {
+					sec = pri
+				}
+				pri = value
+			} else {
+				if value == pri {
+					pri = sec
+				}
+				sec = value
+			}
+			p.PrimaryAction, p.SecondaryAction = defaultAsEmpty(pri, settings.DefaultPrimary), defaultAsEmpty(sec, settings.DefaultSecondary)
+		}
+	case "gridSearch", "gridTrending": // layout only: no cache flush
+		if !slices.Contains(settings.GridSizes, value) {
+			return s.Snapshot(ctx), errInvalidValue
+		}
+		v := defaultAsEmpty(value, "medium")
+		set = func(p *settings.Prefs) {
+			if name == "gridSearch" {
+				p.GridSearch = v
+			} else {
+				p.GridTrending = v
+			}
+		}
 	case "giphyRating":
 		if !slices.Contains(provider.Ratings, value) {
 			return s.Snapshot(ctx), errInvalidValue

@@ -28,6 +28,7 @@ var actionText = map[string]string{
 	"library_read":      "a saved list could not be read",
 	"library_write":     "a saved list could not be written",
 	"invalid_item":      "this item cannot be saved",
+	"klipy_gated":       "Klipy GIFs can't be copied or saved as files yet",
 }
 
 func (e *ActionError) Error() string {

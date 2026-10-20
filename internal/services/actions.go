@@ -98,9 +98,22 @@ func stageErr(err error) error {
 	return actionErr("download_failed")
 }
 
+// gated refuses a Klipy file action until KlipyFileActions (RELS-04): checked before the busy lock,
+// staging, HTTP or the pasteboard. Text actions (links, Markdown) never call it.
+func (a *ActionService) gated(g provider.Gif) error {
+	if g.Provider == provider.Klipy && !a.KlipyFileActions {
+		log.Printf("klipy file action refused (not cleared)")
+		return actionErr("klipy_gated")
+	}
+	return nil
+}
+
 // Copy puts the selected GIF (a Clip's MP4) on the clipboard as a file. The panel stays open:
 // the frontend shows the confirmation, then hides it.
 func (a *ActionService) Copy(ctx context.Context, g provider.Gif) (Result, error) {
+	if err := a.gated(g); err != nil {
+		return Result{}, err
+	}
 	if !a.busy.TryLock() {
 		return Result{}, ErrBusy
 	}
@@ -119,6 +132,9 @@ func (a *ActionService) Copy(ctx context.Context, g provider.Gif) (Result, error
 // Paste copies the GIF, hides the panel and posts one ⌘V to the previous app.
 // Without Accessibility it only copies and keeps the panel open with instructions.
 func (a *ActionService) Paste(ctx context.Context, g provider.Gif) (Result, error) {
+	if err := a.gated(g); err != nil {
+		return Result{}, err
+	}
 	if !a.busy.TryLock() {
 		return Result{}, ErrBusy
 	}
@@ -402,6 +418,9 @@ type DownloadResult struct {
 // Download saves the selected GIF (a Clip's MP4) into the download folder; the panel stays open.
 // It never goes through staging, the pasteboard or Recents (D-17, D-07).
 func (a *ActionService) Download(ctx context.Context, g provider.Gif) (DownloadResult, error) {
+	if err := a.gated(g); err != nil {
+		return DownloadResult{}, err
+	}
 	if !a.busy.TryLock() {
 		return DownloadResult{}, ErrBusy
 	}
@@ -454,6 +473,9 @@ const (
 // CopySquare puts a center-cropped square copy of the GIF on the clipboard as a file (D-16).
 // The panel stays open: the frontend shows the confirmation, then hides it.
 func (a *ActionService) CopySquare(ctx context.Context, g provider.Gif) (Result, error) {
+	if err := a.gated(g); err != nil {
+		return Result{}, err
+	}
 	if !a.busy.TryLock() {
 		return Result{}, ErrBusy
 	}
@@ -630,6 +652,9 @@ func framePixels(r io.Reader) (int64, error) {
 // PasteSquare copies the square GIF like CopySquare, then pastes it like Paste. A pasted Klipy
 // square file gets the same grace delete as a pasted Klipy GIF (D-19).
 func (a *ActionService) PasteSquare(ctx context.Context, g provider.Gif) (Result, error) {
+	if err := a.gated(g); err != nil {
+		return Result{}, err
+	}
 	if !a.busy.TryLock() {
 		return Result{}, ErrBusy
 	}

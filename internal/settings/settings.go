@@ -300,6 +300,34 @@ func (p *Prefs) Normalize() []string {
 		p.KlipyCountry = ""
 		reset = append(reset, "klipyCountry")
 	}
+	for _, f := range []struct {
+		name string
+		v    *string
+	}{{"primaryAction", &p.PrimaryAction}, {"secondaryAction", &p.SecondaryAction}} {
+		if *f.v != "" && !slices.Contains(Actions, *f.v) {
+			*f.v = ""
+			reset = append(reset, f.name)
+		}
+	}
+	// ↵ and ⌘↵ never run the same action: the secondary gives way first, then the primary.
+	if cmp.Or(p.PrimaryAction, DefaultPrimary) == cmp.Or(p.SecondaryAction, DefaultSecondary) {
+		if p.SecondaryAction != "" {
+			p.SecondaryAction = ""
+			reset = append(reset, "secondaryAction")
+		} else {
+			p.PrimaryAction = ""
+			reset = append(reset, "primaryAction")
+		}
+	}
+	for _, f := range []struct {
+		name string
+		v    *string
+	}{{"gridSearch", &p.GridSearch}, {"gridTrending", &p.GridTrending}} {
+		if *f.v != "" && !slices.Contains(GridSizes, *f.v) {
+			*f.v = ""
+			reset = append(reset, f.name)
+		}
+	}
 	if p.DownloadDir != "" && !filepath.IsAbs(p.DownloadDir) { // only Go's picker path is stored, always absolute
 		p.DownloadDir = ""
 		reset = append(reset, "downloadDir")
