@@ -5,16 +5,16 @@ milestone_name: Gifsmith MVP
 current_phase: 4
 current_phase_name: Settings, Shell Polish & Release
 status: executing
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-10-18T21:45:22.801Z"
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-10-20T01:49:18.783Z"
 last_activity: 2026-10-18
 last_activity_desc: Phase 4 execution started
-state_head: 0169d535c4814bd534b5a1674e4e8aa590a74c3f
+state_head: 3859e3d09d4b7977468b65c191b018c95aa099c0
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 25
-  completed_plans: 20
+  completed_plans: 21
 ---
 
 # Project State
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-18)
 ## Current Position
 
 Phase: 4 (Settings, Shell Polish & Release) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Ready to execute
 Last activity: 2026-10-18 — Phase 4 execution started
 
@@ -79,6 +79,7 @@ Progress: [████████░░] 75% (3/4 phases; 18/18 planned plans 
 | Phase 03 P08 | 10min | 2 tasks | 1 files |
 | Phase 04 P01 | 22 min | 7 tasks | 42 files |
 | Phase 04 P02 | 28 min | 8 tasks | 46 files |
+| Phase 04 P03 | 33 min | 6 tasks | 42 files |
 
 ## Accumulated Context
 
@@ -157,6 +158,9 @@ Recent decisions affecting current work:
 - [Phase 04]: 04-02: search.Service keeps a key generation (429 recording) separate from the cache generation (Flush and Invalidate), so a parameter change never voids a real 429
 - [Phase 04]: 04-02: provider parameters are read per request through Params func on each client; Match System is stored as empty and resolved from platform.SystemLocale with en/us fallbacks
 - [Phase 04]: 04-02: the Keys card message line wraps instead of UI-SPEC's one-line ellipsis (K2/K3/K-T2 exceed 400px at 12px)
+- [Phase 04]: Hotkey parser lives in settings (CanonicalHotkey) so Normalize validates stored hotkeys without an import cycle; hotkeys stored in Wails canonical form, Open default stored as empty
+- [Phase 04]: Webview hotkey calls (set/suspend/resume) run strictly in order and Go resumes hotkeys on Settings hide, Cmd+W and lost focus
+- [Phase 04]: Reduce Motion uses a one-time canvas first frame for every provider; only the selected tile keeps an animated img
 
 ### Pending Todos
 
@@ -190,6 +194,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-18T21:45:22.525Z
-Stopped at: Completed 04-02-PLAN.md
+Last session: 2026-10-20T01:49:18.529Z
+Stopped at: Completed 04-03-PLAN.md
 Resume file: None

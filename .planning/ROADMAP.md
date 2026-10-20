@@ -149,7 +149,7 @@ Plans:
   5. The About screen credits the original MIT-licensed Raycast extension and its authors, and Klipy file actions stay disabled (link and Markdown only) unless written clearance from Klipy is recorded.
   6. The app checks GitHub Releases for a newer version, alerts the user, and Settings has a "Check for Updates…" button; if the user accepts, it downloads the new DMG, verifies its checksum, Developer ID signature and notarization, and opens it (no self-replacement). (added 2026-10-18)
 
-**Plans:** 2/7 plans executed
+**Plans:** 3/7 plans executed
 
 Plans:
 
@@ -160,7 +160,7 @@ Plans:
 - [x] 04-02-PLAN.md — Content rating, page size, GIPHY language and Klipy country as per-request Params (Flush keeps 429 blocks); Keys pane add/test/change/remove with last-4 status
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 04-03-PLAN.md — Rebindable hotkeys with rollback, Favorites/Recents hotkeys, suspend-while-recording, 5 s Test; Phase 3 polish and Reduce Motion stills
+- [x] 04-03-PLAN.md — Rebindable hotkeys with rollback, Favorites/Recents hotkeys, suspend-while-recording, 5 s Test; Phase 3 polish and Reduce Motion stills
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 04-04-PLAN.md — Validated download folder + hide filenames, configurable ↵/⌘↵ with the Klipy file-action gate (Go const), grid sizes and menu placement, Phase 4 UI backstops
@@ -190,4 +190,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Native Spike & Signed Dev Loop | 4/4 | Complete    | 2026-10-17 |
 | 2. Providers, Search UI & First Run | 6/6 | Complete    | 2026-10-17 |
 | 3. Action Pipeline & Library | 8/8 | Complete    | 2026-10-18 |
-| 4. Settings, Shell Polish & Release | 2/7 | In Progress | - |
+| 4. Settings, Shell Polish & Release | 3/7 | In Progress | - |

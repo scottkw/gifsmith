@@ -12,7 +12,7 @@
 - [x] **SHEL-03**: Panel closes on Esc and on click-away
 - [x] **SHEL-04**: App lives in the menu bar with no Dock icon; menu offers Open, Settings, Quit
 - [x] **SHEL-05**: User can enable launch at login
-- [ ] **SHEL-06**: User can open Favorites or Recents directly with their own hotkeys
+- [x] **SHEL-06**: User can open Favorites or Recents directly with their own hotkeys
 
 ### Search
 
@@ -60,7 +60,7 @@
 
 - [x] **SETT-01**: Settings open in their own window, where pasting into fields works
 - [x] **SETT-02**: User can add, test, change (replace), and remove GIPHY and Klipy keys; each key row links to the provider's key sign-up page (GIPHY developer dashboard, Klipy Partner Panel)
-- [ ] **SETT-03**: User can rebind the global hotkeys; conflicts are reported and the old binding stays until the new one registers
+- [x] **SETT-03**: User can rebind the global hotkeys; conflicts are reported and the old binding stays until the new one registers
 - [ ] **SETT-04**: User can set grid item size (search and trending), max results, download folder, hide filename, GIPHY and Klipy locales
 - [x] **SETT-05**: Settings shows Accessibility permission status and a button to grant it
 - [x] **SETT-06**: User can choose the window theme: Light, Dark, or System (default System, follows macOS appearance)
@@ -110,7 +110,7 @@
 | SHEL-03 | Phase 1 | Complete |
 | SHEL-04 | Phase 1 | Complete |
 | SHEL-05 | Phase 4 | Complete |
-| SHEL-06 | Phase 4 | Pending |
+| SHEL-06 | Phase 4 | Complete |
 | SRCH-01 | Phase 2 | Complete |
 | SRCH-02 | Phase 2 | Complete |
 | SRCH-03 | Phase 2 | Complete |
@@ -143,7 +143,7 @@
 | LIBR-05 | Phase 3 | Complete |
 | SETT-01 | Phase 4 | Complete |
 | SETT-02 | Phase 4 | Complete |
-| SETT-03 | Phase 4 | Pending |
+| SETT-03 | Phase 4 | Complete |
 | SETT-04 | Phase 4 | Pending |
 | SETT-05 | Phase 4 | Complete |
 | SETT-06 | Phase 4 | Complete |
