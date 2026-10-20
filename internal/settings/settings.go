@@ -284,6 +284,10 @@ func (p *Prefs) Normalize() []string {
 		p.KlipyCountry = ""
 		reset = append(reset, "klipyCountry")
 	}
+	if p.DownloadDir != "" && !filepath.IsAbs(p.DownloadDir) { // only Go's picker path is stored, always absolute
+		p.DownloadDir = ""
+		reset = append(reset, "downloadDir")
+	}
 	return append(reset, p.Hotkeys.normalize()...)
 }
 

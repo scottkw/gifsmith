@@ -89,6 +89,7 @@ func main() {
 		return &giphy.Client{BaseURL: d.GiphyBase, Key: candidate, HTTP: d.HTTP, Params: params}
 	}, PickFolder: d.PickFolder, DefaultDownloads: d.DownloadsDir}
 	actions.DownloadsDir = settingsSvc.DownloadDir // read at call time: a new folder applies to the next download
+	actions.HideFilenames = settingsSvc.HideFilenames
 
 	var sh *shell.Shell // set below, before app.Run; a second launch arrives only after Run starts
 	// No ApplicationShouldTerminateAfterLastWindowClosed: the hidden panel counts as closed.

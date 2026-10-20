@@ -94,4 +94,5 @@ export interface Snapshot {
     "downloadDirName": string;
     "downloadDirDefault": boolean;
     "downloadDirMissing": boolean;
+    "hideFilenames": boolean;
 }

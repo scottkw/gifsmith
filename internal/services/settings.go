@@ -314,7 +314,7 @@ func (s *SettingsService) snapshotOf(p settings.Prefs) Snapshot {
 	return Snapshot{Theme: p.Theme, LaunchAtLogin: on && err == nil, GiphyRating: prm.Rating, PageSize: prm.PageSize,
 		GiphyLang: p.GiphyLang, KlipyCountry: p.KlipyCountry, Hotkeys: s.Hotkeys.Bindings(),
 		DownloadDir: dir, DownloadDirName: filepath.Base(dir), DownloadDirDefault: p.DownloadDir == "",
-		DownloadDirMissing: statErr != nil || !fi.IsDir()}
+		DownloadDirMissing: statErr != nil || !fi.IsDir(), HideFilenames: p.HideFilenames}
 }
 
 var errUnchanged = errors.New("unchanged")
@@ -328,6 +328,11 @@ func (s *SettingsService) SetPref(ctx context.Context, name, value string) (Snap
 	switch name {
 	case "theme":
 		set = func(p *settings.Prefs) { p.Theme = value }
+	case "hideFilenames":
+		if value != "true" && value != "false" {
+			return s.Snapshot(ctx), errInvalidValue
+		}
+		set = func(p *settings.Prefs) { p.HideFilenames = value == "true" }
 	case "giphyRating":
 		if !slices.Contains(provider.Ratings, value) {
 			return s.Snapshot(ctx), errInvalidValue
@@ -535,7 +540,7 @@ func (s *SettingsService) DownloadDir() string {
 }
 
 // HideFilenames reports the Hide original file names choice.
-func (s *SettingsService) HideFilenames() bool { return false }
+func (s *SettingsService) HideFilenames() bool { return s.Store.Get().HideFilenames }
 
 // ChooseDownloadDir shows the folder picker and saves the picked folder only if
 // ValidateDownloadDir accepts it; a cancel changes nothing. It takes no path from the webview.

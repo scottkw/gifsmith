@@ -183,6 +183,17 @@ if [ "$CODE" = "200" ] || [ "$COUNT" != "2" ]; then
 fi
 echo "ActionService.Download(html media): HTTP $CODE $(cat "$BODY"), no new file"
 
+# Hide original file names: the next download is gifsmith-{id}.gif; the pref goes back off after.
+SETPREF_ID=$(method_id "$SVC/settingsservice.ts" SetPref)
+[ -n "$SETPREF_ID" ] || fail "could not find the SettingsService.SetPref method ID"
+CODE=$(call "$SETPREF_ID" '["hideFilenames","true"]')
+[ "$CODE" = "200" ] && grep -q '"hideFilenames":true' "$BODY" || fail "SetPref(hideFilenames, true): HTTP $CODE, body: $(cat "$BODY")"
+CODE=$(call "$DOWNLOAD_ID" "[$ITEM]")
+[ "$CODE" = "200" ] && grep -q '"name":"gifsmith-' "$BODY" || fail "Download with hidden names: HTTP $CODE, body: $(cat "$BODY")"
+echo "ActionService.Download with hideFilenames: HTTP 200 $(cat "$BODY")"
+CODE=$(call "$SETPREF_ID" '["hideFilenames","false"]')
+[ "$CODE" = "200" ] && grep -q '"hideFilenames":false' "$BODY" || fail "SetPref(hideFilenames, false): HTTP $CODE, body: $(cat "$BODY")"
+
 COPYTEXT_ID=$(method_id "$SVC/actionservice.ts" CopyText)
 [ -n "$COPYTEXT_ID" ] || fail "could not find the ActionService.CopyText method ID"
 CODE=$(call "$COPYTEXT_ID" "[$ITEM,\"link\"]")

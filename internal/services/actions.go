@@ -406,8 +406,7 @@ func (a *ActionService) Download(ctx context.Context, g provider.Gif) (DownloadR
 	if dir == "" {
 		return DownloadResult{}, actionErr("folder_unwritable")
 	}
-	// hide is the Phase 4 Settings toggle (SETT-04); FileStem already implements both names.
-	path, err := a.Staging.Save(ctx, g, dir, false)
+	path, err := a.Staging.Save(ctx, g, dir, a.HideFilenames != nil && a.HideFilenames())
 	if err != nil {
 		log.Printf("download %s: %v", g.Provider, err)
 		return DownloadResult{}, stageErr(err)

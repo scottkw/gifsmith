@@ -59,6 +59,13 @@ export function DownloadDir(): $CancellablePromise<string> {
 }
 
 /**
+ * HideFilenames reports the Hide original file names choice.
+ */
+export function HideFilenames(): $CancellablePromise<boolean> {
+    return $Call.ByID(3262587179);
+}
+
+/**
  * KeyStatus reports GIPHY then Klipy.
  */
 export function KeyStatus(): $CancellablePromise<$models.KeyStatus[] | null> {
