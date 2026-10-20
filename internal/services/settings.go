@@ -539,6 +539,7 @@ func (s *SettingsService) SetHotkey(ctx context.Context, slot, accel string) (Sn
 	s.hkMu.Lock()
 	defer s.hkMu.Unlock()
 	s.Hotkeys.Resume()
+	before := s.Hotkeys.Bindings()
 	if err := s.Hotkeys.Bind(slot, accel); err != nil {
 		return s.Snapshot(ctx), err
 	}
@@ -560,6 +561,9 @@ func (s *SettingsService) SetHotkey(ctx context.Context, slot, accel string) (Sn
 		return s.snapshotOf(p), nil
 	case err != nil:
 		log.Printf("settings write failed: hotkeys.%s", slot)
+		if err := s.Hotkeys.Revert(slot, *slotOf(&before, slot)); err != nil { // registered = stored again
+			log.Printf("hotkey rollback failed: %s", slot)
+		}
 		return s.snapshotOf(p), errPrefsWriteFailed
 	}
 	if slot == "open" && s.OnOpenHotkey != nil {

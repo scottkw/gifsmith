@@ -139,6 +139,19 @@ func (h *Hotkeys) Bind(slot, accel string) error {
 			}
 		}
 	}
+	return h.rebind(slot, c)
+}
+
+// Revert puts slot back to old, the value Bindings reported before a Bind the caller could not store.
+func (h *Hotkeys) Revert(slot, old string) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.rebind(slot, old)
+}
+
+// rebind moves slot from its current combo to c (canonical, already checked); h.mu is held.
+func (h *Hotkeys) rebind(slot, c string) error {
+	cur := slotOf(&h.bound, slot)
 	old := *cur
 	if c == old {
 		return nil

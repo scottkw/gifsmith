@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -303,6 +305,24 @@ func TestSetHotkeyErrorKeepsStore(t *testing.T) {
 	}
 	if len(*f.events) != 0 {
 		t.Errorf("events = %v, want none", *f.events)
+	}
+}
+
+func TestSetHotkeyWriteFailureRollsBack(t *testing.T) {
+	f, reg := settingsWithHotkeys(t)
+	file := filepath.Join(f.dir, "not-a-dir")
+	if err := os.WriteFile(file, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f.svc.Store = settings.OpenStore(file) // every write fails
+	snap, err := f.svc.SetHotkey(context.Background(), "open", "Cmd+Ctrl+Option+H")
+	wantSettingsErr(t, err, "prefs_write_failed")
+	want := []string{"unregister Cmd+Ctrl+Option+G", "register Cmd+Ctrl+Option+H", "unregister Cmd+Ctrl+Option+H", "register Cmd+Ctrl+Option+G"}
+	if c := reg.take(); !reflect.DeepEqual(c, want) {
+		t.Errorf("calls = %v, want %v", c, want)
+	}
+	if snap.Hotkeys.Open != DefaultOpenHotkey || f.svc.Hotkeys.Bindings().Open != DefaultOpenHotkey {
+		t.Errorf("Open = %q / %q, want the stored binding registered again", snap.Hotkeys.Open, f.svc.Hotkeys.Bindings().Open)
 	}
 }
 
