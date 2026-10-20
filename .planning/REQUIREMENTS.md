@@ -71,8 +71,8 @@
 - [ ] **RELS-02**: App installs and runs on a clean user account (Gatekeeper, fresh permissions)
 - [ ] **RELS-03**: About screen credits the original MIT-licensed Raycast extension and authors
 - [ ] **RELS-04**: Klipy file actions are disabled (link/Markdown only) unless Klipy gives written clearance for temp file copies
-- [ ] **RELS-05**: App checks GitHub Releases (scottkw/gifsmith) for a newer version and alerts the user when one is available; Settings has a "Check for Updates…" button
-- [ ] **RELS-06**: If the user chooses, the app downloads the new DMG, verifies its code signature and notarization, and opens it (no in-place self-replacement)
+- [x] **RELS-05**: App checks GitHub Releases (scottkw/gifsmith) for a newer version and alerts the user when one is available; Settings has a "Check for Updates…" button
+- [x] **RELS-06**: If the user chooses, the app downloads the new DMG, verifies its code signature and notarization, and opens it (no in-place self-replacement)
 
 ## v2 Requirements
 
@@ -151,8 +151,8 @@
 | RELS-02 | Phase 4 | Pending |
 | RELS-03 | Phase 4 | Pending |
 | RELS-04 | Phase 4 | Pending |
-| RELS-05 | Phase 4 | Pending |
-| RELS-06 | Phase 4 | Pending |
+| RELS-05 | Phase 4 | Complete |
+| RELS-06 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 48 total

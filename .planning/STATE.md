@@ -5,16 +5,16 @@ milestone_name: Gifsmith MVP
 current_phase: 4
 current_phase_name: Settings, Shell Polish & Release
 status: executing
-stopped_at: Completed 04-04-PLAN.md
-last_updated: "2026-10-20T02:24:37.159Z"
+stopped_at: Completed 04-07-PLAN.md
+last_updated: "2026-10-20T02:46:37.266Z"
 last_activity: 2026-10-18
 last_activity_desc: Phase 4 execution started
-state_head: 1dba92bc205445208f0069bd88b8d20915f9f5d4
+state_head: d6a1d537562ad2e87cd14402269ec533789ab129
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 25
-  completed_plans: 22
+  completed_plans: 23
 ---
 
 # Project State
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-18)
 ## Current Position
 
 Phase: 4 (Settings, Shell Polish & Release) — EXECUTING
-Plan: 5 of 7
+Plan: 6 of 7
 Status: Ready to execute
 Last activity: 2026-10-18 — Phase 4 execution started
 
@@ -81,6 +81,7 @@ Progress: [████████░░] 75% (3/4 phases; 18/18 planned plans 
 | Phase 04 P02 | 28 min | 8 tasks | 46 files |
 | Phase 04 P03 | 33 min | 6 tasks | 42 files |
 | Phase 04 P04 | 32min | 9 tasks | 46 files |
+| Phase 04 P07 | 19 min | 4 tasks | 31 files |
 
 ## Accumulated Context
 
@@ -166,6 +167,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Download folder comes only from the picker seam (NSOpenPanel / FAKE_PICK_FOLDER) and is validated by ValidateDownloadDir (Statfs type + MNT_LOCAL + os.Link probe) before the Store saves it
 - [Phase 04]: Grid math takes the column count; a grid-size change remounts the grid via its key, keeping the selection
 - [Phase 04]: Keys-card message backstop follows 04-02's wrap decision; footer-centre >= 200px is measured with the GIPHY mark (Finer leaves ~179px, ellipsized)
+- [Phase 04]: 04-07: update check is one GET to GitHub releases/latest (Accept, User-Agent Gifsmith, If-None-Match only); 404 = up to date; a release without a valid DMG asset counts as up to date
+- [Phase 04]: 04-07: UpdateService opens the DMG only after update.Verify (SHA-256 = API digest, codesign --strict, TeamIdentifier=S2K7P43927, spctl Notarized Developer ID, quarantine); RunAutoUpdates is a package func so Wails never binds it
 
 ### Pending Todos
 
@@ -199,6 +202,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-20T02:24:36.944Z
-Stopped at: Completed 04-04-PLAN.md
+Last session: 2026-10-20T02:46:15.740Z
+Stopped at: Completed 04-07-PLAN.md
 Resume file: None
