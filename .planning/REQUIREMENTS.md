@@ -73,6 +73,7 @@
 - [x] **RELS-04**: Klipy file actions are disabled (link/Markdown only) unless Klipy gives written clearance for temp file copies
 - [x] **RELS-05**: App checks GitHub Releases (scottkw/gifsmith) for a newer version and alerts the user when one is available; Settings has a "Check for Updates…" button
 - [x] **RELS-06**: If the user chooses, the app downloads the new DMG, verifies its code signature and notarization, and opens it (no in-place self-replacement)
+- [ ] **RELS-07**: GitHub Actions runs the test suite on every push to main and every PR; pushing a vX.Y.Z tag builds, signs, notarizes and verifies the DMG and creates a draft GitHub Release with the DMG, .sha256 and notes
 
 ## v2 Requirements
 
@@ -153,12 +154,13 @@
 | RELS-04 | Phase 4 | Complete |
 | RELS-05 | Phase 4 | Complete |
 | RELS-06 | Phase 4 | Complete |
+| RELS-07 | Phase 4 | Pending |
 
 **Coverage:**
-- v1 requirements: 48 total
-- Mapped to phases: 48 (Phase 1: 6, Phase 2: 12, Phase 3: 14, Phase 4: 16)
+- v1 requirements: 49 total
+- Mapped to phases: 49 (Phase 1: 6, Phase 2: 12, Phase 3: 14, Phase 4: 17)
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-10-17*
-*Last updated: 2026-10-18 — added RELS-05/06 (GitHub update check + verified DMG download) at user request during Phase 4*
+*Last updated: 2026-10-20 — added RELS-07 (GitHub Actions CI and tag-triggered draft releases from v1.0.1) at user request during Phase 4; 2026-10-18 — added RELS-05/06 (GitHub update check + verified DMG download)*
