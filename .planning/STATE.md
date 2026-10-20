@@ -2,43 +2,40 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: Gifsmith MVP
-current_phase: 4
-current_phase_name: Settings, Shell Polish & Release
-status: verifying
-stopped_at: Completed 04-08-PLAN.md
-last_updated: "2026-10-20T15:22:21.812Z"
-last_activity: 2026-10-18
-last_activity_desc: Phase 4 execution started
-state_head: 438ed772091fd54e45a7a3c50a941e5711ec569c
+status: Awaiting next milestone
+stopped_at: Phase 4 complete — all phases complete
+last_updated: "2026-10-20T19:23:33.623Z"
+last_activity: 2026-10-20
+last_activity_desc: Milestone v1.0 completed and archived
+state_head: 13e57a5336575fb9d38dba58f9a56b3c43df2a03
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 26
   completed_plans: 26
+current_phase: 4
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-18)
+See: .planning/PROJECT.md (updated 2026-10-20)
 
 **Core value:** Hotkey → type → Enter puts the right GIF on the clipboard (or into the frontmost app) in seconds, without Raycast.
-**Current focus:** Phase 4 — Settings, Shell Polish & Release
+**Current focus:** Planning next milestone (v1.0.0 shipped 2026-10-20; 1.0.1 candidates in milestones/v1.0-MILESTONE-AUDIT.md)
 
 ## Current Position
 
-Phase: 4 (Settings, Shell Polish & Release) — EXECUTING
-Plan: 7 of 7
-Status: Phase complete — ready for verification
-Last activity: 2026-10-18 — Phase 4 execution started
-
-Progress: [████████░░] 75% (3/4 phases; 18/18 planned plans complete)
+Phase: Milestone v1.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-10-20 — Milestone v1.0 completed and archived
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 18
+- Total plans completed: 26
 - Average duration: - min
 - Total execution time: 0.0 hours
 
@@ -49,6 +46,7 @@ Progress: [████████░░] 75% (3/4 phases; 18/18 planned plans 
 | 1 | 4 | - | - |
 | 2 | 6 | - | - |
 | 3 | 8 | - | - |
+| 4 | 8 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -208,10 +206,14 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 | Category | Item | Status | Deferred At | Milestone |
 |----------|------|--------|-------------|-----------|
-| *(none)* | | | | |
+| deferred_items | 04/deferred-items.md: scripts/uat/18-backstops.js intermittent CancelledRejectionError page error (UAT flaky ~1 in 4; fix in App.svelte search cancel path) | acknowledged | 2026-10-20 | v1.0 |
 
 ## Session Continuity
 
 Last session: 2026-10-20T15:22:21.686Z
-Stopped at: Completed 04-08-PLAN.md
+Stopped at: Phase 4 complete — all phases complete
 Resume file: None
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

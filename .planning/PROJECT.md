@@ -12,9 +12,11 @@ Hotkey → type → Enter puts the right GIF on the clipboard (or into the front
 
 ### Validated
 
+Shipped in v1.0 (Phases 1–3 entries below were validated by phase; all 49 v1 requirements satisfied per the milestone audit):
+
 - ✓ Global hotkey (⌃⌥⌘G) opens a non-activating floating panel that takes typing while the previous app keeps focus, shows over full-screen apps, hides on Esc/click-away; menu bar only, no Dock icon — Phase 1
 - ✓ Copy GIF as a file (no Accessibility needed) and ⌘Enter auto-paste into the previous app (Accessibility-gated, copy fallback) — Phase 1 (TextEdit, Notes, Mail, Messages; other apps untested)
-- ✓ Developer ID–signed dev build with a stable identity; Accessibility grant survives rebuilds — Phase 1 (notarization deferred to Phase 4)
+- ✓ Developer ID–signed dev build with a stable identity; Accessibility grant survives rebuilds — Phase 1 (notarization delivered in Phase 4)
 - ✓ Search and trending for GIPHY, Klipy and The Finer Gifs Club with a provider switcher (⌘1–⌘4/pills), last provider remembered; GIPHY Clips offered only when the user's key passes a Clips probe, otherwise an explanation card (SRCH-01..03) — Phase 2
 - ✓ Animated, row-virtualized grid that pages as you scroll or arrow near the end; full keyboard navigation (SRCH-04, SRCH-05) — Phase 2
 - ✓ Debounced search, in-memory trending/search caches, local 429 budget with a retry countdown; per-provider network/timeout/provider errors that never block other providers (SRCH-06, SRCH-07) — Phase 2
@@ -22,17 +24,16 @@ Hotkey → type → Enter puts the right GIF on the clipboard (or into the front
 - ✓ Action pipeline: copy/paste GIF link and Markdown, copy page link and open in browser (GIPHY/Clips only), download to Downloads (validated, never overwrites), copy/paste square-cropped GIF (not for Clips), ⌘K action menu; Clips handled as 720p MP4; temp files deleted promptly, Klipy staged files 30 s after paste/next copy/quit (ACTN-03..07, ACTN-09..11) — Phase 3
 - ✓ Favorites and Recents per provider (never blended), rendered from saved metadata offline, removable; GIF details view (title, size, dimensions, tags, source links); recent searches shown when the box is empty (LIBR-01..05, SRCH-08) — Phase 3
 
+- ✓ Settings window: theme (Light/Dark/System), launch at login, Accessibility status/onboarding, key management with sign-up links, content rating, page size, GIPHY language/Klipy country, rebindable Open/Favorites/Recents hotkeys, default ↵/⌘↵ actions, download folder picker + hidden file names, grid size, Reduce Motion honoured (SETT-01..06, SHEL-05/06, SRCH-09, ACTN-08) — v1.0 (Phase 4)
+- ✓ Developer ID–signed, notarized and stapled DMG installs on a clean Mac with only the standard Gatekeeper prompt; in-app update check verifies digest, signature, Team ID and notarization; CI tests every push and a vX.Y.Z tag drafts a notarized release (RELS-01..07) — v1.0 (Phase 4), shipped as v1.0.0 2026-10-20
+
 ### Active
 
-- [ ] Users manage (add, test, replace, remove) their own GIPHY and Klipy API keys in Settings, with key sign-up links (SETT-02; first-run key entry shipped in Phase 2)
-- [ ] Configurable grid item size
-- [ ] Configurable default (Enter) action; default is Copy GIF
-- [ ] Settings: API keys, hotkey, grid sizes, max results, default action, download folder, hide filename, GIPHY/Klipy locales
-- [ ] Signed and notarized macOS download (Developer ID), distributed outside the Mac App Store
-- [ ] Accessibility onboarding deep-links to the permission list (macOS 27 has no browsable path) — emerged in Phase 1
-- [ ] Window theme: Light, Dark or System (SETT-06) — emerged in Phase 2
-- [ ] Download folder picker and hide-original-filename toggle (SETT-04; Phase 3 ships Downloads as the fixed default behind a DownloadsDir seam) — emerged in Phase 3
-- [ ] Honour Reduce Motion for animated GIF tiles (Phase 3 gap) — emerged in Phase 3
+Next milestone not yet defined (run `/gsd-new-milestone`). 1.0.1 candidates — see milestones/v1.0-MILESTONE-AUDIT.md tech_debt:
+- [ ] Re-enable Klipy file actions once developers@klipy.com gives written clearance (email sent 2026-10-20); label Klipy ad items per their answer
+- [ ] Finish the paste matrix: Slack, Discord, Telegram, Safari and Chrome composers (21 PENDING cells)
+- [ ] Login-item checkbox re-reads status while Settings is open; SetupCard hotkey text follows the rebound Open hotkey
+- [ ] Swallow CancelledRejectionError on cancelled searches (18-backstops flake); triage the 30 Info findings in 04-REVIEW
 
 ### Out of Scope
 
@@ -50,7 +51,7 @@ Hotkey → type → Enter puts the right GIF on the clipboard (or into the front
 - Raycast-provided pieces that must be rebuilt: grid UI, search bar + dropdown, action menu, toasts, details view, preferences UI, LocalStorage, frecency sorting, window/hotkey handling, `Clipboard.copy({file})`, `Clipboard.paste`.
 - The extension's square crop shells out to `/usr/bin/swift`; Gifsmith should do it natively (Go `image/gif` or cgo ImageIO).
 - GIPHY free (beta) keys have a low hourly request cap — search must be debounced and trending cached.
-- Current state (after Phase 3): hotkey panel with GIPHY, Klipy and Finer Gifs search/trending (Clips gated on key approval), Keychain-backed first-run key setup, full ⌘K action menu (copy/paste file, link, Markdown, square crop; page link; open in browser; download), Favorites/Recents/recent searches persisted as 0600 JSON, details view, single-instance app. Native UAT passed on a fresh signed install. Settings window, configurable default action, notarized release remain (Phase 4).
+- Current state (v1.0.0 shipped 2026-10-20, https://github.com/scottkw/gifsmith/releases/tag/v1.0.0): every v1 feature above, notarized arm64 DMG, in-app update checks against GitHub Releases, CI on macos-15 with tag-driven notarized draft releases (from v1.0.1; tag ruleset maintainer-only, `release` environment needs reviewer approval). Clean-VM install and full hands-on UAT passed. Klipy file actions ship disabled pending Klipy clearance.
 - Claude Code does the implementation. Frontend can be exercised with dev-browser against the `wails dev` server; native behaviors (paste, focus restore, Accessibility prompt, panel over full-screen apps) need manual testing by the user.
 
 ## Constraints
@@ -66,16 +67,16 @@ Hotkey → type → Enter puts the right GIF on the clipboard (or into the front
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Go + Wails over native Swift / Electron | Author's existing stack; web view animates GIF grids well; Claude can verify UI via dev-browser | — Pending |
+| Go + Wails over native Swift / Electron | Author's existing stack; web view animates GIF grids well; Claude can verify UI via dev-browser | ✓ Good (v1.0): shipped on Wails v3 beta.30 with no framework blockers |
 | User-entered API keys, no proxy | No infra, no GIPHY production approval; Finer Gifs works keyless out of the box | ✓ Good (Phase 2): first-run key setup works with real GIPHY and Klipy keys; Clips still needs GIPHY approval per key |
 | Mirror all four extension providers + switcher | Feature parity with the extension being replaced | ✓ Built (Phase 2); Clips depends on the user's key being approved |
-| Menu bar + hotkey, no Dock icon | Launcher-style utility | — Pending |
-| Copy GIF is default action; paste is opt-in | Copy needs no Accessibility permission | — Pending |
-| macOS only for v1 | Native glue is per-platform; ship one well | — Pending |
+| Menu bar + hotkey, no Dock icon | Launcher-style utility | ✓ Good (v1.0): verified on a clean VM |
+| Copy GIF is default action; paste is opt-in | Copy needs no Accessibility permission | ✓ Good (v1.0): ↵/⌘↵ configurable in Settings |
+| macOS only for v1 | Native glue is per-platform; ship one well | ✓ Good (v1.0) |
 | Spike first: hotkey panel → copy GIF file → paste into TextEdit | De-risk the native parts before building UI | ✓ Good (GO WITH FALLBACKS, 2026-10-17): native architecture holds on the Developer ID–signed dev build; limits recorded in 01-PASTE-MATRIX.md §4 |
 | Wails v3 pinned at v3.0.0-beta.30 (no stable 3.0 yet) | v2 can't deliver tray, NSPanel, global hotkey or accessory policy without shims; v3 betas are nightly snapshots, so pin the exact version for Go module, `wails3` CLI and `@wailsio/runtime` (STACK.md) | ✓ Good: the Phase 1 spike ran on beta.30 with no framework blockers |
 | Pasteboard payload: single file URL | D-12: file URL only unless the matrix proves otherwise | ✓ Sufficient for TextEdit, Notes, Mail, Messages (copy and ⌘Enter, animated); Slack, Discord, Telegram, Safari/Chrome composers unverified (Phase 3 design note) |
-| Notarization deferred to Phase 4 (Apple agreement 403) | `notarytool store-credentials` returns 403 "A required agreement is missing or has expired"; the user chose to go on the signed dev build | ⚠ Open: the user must resolve the Apple Developer agreement before Phase 4; notarized dry run + N15 carry over |
+| Notarization deferred to Phase 4 (Apple agreement 403) | `notarytool store-credentials` returns 403 "A required agreement is missing or has expired"; the user chose to go on the signed dev build | ✓ Resolved: the 403 cleared ~2 days after the agreement was accepted; v1.0.0 notarized locally and on Actions |
 | Phase 2 compliance posture (GIPHY, Klipy, Finer Gifs) | No persistent media cache: only the most recent staged copy file, removed on the next successful copy. API responses are cached in memory only (trending 10 min, search 5 min, no media bytes). Providers are never blended, and results are never reordered or filtered, except same-page duplicate removal for non-Klipy providers and the logged skip of Klipy items that have no GIF rendition (items with GIF renditions, ads included, stay in place — WR-04). Media loads directly from provider URLs. Attribution: the official GIPHY mark on GIPHY/Clips, "Search KLIPY" + "Powered by KLIPY" on Klipy, a courtesy credit on Finer Gifs. User-owned keys are used only from the user's machine. No analytics or pingbacks. Defaults: GIPHY rating pg-13, Klipy content_filter medium. Clips is probed at most once per key, only after the key worked on GIPHY GIFs (D-20) | ✓ Recorded (Phase 2). ⚠ Klipy written clearance for temp-file copies still pending (Phase 4 gate) |
 | API keys in the macOS Keychain via zalando/go-keyring v0.2.8; webview sees configured booleans only | Pure Go, survives ad-hoc dev rebuilds without prompts; no bound method returns a key and errors/logs never contain one | ✓ Built (Phase 2); real Keychain save and relaunch verified natively at the 02-06 Task 3 checkpoint |
 | Klipy items with GIF renditions stay in place, ads included (WR-04) | Klipy rules forbid reordering or filtering; only items with no GIF rendition are skipped (logged) | ✓ Accepted override (Phase 2 verification). ⚠ Ad labelling question (IN-09) goes to developers@klipy.com with the clearance request |
@@ -90,6 +91,7 @@ Hotkey → type → Enter puts the right GIF on the clipboard (or into the front
 | Copy Page Link / Open in Browser offered only for GIPHY and Clips; URLs open only through the Go platform layer | Only GIPHY pages pass the https giphy.com page allowlist; the webview never opens URLs itself | ✓ Built (Phase 3) |
 | Downloads: content validated (real GIF/MP4), names claimed atomically with os.Link, never overwrite or create the folder; DownloadsDir is an injected seam | No error pages saved as GIFs, no collisions; the Phase 4 folder picker replaces the seam | ✓ Built (Phase 3); picker + hide-filename deferred to Phase 4 (SETT-04) |
 | Library JSON files (favorites, recents, searches) written atomically with mode 0600; a corrupt file is refused, not overwritten | Never silently destroy user data | ✓ Built (Phase 3); persisted mode 600 verified natively. Favorites cap 1000 drops the oldest silently (noted for Phase 4) |
+| v1.0.0 built locally; CI releases from v1.0.1 (App Store Connect API key, split build/sign jobs, reviewer-gated `release` environment, stapler retries) | Ship 1.0.0 without waiting on CI; keep signing secrets away from build steps | ✓ Good: dry run on main green (run 39473181660) |
 | Recent-search chip recorded only when the search returned ≥1 result | Empty or failed searches are noise | ✓ Built (Phase 3) |
 | Single instance via Wails SingleInstance; long titles/ids clamped | A second launch must not start a second hotkey owner; untrusted vendor strings must not blow up the UI or files | ✓ Built (Phase 3) |
 | Square crop decode budget counts frame area plus a fixed per-frame overhead; >15 MB or >4096 px canvases refused before decoding | CR-01: three budget bypasses (many tiny frames) closed | ✓ Fixed (Phase 3 review) |
@@ -113,4 +115,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-18 after Phase 3*
+*Last updated: 2026-10-20 after v1.0 milestone*
