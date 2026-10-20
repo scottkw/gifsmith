@@ -29,7 +29,8 @@ func wire() deps {
 	h := fakeapi.Handler(fakeapi.Options{
 		FinerDown:   os.Getenv("FAKE_FINER") == "down",
 		ClipsDenied: os.Getenv("FAKE_CLIPS") == "denied",
-		SlowDelay:   5 * time.Second, // past the 3 s client timeout below, so "slow" times out quickly
+		SlowDelay:   5 * time.Second,          // past the 3 s client timeout below, so "slow" times out quickly
+		Update:      os.Getenv("FAKE_UPDATE"), // "" 9.9.0 available, "current" 404, "tamper" wrong digest
 	})
 	go func() { log.Fatal(http.Serve(ln, h)) }()
 	host := ln.Addr().String()
@@ -57,6 +58,9 @@ func wire() deps {
 		Registrar: &memRegistrar{bound: map[string]bool{}, fail: fakeHotkeyFail()},
 		// No native picker in server mode: Choose… "picks" FAKE_PICK_FOLDER (a bin/ path; "" = cancel).
 		PickFolder: func(string) (string, error) { return os.Getenv("FAKE_PICK_FOLDER"), nil },
+		// The update check asks the fixture, never api.github.com; downloads only plain http to it.
+		UpdateAPI:   "http://" + host + "/github",
+		UpdateAllow: func(u *url.URL) bool { return u.Scheme == "http" && u.Host == host },
 	}
 }
 

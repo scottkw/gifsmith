@@ -4,11 +4,14 @@
   import { onMount, untrack } from 'svelte';
   import {
     accessibilityStatus,
+    checkForUpdates,
     requestAccessibility,
     setLaunchAtLogin,
     setPref,
     settingsError,
+    updateStatus,
     type SettingsSnapshot,
+    type UpdateStatus,
   } from '../lib/api';
   import { DEFAULT_ACTIONS } from '../lib/prefs';
   import SettingRow from './SettingRow.svelte';
@@ -26,6 +29,21 @@
   let axOn = $state<boolean | null>(null); // null until the first read
   let axError = $state('');
   let axTimer: ReturnType<typeof setInterval> | undefined;
+  let upd = $state<UpdateStatus>({ state: 'idle', current: '', latest: '', done: 0, total: 0 });
+  let updError = $state('');
+  const updBusy = $derived(upd.state === 'checking' || upd.state === 'downloading' || upd.state === 'verifying');
+
+  function updText(st: UpdateStatus): string {
+    switch (st.state) {
+      case 'checking':
+        return 'Checking for updates…';
+      case 'current':
+        return `Gifsmith ${st.current} is up to date.`;
+      case 'available':
+        return `Gifsmith ${st.latest} is available. You have ${st.current}.`;
+    }
+    return '';
+  }
 
   const THEMES = [
     { value: '', label: 'System' },
@@ -44,6 +62,8 @@
 
   onMount(() => {
     readAX();
+    updateStatus().then((st) => (upd = st));
+    const offUpdate = Events.On('update:status', (e) => (upd = e.data as UpdateStatus));
     const offShow = Events.On('settings:show', readAX);
     const offChanged = Events.On('settings:changed', (e) => {
       const s = e.data as SettingsSnapshot;
@@ -52,6 +72,7 @@
       actions = { primaryAction: s.primaryAction, secondaryAction: s.secondaryAction };
     });
     return () => {
+      offUpdate();
       offShow();
       offChanged();
       clearInterval(axTimer);
@@ -93,6 +114,15 @@
     } catch {
       box.value = actions[name];
       actionError = "Couldn't save this setting. Try again.";
+    }
+  }
+
+  async function check() {
+    updError = '';
+    try {
+      upd = await checkForUpdates();
+    } catch {
+      updError = "Couldn't check for updates. Check your connection, then try again.";
     }
   }
 
@@ -172,7 +202,49 @@
   </SettingRow>
 </div>
 
+<div class="settings-section">
+  <SettingRow label="Updates" id="updates" error={updError}>
+    {#if updText(upd)}
+      <p class="update-status {upd.state}" role="status">
+        {#if upd.state === 'checking'}<span class="spinner" aria-hidden="true"></span>{/if}
+        {#if upd.state === 'current'}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" /></svg>{/if}
+        {updText(upd)}
+      </p>
+    {/if}
+    <button class="btn-secondary" disabled={updBusy} onclick={check}>Check for Updates…</button>
+  </SettingRow>
+</div>
+
 <style>
+  .update-status {
+    flex-basis: 100%;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+    font: var(--body);
+    color: var(--text);
+  }
+  .update-status.checking {
+    color: var(--text-secondary);
+  }
+  .update-status.current {
+    color: var(--success);
+  }
+  .update-status .spinner {
+    width: 12px;
+    height: 12px;
+  }
+  .update-status svg {
+    width: 12px;
+    height: 12px;
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
   select {
     min-width: 160px;
     max-width: 272px;

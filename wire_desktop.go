@@ -12,6 +12,7 @@ import (
 	"gifsmith/internal/platform"
 	"gifsmith/internal/settings"
 	"gifsmith/internal/staging"
+	"gifsmith/internal/update"
 )
 
 func wire() deps {
@@ -39,5 +40,7 @@ func wire() deps {
 		DownloadsDir: filepath.Join(home, "Downloads"),
 		Allow:        staging.VendorAllow,
 		Platform:     platform.New(),
+		UpdateAPI:    update.GitHubAPI,
+		UpdateAllow:  update.GitHubAllow,
 	}
 }

@@ -20,6 +20,7 @@ import (
 	"gifsmith/internal/settings"
 	"gifsmith/internal/shell"
 	"gifsmith/internal/staging"
+	"gifsmith/internal/update"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -47,6 +48,8 @@ type deps struct {
 	Autostart             services.Autostarter               // nil in the app (app.Autostart); in-memory in the UAT build
 	Registrar             services.Registrar                 // nil in the app (app.GlobalShortcut); a fake in the UAT build
 	PickFolder            func(start string) (string, error) // nil in the app (the native picker); FAKE_PICK_FOLDER in the UAT build
+	UpdateAPI             string                             // GitHub REST base (the fixture's /github in the UAT build)
+	UpdateAllow           func(*url.URL) bool                // allowed update download URLs and redirects
 }
 
 func main() {
@@ -94,6 +97,11 @@ func main() {
 	actions.KlipyFileActions = services.KlipyFileActionsCleared
 	settingsSvc.KlipyFileActions = services.KlipyFileActionsCleared
 
+	updates := &services.UpdateService{
+		Checker: &update.Checker{API: d.UpdateAPI, Repo: update.Repo, HTTP: d.HTTP, Allow: d.UpdateAllow},
+		Current: services.Version,
+	}
+
 	var sh *shell.Shell // set below, before app.Run; a second launch arrives only after Run starts
 	// No ApplicationShouldTerminateAfterLastWindowClosed: the hidden panel counts as closed.
 	app := application.New(application.Options{
@@ -111,6 +119,7 @@ func main() {
 			application.NewService(panel),
 			application.NewService(settingsSvc),
 			application.NewService(&services.LibraryService{Store: lib}),
+			application.NewService(updates),
 		},
 		MarshalError: func(err error) []byte {
 			if b := provider.MarshalError(err); b != nil {
@@ -124,6 +133,7 @@ func main() {
 		Server: application.ServerOptions{Host: "localhost", Port: 8089},
 	})
 	settingsSvc.Emit = func(n string, data ...any) { app.Event.Emit(n, data...) }
+	updates.Emit = settingsSvc.Emit
 	settingsSvc.Autostart = d.Autostart
 	if d.Autostart == nil {
 		settingsSvc.Autostart = app.Autostart // SMAppService on macOS 13+ for the bundled app

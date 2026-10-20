@@ -5,6 +5,8 @@ package fakeapi
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
@@ -22,6 +24,9 @@ type Options struct {
 	FinerDown   bool          // /finer/search answers like the real host does when it is down (530, Cloudflare 1033)
 	SlowDelay   time.Duration // used by the "slow" scenario word (plan 02-03)
 	ClipsDenied bool          // /giphy/v1/clips/* answer 403, as for a key GIPHY has not approved for Clips
+	// Update drives /github/...: "" serves v9.9.0, "current" answers 404 (nothing published),
+	// "tamper" serves v9.9.0 with a digest that does not match the download.
+	Update string
 }
 
 const (
@@ -37,7 +42,63 @@ func Handler(o Options) http.Handler {
 	mux.HandleFunc("GET /giphy/v1/clips/{kind}", func(w http.ResponseWriter, r *http.Request) { giphyGifs(w, r, o, true) })
 	mux.HandleFunc("GET /klipy/api/v1/{key}/gifs/{kind}", func(w http.ResponseWriter, r *http.Request) { klipyGifs(w, r, o) })
 	mux.HandleFunc("GET /media/{file}", media)
+	mux.HandleFunc("GET /github/repos/scottkw/gifsmith/releases/latest", func(w http.ResponseWriter, r *http.Request) { githubLatest(w, r, o) })
+	mux.HandleFunc("GET /github/download/v9.9.0/Gifsmith-9.9.0-arm64.dmg", githubDMG)
 	return mux
+}
+
+// fakeDMG is the fixture release asset: 1 MiB of deterministic bytes (not a real disk image;
+// the server build's verifier is canned).
+var fakeDMG = func() []byte {
+	b := make([]byte, 1<<20)
+	for i := range b {
+		b[i] = byte(i * 7 % 251)
+	}
+	return b
+}()
+
+// githubLatest answers like GitHub's releases/latest: ETag "fixture-1", 304 on If-None-Match.
+func githubLatest(w http.ResponseWriter, r *http.Request, o Options) {
+	if o.Update == "current" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = fmt.Fprint(w, `{"message":"Not Found","status":"404"}`)
+		return
+	}
+	w.Header().Set("ETag", `"fixture-1"`)
+	if r.Header.Get("If-None-Match") == `"fixture-1"` {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	sum := sha256.Sum256(fakeDMG)
+	if o.Update == "tamper" {
+		sum = sha256.Sum256(fakeDMG[1:])
+	}
+	writeJSON(w, map[string]any{"tag_name": "v9.9.0", "draft": false, "prerelease": false, "assets": []map[string]any{{
+		"name": "Gifsmith-9.9.0-arm64.dmg", "size": len(fakeDMG), "state": "uploaded",
+		"digest":               "sha256:" + hex.EncodeToString(sum[:]),
+		"browser_download_url": "http://" + r.Host + "/github/download/v9.9.0/Gifsmith-9.9.0-arm64.dmg",
+	}}})
+}
+
+// githubDMG streams fakeDMG in 16 KiB chunks about 15 ms apart, so progress is visible.
+func githubDMG(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Length", strconv.Itoa(len(fakeDMG)))
+	f, _ := w.(http.Flusher)
+	for b := fakeDMG; len(b) > 0; b = b[min(len(b), 16<<10):] {
+		if _, err := w.Write(b[:min(len(b), 16<<10)]); err != nil {
+			return
+		}
+		if f != nil {
+			f.Flush()
+		}
+		select {
+		case <-time.After(15 * time.Millisecond):
+		case <-r.Context().Done():
+			return
+		}
+	}
 }
 
 func finerSearch(w http.ResponseWriter, r *http.Request, o Options) {

@@ -85,6 +85,11 @@ var settingsText = map[string]string{
 	"folder_network":    "the folder is on a network drive",
 	"folder_unwritable": "the folder is not writable",
 	"picker_failed":     "couldn't open the folder picker",
+	// Updates (U-E1..U-E4): never a URL or path.
+	"update_check_failed":    "couldn't check for updates",
+	"update_download_failed": "couldn't download the update",
+	"update_verify_failed":   "the download didn't pass the signature check",
+	"update_open_failed":     "couldn't open the downloaded disk image",
 }
 
 func (e *SettingsError) Error() string {

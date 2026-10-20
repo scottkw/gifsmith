@@ -6,12 +6,14 @@ import * as GifService from "./gifservice.js";
 import * as LibraryService from "./libraryservice.js";
 import * as PanelService from "./panelservice.js";
 import * as SettingsService from "./settingsservice.js";
+import * as UpdateService from "./updateservice.js";
 export {
     ActionService,
     GifService,
     LibraryService,
     PanelService,
-    SettingsService
+    SettingsService,
+    UpdateService
 };
 
 export type {
@@ -20,5 +22,6 @@ export type {
     KeyStatus,
     ProviderStatus,
     Result,
-    Snapshot
+    Snapshot,
+    UpdateStatus
 } from "./models.js";

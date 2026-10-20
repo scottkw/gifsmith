@@ -5,18 +5,20 @@ import {
   LibraryService,
   PanelService,
   SettingsService,
+  UpdateService,
   type DownloadResult,
   type ProviderStatus,
   type Result,
   type KeyStatus,
   type Snapshot as SettingsSnapshot,
+  type UpdateStatus,
 } from '../../bindings/gifsmith/internal/services';
 import type { Gif, Page } from '../../bindings/gifsmith/internal/provider';
 import type { Entry, Snapshot } from '../../bindings/gifsmith/internal/library';
 import { Browser, CancelError, type CancellablePromise } from '@wailsio/runtime';
 import { CLIPS_ACCESS_MAILTO, GIPHY_KEY_URL, KLIPY_KEY_URL } from './providers';
 
-export type { DownloadResult, Entry, Gif, KeyStatus, Page, ProviderStatus, Result, SettingsSnapshot };
+export type { DownloadResult, Entry, Gif, KeyStatus, Page, ProviderStatus, Result, SettingsSnapshot, UpdateStatus };
 
 export const search = (p: string, q: string, cursor: string) => GifService.Search(p, q, cursor);
 export const trending = (p: string, cursor: string) => GifService.Trending(p, cursor);
@@ -61,6 +63,11 @@ export const suspendHotkeys = () => inOrder(() => SettingsService.SuspendHotkeys
 export const resumeHotkeys = () => inOrder(() => SettingsService.ResumeHotkeys());
 // Arms slot for 5 s: a press emits hotkey:test {slot} before its normal action.
 export const testHotkey = (slot: string) => SettingsService.TestHotkey(slot);
+// Updates (RELS-05/06): Go asks GitHub; state changes also arrive as the update:status event.
+// Failures reject with cause.kind update_check_failed | update_download_failed | update_verify_failed | update_open_failed.
+export const updateStatus = () => UpdateService.Status();
+export const checkForUpdates = () => UpdateService.Check();
+export const updateError = (e: unknown): { kind: string } | null => providerError(e);
 // Re-probes Clips once when its result is unknown; resolves to the state, rejects with the probe's cause.
 export const checkClips = () => GifService.CheckClips();
 

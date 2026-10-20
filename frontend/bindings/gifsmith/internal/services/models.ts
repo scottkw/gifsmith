@@ -121,3 +121,15 @@ export interface Snapshot {
      */
     "klipyFileActions": boolean;
 }
+
+/**
+ * UpdateStatus is what the Updates row renders. State: idle | checking | current | available |
+ * downloading | verifying | opened.
+ */
+export interface UpdateStatus {
+    "state": string;
+    "current": string;
+    "latest": string;
+    "done": number;
+    "total": number;
+}
